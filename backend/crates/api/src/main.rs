@@ -80,11 +80,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|_| "Invalid OIDC configuration")?,
         ));
     }
-    tracing::info!(%address, "API listening");
-    axum::serve(listener, router(state))
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
+    let index_timeout = std::env::var("INDEX_WORKER_TIMEOUT_SECONDS")
+        .unwrap_or_else(|_| "900".into())
+        .parse::<u64>()?;
+    let workers = (0..2)
+        .map(|_| state.index_worker(Duration::from_secs(index_timeout)))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| "INDEX_WORKER_TIMEOUT_SECONDS must be between 30 and 3600")?;
+    let (stop, stopped) = tokio::sync::watch::channel(false);
+    let handles: Vec<_> = workers
+        .into_iter()
+        .map(|worker| {
+            let stopped = stopped.clone();
+            tokio::spawn(async move { worker.run(stopped).await })
         })
-        .await?;
+        .collect();
+    let shutdown_stop = stop.clone();
+    tracing::info!(%address, index_workers = 2, "API listening");
+    let result = axum::serve(listener, router(state))
+        .with_graceful_shutdown(async move {
+            shutdown_signal().await;
+            let _ = shutdown_stop.send(true);
+        })
+        .await;
+    let _ = stop.send(true);
+    for handle in handles {
+        handle.await?;
+    }
+    result?;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut terminate) => tokio::select! {
+                _ = tokio::signal::ctrl_c() => {},
+                _ = terminate.recv() => {},
+            },
+            Err(_) => {
+                let _ = tokio::signal::ctrl_c().await;
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
 }

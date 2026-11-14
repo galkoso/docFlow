@@ -419,3 +419,11 @@ Checkboxes represent verified work only.
   cache reuse and shutdown/restart with exactly one publication. All eleven
   non-performance index scenarios and workspace Clippy pass. API startup, indexed
   reader routing and client readiness polling remain the next integration layer.
+
+- API index-worker lifecycle: application state now shares one configured Git
+  source and approved reader cache with durable indexing. API startup validates
+  a 30–3600 second job timeout (900 default), starts exactly two workers, and
+  cancels both on SIGINT, SIGTERM or server exit. Leases remain recoverable after
+  cancellation. API unit/PostgreSQL integration tests and workspace Clippy pass.
+  Search endpoints still use the prior computation path in this commit; durable
+  query routing and client readiness polling follow separately.

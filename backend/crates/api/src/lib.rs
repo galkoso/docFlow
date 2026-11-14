@@ -11,10 +11,14 @@ use axum::{
     routing::get,
 };
 use serde::Serialize;
-use specspace_application::reader::BookReader;
+use specspace_application::reader::{BookProviderFactory, BookReader};
 use specspace_git_adapter::app_auth::GitHubAppKey;
 use specspace_infrastructure::oidc::Oidc;
 use specspace_infrastructure::{authorization::PgReadAuthorization, github_source::PgGitHubSource};
+use specspace_infrastructure::{
+    index_worker::{GitIndexSource, IndexSource, IndexWorker},
+    search_index::{IndexError, PgSearchIndex},
+};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -25,32 +29,61 @@ pub struct AppState {
     pub oidc: Option<Arc<Oidc>>,
     pub cookies: auth::CookiePolicy,
     pub books: Arc<BookReader>,
+    pub search_index: Arc<PgSearchIndex>,
+    index_source: Arc<dyn IndexSource>,
     pub render_slots: Arc<tokio::sync::Semaphore>,
 }
 
 impl AppState {
     pub fn new(database: PgPool) -> Self {
+        let source = Arc::new(PgGitHubSource::new(database.clone(), None));
         let books = Arc::new(BookReader::new(
             Arc::new(PgReadAuthorization::new(database.clone())),
-            Arc::new(PgGitHubSource::new(database.clone(), None)),
+            source.clone(),
         ));
+        let index_source = Arc::new(GitIndexSource::new(
+            database.clone(),
+            source,
+            Some(books.clone()),
+        ));
+        let search_index = Arc::new(PgSearchIndex::new(database.clone()));
         Self {
             database,
             oidc: None,
             cookies: auth::CookiePolicy::unconfigured(),
             books,
+            search_index,
+            index_source,
             render_slots: Arc::new(tokio::sync::Semaphore::new(2)),
         }
     }
 
     pub fn configure_github(&mut self, key: GitHubAppKey) {
+        self.configure_book_source(Arc::new(PgGitHubSource::new(
+            self.database.clone(),
+            Some(Arc::new(key)),
+        )));
+    }
+
+    /// Reader and background indexer must use the same configured source/cache.
+    pub fn configure_book_source(&mut self, source: Arc<dyn BookProviderFactory>) {
         self.books = Arc::new(BookReader::new(
             Arc::new(PgReadAuthorization::new(self.database.clone())),
-            Arc::new(PgGitHubSource::new(
-                self.database.clone(),
-                Some(Arc::new(key)),
-            )),
+            source.clone(),
         ));
+        self.index_source = Arc::new(GitIndexSource::new(
+            self.database.clone(),
+            source,
+            Some(self.books.clone()),
+        ));
+    }
+
+    pub fn index_worker(&self, timeout: std::time::Duration) -> Result<IndexWorker, IndexError> {
+        IndexWorker::new(
+            self.search_index.clone(),
+            self.index_source.clone(),
+            timeout,
+        )
     }
 }
 

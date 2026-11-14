@@ -78,3 +78,8 @@ Checkboxes represent verified work only.
   repositories, proposals, buffers, operations, jobs, outbox and webhook dedupe.
   Review/bundle/search persistence, authorization enforcement and the recovery
   reconciler are still pending; uniqueness alone is not an idempotent use case.
+- Review/authorization domain: four additional behavioral tests pass for resource
+  scope, role/assignment gates, author exclusion, independent product/development
+  reviewers, revoked qualification, UI impact and head/target/policy invalidation.
+  Content edits demote APPROVED and reject final-state writes. These pure rules
+  still need API/persistence integration; merge readiness is not implemented yet.

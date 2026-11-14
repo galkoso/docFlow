@@ -1370,6 +1370,9 @@ dependencies = [
 [[package]]
 name = "specspace-domain"
 version = "0.1.0"
+dependencies = [
+ "uuid",
+]
 
 [[package]]
 name = "specspace-infrastructure"

@@ -1,0 +1,324 @@
+use async_trait::async_trait;
+use axum::{
+    Router,
+    body::Body,
+    http::{Request, StatusCode},
+};
+use http_body_util::BodyExt;
+use specspace_api::{AppState, router};
+use specspace_application::{
+    book::BookError,
+    reader::{BookProviderFactory, BookReader},
+};
+use specspace_domain::{BranchName, RepositoryPath};
+use specspace_git_adapter::{
+    CommitMetadata, CommitRequest, CommitSha, FileEntry, GitError, GitProvider,
+};
+use specspace_infrastructure::{authorization::PgReadAuthorization, sessions::SessionStore};
+use sqlx::PgPool;
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicU8, AtomicUsize, Ordering},
+    },
+};
+use tower::ServiceExt;
+use uuid::Uuid;
+
+const OLD: &str = "1111111111111111111111111111111111111111";
+const NEW: &str = "2222222222222222222222222222222222222222";
+
+struct Provider {
+    files: HashMap<String, String>,
+    version: AtomicU8,
+    reads: AtomicUsize,
+}
+
+#[async_trait]
+impl GitProvider for Provider {
+    async fn main_head(&self) -> Result<CommitSha, GitError> {
+        CommitSha::parse(if self.version.load(Ordering::SeqCst) == 0 {
+            OLD
+        } else {
+            NEW
+        })
+    }
+    async fn branch_head(&self, _: &BranchName) -> Result<CommitSha, GitError> {
+        Err(GitError::ProviderRejected)
+    }
+    async fn create_branch(&self, _: &BranchName, _: &CommitSha) -> Result<CommitSha, GitError> {
+        Err(GitError::ProviderRejected)
+    }
+    async fn commit(&self, _: CommitRequest<'_>) -> Result<CommitSha, GitError> {
+        Err(GitError::ProviderRejected)
+    }
+    async fn read_text(
+        &self,
+        commit: &CommitSha,
+        path: &RepositoryPath,
+    ) -> Result<String, GitError> {
+        self.reads.fetch_add(1, Ordering::SeqCst);
+        let source = self
+            .files
+            .get(path.as_str())
+            .ok_or(GitError::InvalidResponse)?;
+        Ok(
+            if commit.as_str() == NEW && path.as_str() == "docs/permissions.md" {
+                source.replace("מחיקה", "צפייה")
+            } else {
+                source.clone()
+            },
+        )
+    }
+    async fn list_files(&self, _: &CommitSha) -> Result<Vec<FileEntry>, GitError> {
+        Ok(self
+            .files
+            .iter()
+            .map(|(path, text)| FileEntry {
+                path: RepositoryPath::parse(path).unwrap(),
+                blob_sha: CommitSha::parse(OLD).unwrap(),
+                size: text.len() as u64,
+            })
+            .collect())
+    }
+    async fn commit_metadata(&self, commit: &CommitSha) -> Result<CommitMetadata, GitError> {
+        Ok(CommitMetadata {
+            sha: commit.clone(),
+            committed_at: if commit.as_str() == OLD {
+                "2026-11-14T10:00:00Z"
+            } else {
+                "2026-11-15T10:00:00Z"
+            }
+            .parse()
+            .unwrap(),
+        })
+    }
+    async fn is_ancestor(
+        &self,
+        ancestor: &CommitSha,
+        descendant: &CommitSha,
+    ) -> Result<bool, GitError> {
+        Ok(ancestor == descendant || (ancestor.as_str() == OLD && descendant.as_str() == NEW))
+    }
+}
+
+struct Source(Arc<Provider>);
+
+#[async_trait]
+impl BookProviderFactory for Source {
+    async fn provider(&self, _: Uuid) -> Result<Arc<dyn GitProvider>, BookError> {
+        Ok(self.0.clone())
+    }
+}
+
+async fn setup(pool: &PgPool) -> (Uuid, Uuid, Uuid, String) {
+    let actor = Uuid::new_v4();
+    let organization = Uuid::new_v4();
+    let repository = Uuid::new_v4();
+    let foreign = Uuid::new_v4();
+    let foreign_repo = Uuid::new_v4();
+    sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, 'Synthetic book'), ($2, 'Other organization')").bind(organization).bind(foreign).execute(pool).await.unwrap();
+    sqlx::query("INSERT INTO users (id, issuer, external_subject, display_name) VALUES ($1, 'fixture', $1::text, 'Synthetic reader')").bind(actor).execute(pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO memberships (organization_id, user_id, role) VALUES ($1, $2, 'READER')",
+    )
+    .bind(organization)
+    .bind(actor)
+    .execute(pool)
+    .await
+    .unwrap();
+    for (id, org) in [(repository, organization), (foreign_repo, foreign)] {
+        sqlx::query("INSERT INTO repositories (id, organization_id, provider, remote_id, installation_id) VALUES ($1, $2, 'GITHUB', '42', '7')").bind(id).bind(org).execute(pool).await.unwrap();
+    }
+    let credentials = SessionStore::new(pool.clone())
+        .mint(actor, 3600)
+        .await
+        .unwrap();
+    (
+        actor,
+        repository,
+        foreign_repo,
+        credentials.session_cookie_value().into(),
+    )
+}
+
+fn fixture(pool: &PgPool) -> (Router, Arc<Provider>) {
+    let root =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures/repository");
+    let files = [
+        ".specspace/catalog.json",
+        "docs/overview.md",
+        "docs/permissions.md",
+        "docs/media.md",
+        "docs/recordings.md",
+        "docs/player.md",
+        "docs/operations.md",
+    ]
+    .into_iter()
+    .map(|path| {
+        (
+            path.into(),
+            std::fs::read_to_string(root.join(path)).unwrap(),
+        )
+    })
+    .collect();
+    let provider = Arc::new(Provider {
+        files,
+        version: AtomicU8::new(0),
+        reads: AtomicUsize::new(0),
+    });
+    let mut state = AppState::new(pool.clone());
+    state.books = Arc::new(BookReader::new(
+        Arc::new(PgReadAuthorization::new(pool.clone())),
+        Arc::new(Source(provider.clone())),
+    ));
+    (router(state), provider)
+}
+
+async fn get(app: &Router, token: &str, uri: &str) -> (StatusCode, serde_json::Value) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(uri)
+                .header("Cookie", format!("__Host-specspace-session={token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    (status, value)
+}
+
+fn search(repository: Uuid, commit: &str, cursor: Option<&str>) -> String {
+    let mut query = url::form_urlencoded::Serializer::new(String::new());
+    query
+        .append_pair("q", "מחיקה")
+        .append_pair("commit", commit)
+        .append_pair("limit", "2");
+    if let Some(cursor) = cursor {
+        query.append_pair("cursor", cursor);
+    }
+    format!("/api/v1/repositories/{repository}/find?{}", query.finish())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn book_document_and_search_pages_remain_pinned_when_main_advances(pool: PgPool) {
+    let (_, repository, _, token) = setup(&pool).await;
+    let (app, provider) = fixture(&pool);
+    let (status, catalog) = get(
+        &app,
+        &token,
+        &format!("/api/v1/repositories/{repository}/specification"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(catalog["snapshot_sha"], OLD);
+    assert_eq!(catalog["documents"].as_array().unwrap().len(), 6);
+    assert_eq!(catalog["documents"][0]["document_id"], "DOC-OVERVIEW");
+    let (_, first) = get(&app, &token, &search(repository, OLD, None)).await;
+    assert_eq!(first["total_matches"], 4);
+    assert_eq!(first["matches"].as_array().unwrap().len(), 2);
+    let cursor = first["next_cursor"].as_str().unwrap();
+    provider.version.store(1, Ordering::SeqCst);
+    let (_, latest) = get(
+        &app,
+        &token,
+        &format!("/api/v1/repositories/{repository}/specification"),
+    )
+    .await;
+    assert_eq!(latest["snapshot_sha"], NEW);
+    let (_, second) = get(&app, &token, &search(repository, OLD, Some(cursor))).await;
+    assert_eq!(second["snapshot_sha"], OLD);
+    assert_eq!(second["total_matches"], 4);
+    assert_eq!(second["matches"][1]["document_id"], "DOC-OPERATIONS");
+    let (_, changed) = get(&app, &token, &search(repository, NEW, None)).await;
+    assert_eq!(changed["total_matches"], 3);
+    assert_eq!(
+        get(&app, &token, &search(repository, NEW, Some(cursor)))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    let (_, old_doc) = get(
+        &app,
+        &token,
+        &format!("/api/v1/repositories/{repository}/documents/DOC-PERMISSIONS?commit={OLD}"),
+    )
+    .await;
+    assert!(old_doc["markdown"].as_str().unwrap().contains("מחיקה"));
+    let (_, new_doc) = get(
+        &app,
+        &token,
+        &format!("/api/v1/repositories/{repository}/documents/DOC-PERMISSIONS?commit={NEW}"),
+    )
+    .await;
+    assert!(new_doc["markdown"].as_str().unwrap().contains("צפייה"));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn foreign_repositories_and_revoked_sessions_never_receive_cached_content(pool: PgPool) {
+    let (actor, repository, foreign, token) = setup(&pool).await;
+    let (app, provider) = fixture(&pool);
+    let (_, repositories) = get(&app, &token, "/api/v1/repositories").await;
+    assert_eq!(repositories["repositories"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!("/api/v1/repositories/{foreign}/specification")
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(provider.reads.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!("/api/v1/repositories/{repository}/specification")
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    sqlx::query("UPDATE users SET status = 'DISABLED' WHERE id = $1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&app, &token, &search(repository, OLD, None)).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!("/api/v1/repositories/{repository}/documents/DOC-OVERVIEW?commit={OLD}")
+        )
+        .await
+        .0,
+        StatusCode::UNAUTHORIZED
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn missing_app_configuration_returns_a_setup_error_without_fixture_fallback(pool: PgPool) {
+    let (_, repository, _, token) = setup(&pool).await;
+    let app = router(AppState::new(pool));
+    let (status, body) = get(
+        &app,
+        &token,
+        &format!("/api/v1/repositories/{repository}/specification"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["error"]["code"], "REPOSITORY_NOT_CONFIGURED");
+    assert_eq!(body["error"]["retryable"], false);
+}

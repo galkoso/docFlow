@@ -194,6 +194,14 @@ Checkboxes represent verified work only.
   contents. Eleven document-engine tests pass. The updated 20MiB / 1,000-document
   benchmark measured engine-only p95 **0.529s** over 20 samples on this machine.
   HTTP and browser latency are not included in that result.
+- Book HTTP stage: repository discovery, ordered book metadata, per-document reads
+  and full-snapshot search are now connected to current session/database access and
+  server-configured GitHub App credentials. Three PostgreSQL HTTP scenarios prove
+  cursor/commit isolation as main advances, cross-organization denial, account
+  revocation against cached data, and explicit setup errors with no fixture fallback.
+  API unit/integration checks and workspace Clippy pass. The OpenAPI contract and
+  Angular types include these routes. Reader rendering, durable indexes, background
+  jobs and live GitHub App validation remain open.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod contract;
+pub mod specification;
 
 use axum::{
     Json, Router,
@@ -10,7 +11,10 @@ use axum::{
     routing::get,
 };
 use serde::Serialize;
+use specspace_application::reader::BookReader;
+use specspace_git_adapter::app_auth::GitHubAppKey;
 use specspace_infrastructure::oidc::Oidc;
+use specspace_infrastructure::{authorization::PgReadAuthorization, github_source::PgGitHubSource};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -20,15 +24,31 @@ pub struct AppState {
     pub database: PgPool,
     pub oidc: Option<Arc<Oidc>>,
     pub cookies: auth::CookiePolicy,
+    pub books: Arc<BookReader>,
 }
 
 impl AppState {
     pub fn new(database: PgPool) -> Self {
+        let books = Arc::new(BookReader::new(
+            Arc::new(PgReadAuthorization::new(database.clone())),
+            Arc::new(PgGitHubSource::new(database.clone(), None)),
+        ));
         Self {
             database,
             oidc: None,
             cookies: auth::CookiePolicy::unconfigured(),
+            books,
         }
+    }
+
+    pub fn configure_github(&mut self, key: GitHubAppKey) {
+        self.books = Arc::new(BookReader::new(
+            Arc::new(PgReadAuthorization::new(self.database.clone())),
+            Arc::new(PgGitHubSource::new(
+                self.database.clone(),
+                Some(Arc::new(key)),
+            )),
+        ));
     }
 }
 
@@ -49,11 +69,14 @@ pub struct ApiError {
     pub trace_id: Uuid,
     pub retryable: bool,
     pub field_errors: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
 }
 
 pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(auth::routes())
+        .merge(specification::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))
         .fallback(not_found)
@@ -97,6 +120,7 @@ async fn not_found() -> (StatusCode, Json<ErrorBody>) {
                 trace_id: Uuid::new_v4(),
                 retryable: false,
                 field_errors: serde_json::json!({}),
+                details: None,
             },
         }),
     )

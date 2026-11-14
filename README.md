@@ -67,3 +67,19 @@ Backend CI checks that this artifact matches the source contract.
 Angular API types are generated with `npm ci --prefix tools/api-client`, then
 `cd frontend && npm run api:generate`. The generator has an isolated TypeScript 5
 tooling package; the Angular application continues to use TypeScript 6.
+
+## Specification repository connection
+
+Set `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY_SECRET_REF` together in the API server
+environment. Secret references support `env:NAME` or an absolute `file:/path`;
+the key is never accepted from a browser request. `GIT_PROVIDER` defaults to GitHub.
+The organization's `repositories` record supplies the numeric GitHub repository
+and installation IDs (`remote_id` and `installation_id`) and `default_branch=main`.
+GitHub metadata is checked against the configured ID before the client is used.
+
+Authenticated reads are available under `/api/v1/repositories`: repository list,
+`/:id/specification`, `/:id/documents/:document?commit=...`, and
+`/:id/find?q=...&commit=...`. Book metadata returns the pinned SHA; subsequent
+document/search requests use it. Explicit versions must belong to main history.
+The in-memory snapshot cache is bounded, disposable, and always checks current
+access. Durable search indexing, the worker and the reader UI remain in progress.

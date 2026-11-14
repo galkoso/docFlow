@@ -120,12 +120,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["repositories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{repository}/documents/{document}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{repository}/find": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["find"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{repository}/specification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["specification"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         ApiError: {
             code: string;
+            details?: unknown;
             field_errors: unknown;
             message_he: string;
             retryable: boolean;
@@ -134,6 +199,32 @@ export interface components {
         };
         AuthAvailability: {
             login_available: boolean;
+        };
+        DocumentBlock: {
+            block_id: string;
+            /** Format: int32 */
+            heading_level?: number | null;
+            kind: string;
+            section_id: string;
+            source_end_byte: number;
+            source_start_byte: number;
+            text: string;
+        };
+        DocumentResponse: {
+            blocks: components["schemas"]["DocumentBlock"][];
+            document_id: string;
+            error_code?: string | null;
+            markdown?: string | null;
+            sha256?: string | null;
+            snapshot_sha: string;
+            title: string;
+        };
+        DocumentSummary: {
+            document_id: string;
+            error_code?: string | null;
+            path: string;
+            sections: components["schemas"]["SectionSummary"][];
+            title: string;
         };
         ErrorBody: {
             error: components["schemas"]["ApiError"];
@@ -160,6 +251,55 @@ export interface components {
             merge: boolean;
             read_specification: boolean;
             review: boolean;
+        };
+        ReadFinding: {
+            code: string;
+            path: string;
+            source_end_byte?: number | null;
+            source_start_byte?: number | null;
+        };
+        RepositoryList: {
+            repositories: components["schemas"]["RepositorySummary"][];
+        };
+        RepositorySummary: {
+            default_branch: string;
+            /** Format: uuid */
+            repository_id: string;
+        };
+        SearchHit: {
+            block_id: string;
+            book_order: number;
+            document_id: string;
+            /** Format: int32 */
+            end_utf16: number;
+            excerpt: string;
+            match_id: string;
+            section_id: string;
+            /** Format: int32 */
+            start_utf16: number;
+        };
+        SearchResponse: {
+            matches: components["schemas"]["SearchHit"][];
+            next_cursor?: string | null;
+            query: string;
+            snapshot_sha: string;
+            total_matches: number;
+        };
+        SectionSummary: {
+            /** Format: int32 */
+            level: number;
+            section_id: string;
+            title: string;
+        };
+        Specification: {
+            branch: string;
+            documents: components["schemas"]["DocumentSummary"][];
+            findings: components["schemas"]["ReadFinding"][];
+            /** Format: uuid */
+            repository_id: string;
+            snapshot_sha: string;
+            updated_at: string;
+            version_selected: boolean;
         };
     };
     responses: never;
@@ -377,6 +517,290 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    repositories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryList"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    document: {
+        parameters: {
+            query: {
+                commit: string;
+            };
+            header?: never;
+            path: {
+                repository: string;
+                document: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    find: {
+        parameters: {
+            query: {
+                q: string;
+                commit: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    specification: {
+        parameters: {
+            query?: {
+                commit?: string;
+            };
+            header?: never;
+            path: {
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Specification"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

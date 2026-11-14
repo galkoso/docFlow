@@ -266,6 +266,410 @@
           }
         ]
       }
+    },
+    "/api/v1/repositories": {
+      "get": {
+        "tags": [
+          "crate::specification"
+        ],
+        "operationId": "repositories",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositoryList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/repositories/{repository}/documents/{document}": {
+      "get": {
+        "tags": [
+          "crate::specification"
+        ],
+        "operationId": "document",
+        "parameters": [
+          {
+            "name": "repository",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/repositories/{repository}/find": {
+      "get": {
+        "tags": [
+          "crate::specification"
+        ],
+        "operationId": "find",
+        "parameters": [
+          {
+            "name": "repository",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/repositories/{repository}/specification": {
+      "get": {
+        "tags": [
+          "crate::specification"
+        ],
+        "operationId": "specification",
+        "parameters": [
+          {
+            "name": "repository",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "commit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Specification"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -283,6 +687,7 @@
           "code": {
             "type": "string"
           },
+          "details": {},
           "field_errors": {},
           "message_he": {
             "type": "string"
@@ -304,6 +709,123 @@
         "properties": {
           "login_available": {
             "type": "boolean"
+          }
+        }
+      },
+      "DocumentBlock": {
+        "type": "object",
+        "required": [
+          "block_id",
+          "section_id",
+          "kind",
+          "text",
+          "source_start_byte",
+          "source_end_byte"
+        ],
+        "properties": {
+          "block_id": {
+            "type": "string"
+          },
+          "heading_level": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "kind": {
+            "type": "string"
+          },
+          "section_id": {
+            "type": "string"
+          },
+          "source_end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source_start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "DocumentResponse": {
+        "type": "object",
+        "required": [
+          "snapshot_sha",
+          "document_id",
+          "title",
+          "blocks"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentBlock"
+            }
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "markdown": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snapshot_sha": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "DocumentSummary": {
+        "type": "object",
+        "required": [
+          "document_id",
+          "path",
+          "title",
+          "sections"
+        ],
+        "properties": {
+          "document_id": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SectionSummary"
+            }
+          },
+          "title": {
+            "type": "string"
           }
         }
       },
@@ -402,6 +924,205 @@
             "type": "boolean"
           },
           "review": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReadFinding": {
+        "type": "object",
+        "required": [
+          "path",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "source_end_byte": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "source_start_byte": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      },
+      "RepositoryList": {
+        "type": "object",
+        "required": [
+          "repositories"
+        ],
+        "properties": {
+          "repositories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepositorySummary"
+            }
+          }
+        }
+      },
+      "RepositorySummary": {
+        "type": "object",
+        "required": [
+          "repository_id",
+          "default_branch"
+        ],
+        "properties": {
+          "default_branch": {
+            "type": "string"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchHit": {
+        "type": "object",
+        "required": [
+          "match_id",
+          "document_id",
+          "section_id",
+          "block_id",
+          "start_utf16",
+          "end_utf16",
+          "excerpt",
+          "book_order"
+        ],
+        "properties": {
+          "block_id": {
+            "type": "string"
+          },
+          "book_order": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "end_utf16": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "match_id": {
+            "type": "string"
+          },
+          "section_id": {
+            "type": "string"
+          },
+          "start_utf16": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "required": [
+          "query",
+          "snapshot_sha",
+          "total_matches",
+          "matches"
+        ],
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "query": {
+            "type": "string"
+          },
+          "snapshot_sha": {
+            "type": "string"
+          },
+          "total_matches": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "SectionSummary": {
+        "type": "object",
+        "required": [
+          "section_id",
+          "title",
+          "level"
+        ],
+        "properties": {
+          "level": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "section_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "Specification": {
+        "type": "object",
+        "required": [
+          "branch",
+          "repository_id",
+          "snapshot_sha",
+          "version_selected",
+          "updated_at",
+          "documents",
+          "findings"
+        ],
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentSummary"
+            }
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadFinding"
+            }
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshot_sha": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "version_selected": {
             "type": "boolean"
           }
         }

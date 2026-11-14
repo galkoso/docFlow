@@ -1,6 +1,8 @@
 use specspace_api::auth::CookiePolicy;
 use specspace_api::{AppState, router};
+use specspace_git_adapter::app_auth::GitHubAppKey;
 use specspace_infrastructure::oidc::{Deployment, Oidc};
+use specspace_infrastructure::secrets;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use std::{net::SocketAddr, time::Duration};
@@ -35,6 +37,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect_lazy(&database_url)?;
     let listener = tokio::net::TcpListener::bind(address).await?;
     let mut state = AppState::new(database);
+    if let Ok(provider) = std::env::var("GIT_PROVIDER")
+        && !provider.eq_ignore_ascii_case("github")
+    {
+        return Err("Only GitHub is supported in v1".into());
+    }
+    match (
+        std::env::var("GITHUB_APP_ID").ok(),
+        std::env::var("GITHUB_PRIVATE_KEY_SECRET_REF").ok(),
+    ) {
+        (None, None) => {}
+        (Some(issuer), Some(reference)) => {
+            let secret = secrets::resolve(&reference)
+                .map_err(|_| "Unable to resolve the configured GitHub App key")?;
+            let key = GitHubAppKey::from_pem(&issuer, secret.as_bytes())
+                .map_err(|_| "Invalid GitHub App key configuration")?;
+            state.configure_github(key);
+        }
+        _ => {
+            return Err(
+                "GITHUB_APP_ID and GITHUB_PRIVATE_KEY_SECRET_REF must be configured together"
+                    .into(),
+            );
+        }
+    }
     let public_url = std::env::var("APP_PUBLIC_URL").ok();
     if let Some(public_url) = &public_url {
         state.cookies = CookiePolicy::new(public_url, development)?;

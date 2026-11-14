@@ -97,6 +97,7 @@ pub(crate) fn error(status: StatusCode, code: &'static str, message_he: &'static
                 trace_id: Uuid::new_v4(),
                 retryable: status == StatusCode::SERVICE_UNAVAILABLE,
                 field_errors: serde_json::json!({}),
+                details: None,
             },
         }),
     )

@@ -2403,11 +2403,18 @@ dependencies = [
 name = "specspace-api"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
+ "base64 0.22.1",
  "cookie",
  "http-body-util",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "specspace-application",
+ "specspace-document-engine",
+ "specspace-domain",
+ "specspace-git-adapter",
  "specspace-infrastructure",
  "sqlx",
  "tokio",

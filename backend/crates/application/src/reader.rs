@@ -40,7 +40,7 @@ impl BookReader {
         }
     }
 
-    async fn authorize(&self, actor: Uuid, repository: Uuid) -> Result<(), BookError> {
+    pub async fn authorize(&self, actor: Uuid, repository: Uuid) -> Result<(), BookError> {
         if self.authorization.can_read(actor, repository).await? {
             Ok(())
         } else {

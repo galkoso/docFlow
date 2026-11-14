@@ -2452,6 +2452,7 @@ dependencies = [
  "specspace-domain",
  "unicode-normalization",
  "unicode-segmentation",
+ "utoipa",
 ]
 
 [[package]]

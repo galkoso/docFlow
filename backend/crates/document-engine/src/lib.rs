@@ -2,3 +2,4 @@
 pub mod catalog;
 pub mod find;
 pub mod markdown;
+pub mod render;

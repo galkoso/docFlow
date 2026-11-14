@@ -62,7 +62,7 @@ fn identifier(value: &str) -> bool {
             .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'-')
 }
 
-fn marker(html: &str) -> Option<&str> {
+pub(crate) fn marker(html: &str) -> Option<&str> {
     html.trim()
         .strip_prefix("<!-- ss:section:")?
         .strip_suffix(" -->")
@@ -79,12 +79,19 @@ fn flush(current: &mut Option<TextBlock>, blocks: &mut Vec<TextBlock>, source_en
     }
 }
 
-fn allowed_destination(destination: &str, image: bool) -> bool {
+pub(crate) fn allowed_destination(destination: &str, image: bool) -> bool {
     // URLs are never fetched by this engine. Images are repository-relative only.
     if image {
-        return destination.starts_with("assets/")
-            && !destination.contains("..")
-            && !destination.contains('\\');
+        return destination
+            .strip_prefix("assets/")
+            .and_then(|path| path.rsplit_once('.'))
+            .is_some_and(|(hash, extension)| {
+                hash.len() == 64
+                    && hash
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                    && matches!(extension, "png" | "jpg" | "jpeg" | "webp")
+            });
     }
     let lower = destination.to_ascii_lowercase();
     lower.starts_with("https://")

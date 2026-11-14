@@ -202,6 +202,13 @@ Checkboxes represent verified work only.
   API unit/integration checks and workspace Clippy pass. The OpenAPI contract and
   Angular types include these routes. Reader rendering, durable indexes, background
   jobs and live GitHub App validation remain open.
+- Reader render contract: three additional document-engine tests prove canonical
+  visible-text/UTF-16 parity across formatting, tables, code and nested lists;
+  raw HTML becomes located placeholders and unsafe link/image destinations are
+  omitted. Rendering has explicit depth/event limits and only canonical hashed
+  PNG/JPEG/WebP asset references are accepted. All fourteen engine tests and
+  workspace Clippy pass. HTTP delivery, Angular rendering and asset byte serving
+  are the next integration steps; no visual acceptance is claimed yet.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

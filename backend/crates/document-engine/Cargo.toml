@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+openapi = ["dep:utoipa"]
+
 [dependencies]
 unicode-normalization = "0.1"
 unicode-segmentation = "1.13"
@@ -13,6 +16,7 @@ serde_yaml_ng = "0.10"
 pulldown-cmark = { version = "0.13", default-features = false }
 sha2 = "0.10"
 specspace-domain = { path = "../domain" }
+utoipa = { version = "6", optional = true }
 
 [lints]
 workspace = true

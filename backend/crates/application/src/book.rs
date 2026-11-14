@@ -157,6 +157,23 @@ impl BookService {
         self.load_commit(actor, commit).await
     }
 
+    /// Only the reader may use a persisted proof of previously approved main
+    /// history. Actual commit metadata/content and current ACL are still read.
+    pub(crate) async fn load_recorded_main(
+        &self,
+        actor: Uuid,
+        commit: CommitSha,
+    ) -> Result<BookSnapshot, BookError> {
+        if !self
+            .authorization
+            .can_read(actor, self.repository_id)
+            .await?
+        {
+            return Err(BookError::NotFound);
+        }
+        self.load_commit(actor, commit).await
+    }
+
     async fn load_commit(&self, actor: Uuid, commit: CommitSha) -> Result<BookSnapshot, BookError> {
         let metadata = self
             .provider
@@ -618,6 +635,65 @@ mod tests {
                     100
                 )
                 .await,
+            Err(BookError::NotFound)
+        ));
+    }
+
+    struct RecordedHistory {
+        repository: Uuid,
+        commit: CommitSha,
+    }
+    #[async_trait]
+    impl crate::reader::MainHistoryProof for RecordedHistory {
+        async fn contains(&self, repository: Uuid, commit: &CommitSha) -> Result<bool, BookError> {
+            Ok(repository == self.repository && commit == &self.commit)
+        }
+    }
+
+    #[tokio::test]
+    async fn recorded_main_survives_a_cold_reader_without_approving_other_commits_or_revoked_users()
+    {
+        let actor = Uuid::new_v4();
+        let repository = Uuid::new_v4();
+        let authorization = Arc::new(ReaderAuthorization {
+            actor,
+            repository,
+            active: AtomicBool::new(true),
+        });
+        let source = Arc::new(ReaderSource {
+            provider: Arc::new(fixtures()),
+            online: AtomicBool::new(true),
+        });
+        let recorded = CommitSha::parse("2222222222222222222222222222222222222222").unwrap();
+        let reader = crate::reader::BookReader::new(authorization.clone(), source.clone())
+            .with_history(Arc::new(RecordedHistory {
+                repository,
+                commit: recorded.clone(),
+            }));
+        let book = reader
+            .at(actor, repository, recorded.clone())
+            .await
+            .unwrap();
+        assert_eq!(book.commit, recorded);
+        assert_eq!(source.provider.main_reads.load(Ordering::SeqCst), 0);
+        assert!(!source.provider.reads.lock().unwrap().is_empty());
+        assert!(
+            source
+                .provider
+                .reads
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|sha| sha == recorded.as_str())
+        );
+        let unknown = CommitSha::parse("3333333333333333333333333333333333333333").unwrap();
+        assert!(matches!(
+            reader.at(actor, repository, unknown).await,
+            Err(BookError::NotFound)
+        ));
+        authorization.active.store(false, Ordering::SeqCst);
+        assert!(matches!(
+            reader.at(actor, repository, recorded).await,
             Err(BookError::NotFound)
         ));
     }

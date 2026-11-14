@@ -194,6 +194,48 @@ fn book(commit: &str, body: &str) -> specspace_application::book::BookSnapshot {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn main_history_proof_requires_a_completed_main_index_job_and_exact_repository(pool: PgPool) {
+    use specspace_application::reader::MainHistoryProof;
+    use specspace_infrastructure::search_index::{IndexError, PgSearchIndex};
+    let fixture = create_fixture(&pool).await;
+    let store = PgSearchIndex::new(pool.clone());
+    let commit = specspace_git_adapter::CommitSha::parse(SHA).unwrap();
+    assert!(!store.contains(fixture.repository, &commit).await.unwrap());
+    let hash = text(&pool, &fixture).await;
+    block(&pool, &fixture, 0, &hash, 1).await.unwrap();
+    ready(&pool, &fixture, 1).await.unwrap();
+    // READY content alone cannot promote a private/proposal index into main history.
+    assert!(!store.contains(fixture.repository, &commit).await.unwrap());
+    sqlx::query("UPDATE jobs SET state='SUCCEEDED',kind='INDEX_PROPOSAL' WHERE organization_id=$1")
+        .bind(fixture.organization)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(!store.contains(fixture.repository, &commit).await.unwrap());
+    assert!(matches!(
+        store
+            .find(fixture.user, fixture.repository, &commit, "alpha", 0, 100)
+            .await,
+        Err(IndexError::NotReady)
+    ));
+    sqlx::query("UPDATE jobs SET kind='INDEX_SNAPSHOT' WHERE organization_id=$1")
+        .bind(fixture.organization)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(store.contains(fixture.repository, &commit).await.unwrap());
+    assert!(!store.contains(Uuid::new_v4(), &commit).await.unwrap());
+    assert_eq!(
+        store
+            .find(fixture.user, fixture.repository, &commit, "alpha", 0, 100)
+            .await
+            .unwrap()
+            .total_matches,
+        1
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn durable_store_keeps_literal_matches_pinned_and_rechecks_revoked_access(pool: PgPool) {
     use specspace_application::search::IndexSnapshot;
     use specspace_infrastructure::search_index::{IndexError, PgSearchIndex};

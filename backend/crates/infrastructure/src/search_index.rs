@@ -1,7 +1,9 @@
 //! Derived snapshot publication and reads. All content reads recheck current ACL;
 //! Git/provider work happens before the publication transaction begins.
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use specspace_application::search::{IndexBlock, IndexSnapshot};
+use specspace_application::{book::BookError, reader::MainHistoryProof};
 use specspace_document_engine::{
     find::{MatchPage, VisibleBlock},
     index::{self, IndexedBlock, IndexedText, NORMALIZER_VERSION},
@@ -101,6 +103,15 @@ pub struct PgSearchIndex {
     pool: PgPool,
     cache: Mutex<VecDeque<CachedText>>,
     processing: Arc<Semaphore>,
+}
+
+#[async_trait]
+impl MainHistoryProof for PgSearchIndex {
+    async fn contains(&self, repository: Uuid, commit: &CommitSha) -> Result<bool, BookError> {
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM search_index_snapshots s JOIN jobs j ON j.id=s.job_id AND j.organization_id=s.organization_id WHERE s.repository_id=$1 AND s.snapshot_sha=$2 AND s.normalizer_version=$3 AND s.state='READY' AND j.kind='INDEX_SNAPSHOT' AND j.state='SUCCEEDED')")
+            .bind(repository).bind(commit.as_str()).bind(NORMALIZER_VERSION)
+            .fetch_one(&self.pool).await.map_err(|_| BookError::AuthorizationUnavailable)
+    }
 }
 
 impl PgSearchIndex {
@@ -364,7 +375,7 @@ impl PgSearchIndex {
         sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
             .execute(&mut *tx)
             .await?;
-        let ready: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM search_index_snapshots WHERE organization_id=$1 AND repository_id=$2 AND snapshot_sha=$3 AND normalizer_version=$4 AND state='READY')")
+        let ready: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM search_index_snapshots s JOIN jobs j ON j.id=s.job_id AND j.organization_id=s.organization_id WHERE s.organization_id=$1 AND s.repository_id=$2 AND s.snapshot_sha=$3 AND s.normalizer_version=$4 AND s.state='READY' AND j.kind='INDEX_SNAPSHOT' AND j.state='SUCCEEDED')")
             .bind(organization).bind(repository).bind(commit.as_str()).bind(NORMALIZER_VERSION).fetch_one(&mut *tx).await?;
         if !ready {
             return Err(IndexError::NotReady);

@@ -427,3 +427,14 @@ Checkboxes represent verified work only.
   cancellation. API unit/PostgreSQL integration tests and workspace Clippy pass.
   Search endpoints still use the prior computation path in this commit; durable
   query routing and client readiness polling follow separately.
+
+- Persisted main-history proof: the reader can reopen an approved pinned SHA
+  after cache loss without depending on a later main ref still containing it.
+  Proof requires the exact repository/SHA/normalizer READY snapshot and a
+  successful INDEX_SNAPSHOT job in the same organization. READY content from a
+  proposal job is insufficient, including for durable find queries. Actual Git
+  metadata/content validation and current browser ACL checks still apply. API
+  sources share this proof with the reader. New cold-reader and PostgreSQL tests
+  cover historical reads, unknown commits, revoked users and proposal exclusion.
+  Full backend tests and Clippy pass (12 durable-index scenarios; the separate
+  release performance benchmark remains intentionally ignored in ordinary runs).

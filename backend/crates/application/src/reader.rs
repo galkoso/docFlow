@@ -15,6 +15,13 @@ pub trait BookProviderFactory: Send + Sync {
     async fn provider(&self, repository: Uuid) -> Result<Arc<dyn GitProvider>, BookError>;
 }
 
+/// Trusted persistence of a completed main-history read. This proof never
+/// replaces the reader's current user/repository authorization checks.
+#[async_trait]
+pub trait MainHistoryProof: Send + Sync {
+    async fn contains(&self, repository: Uuid, commit: &CommitSha) -> Result<bool, BookError>;
+}
+
 struct CachedBook {
     repository: Uuid,
     book: Arc<BookSnapshot>,
@@ -23,6 +30,7 @@ struct CachedBook {
 pub struct BookReader {
     authorization: Arc<dyn ReadAuthorization>,
     source: Arc<dyn BookProviderFactory>,
+    history: Option<Arc<dyn MainHistoryProof>>,
     cache: Mutex<VecDeque<CachedBook>>,
     loads: Semaphore,
     computations: Arc<Semaphore>,
@@ -37,11 +45,17 @@ impl BookReader {
         Self {
             authorization,
             source,
+            history: None,
             cache: Mutex::new(VecDeque::new()),
             loads: Semaphore::new(2),
             computations: Arc::new(Semaphore::new(2)),
             assets: Arc::new(Semaphore::new(2)),
         }
+    }
+
+    pub fn with_history(mut self, history: Arc<dyn MainHistoryProof>) -> Self {
+        self.history = Some(history);
+        self
     }
 
     pub async fn authorize(&self, actor: Uuid, repository: Uuid) -> Result<(), BookError> {
@@ -126,11 +140,16 @@ impl BookReader {
         let book = if let Some(book) = self.cached(repository, &commit).await {
             book
         } else {
-            let book = Arc::new(
-                BookService::new(repository, provider, self.authorization.clone())
-                    .load_at(actor, commit)
-                    .await?,
-            );
+            let recorded = match &self.history {
+                Some(history) => history.contains(repository, &commit).await?,
+                None => false,
+            };
+            let service = BookService::new(repository, provider, self.authorization.clone());
+            let book = Arc::new(if recorded {
+                service.load_recorded_main(actor, commit).await?
+            } else {
+                service.load_at(actor, commit).await?
+            });
             let mut cache = self.cache.lock().await;
             if !cache
                 .iter()

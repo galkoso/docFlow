@@ -37,16 +37,19 @@ pub struct AppState {
 impl AppState {
     pub fn new(database: PgPool) -> Self {
         let source = Arc::new(PgGitHubSource::new(database.clone(), None));
-        let books = Arc::new(BookReader::new(
-            Arc::new(PgReadAuthorization::new(database.clone())),
-            source.clone(),
-        ));
+        let search_index = Arc::new(PgSearchIndex::new(database.clone()));
+        let books = Arc::new(
+            BookReader::new(
+                Arc::new(PgReadAuthorization::new(database.clone())),
+                source.clone(),
+            )
+            .with_history(search_index.clone()),
+        );
         let index_source = Arc::new(GitIndexSource::new(
             database.clone(),
             source,
             Some(books.clone()),
         ));
-        let search_index = Arc::new(PgSearchIndex::new(database.clone()));
         Self {
             database,
             oidc: None,
@@ -67,10 +70,13 @@ impl AppState {
 
     /// Reader and background indexer must use the same configured source/cache.
     pub fn configure_book_source(&mut self, source: Arc<dyn BookProviderFactory>) {
-        self.books = Arc::new(BookReader::new(
-            Arc::new(PgReadAuthorization::new(self.database.clone())),
-            source.clone(),
-        ));
+        self.books = Arc::new(
+            BookReader::new(
+                Arc::new(PgReadAuthorization::new(self.database.clone())),
+                source.clone(),
+            )
+            .with_history(self.search_index.clone()),
+        );
         self.index_source = Arc::new(GitIndexSource::new(
             self.database.clone(),
             source,

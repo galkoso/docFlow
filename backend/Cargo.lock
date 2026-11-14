@@ -1409,6 +1409,7 @@ dependencies = [
 name = "specspace-domain"
 version = "0.1.0"
 dependencies = [
+ "unicode-normalization",
  "uuid",
 ]
 

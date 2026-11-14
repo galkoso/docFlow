@@ -1,4 +1,5 @@
 use std::fmt;
+use unicode_normalization::UnicodeNormalization;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidationError(pub &'static str);
@@ -54,6 +55,7 @@ impl RepositoryPath {
         let value = value.into();
         let parts: Vec<_> = value.split('/').collect();
         if value.is_empty()
+            || value.nfc().ne(value.chars())
             || value.chars().count() > 240
             || parts.len() > 10
             || value
@@ -135,6 +137,7 @@ mod tests {
         }
         assert!(RepositoryPath::parse("a/".repeat(10) + "b").is_err());
         assert!(RepositoryPath::parse("a".repeat(241)).is_err());
+        assert!(RepositoryPath::parse("docs/cafe\u{301}.md").is_err());
         assert_eq!(
             RepositoryPath::parse("docs/הרשאות.md").unwrap().as_str(),
             "docs/הרשאות.md"

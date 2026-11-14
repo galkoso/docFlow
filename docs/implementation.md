@@ -100,3 +100,6 @@ Checkboxes represent verified work only.
   Hebrew/English fixture searched as one book. Fixture search finds four instances
   across four documents, including pointed Hebrew. This verifies engine composition;
   Git-backed loading, browser rendering and internal-link validation remain open.
+- Path canonicalization additionally rejects non-NFC filenames; a decomposed
+  Unicode path is covered by the traversal test, preventing ambiguous normalization
+  from silently targeting another file. Archive-level duplicate detection is pending.

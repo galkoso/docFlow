@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 
 pub const NORMALIZER_VERSION: i32 = 1;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct Run {
     normalized_start: u32,
     original_start: u32,
@@ -17,9 +17,18 @@ struct Run {
 }
 
 #[derive(Debug)]
+struct Checkpoint {
+    normalized: u32,
+    original_end: u32,
+    byte_end: u32,
+    encoded_offset: u32,
+}
+
+#[derive(Debug)]
 pub struct IndexedText {
     normalized: String,
-    runs: Vec<Run>,
+    map: Vec<u8>,
+    checkpoints: Vec<Checkpoint>,
 }
 
 pub struct IndexedBlock<'a> {
@@ -78,21 +87,32 @@ impl IndexedText {
             }
             index = next;
         }
-        Ok(Self { normalized, runs })
+        Ok(Self::pack(normalized, &runs))
     }
 
     pub fn normalized(&self) -> &str {
         &self.normalized
     }
     pub fn estimated_bytes(&self) -> usize {
-        self.normalized.capacity() + self.runs.capacity() * std::mem::size_of::<Run>()
+        self.normalized.capacity()
+            + self.map.capacity()
+            + self.checkpoints.capacity() * std::mem::size_of::<Checkpoint>()
     }
 
-    pub fn encode_map(&self) -> Vec<u8> {
+    fn pack(normalized: String, runs: &[Run]) -> Self {
         let mut bytes = b"SSM1".to_vec();
         let mut previous_original = 0i64;
         let mut previous_byte = 0i64;
-        for run in &self.runs {
+        let mut checkpoints = Vec::with_capacity(runs.len().div_ceil(16));
+        for (index, run) in runs.iter().enumerate() {
+            if index.is_multiple_of(16) {
+                checkpoints.push(Checkpoint {
+                    normalized: run.normalized_start,
+                    original_end: previous_original as u32,
+                    byte_end: previous_byte as u32,
+                    encoded_offset: bytes.len() as u32,
+                });
+            }
             let delta_original = i64::from(run.original_start) - previous_original;
             let delta_byte = i64::from(run.original_byte_start) - previous_byte;
             for value in [
@@ -110,7 +130,15 @@ impl IndexedText {
             previous_byte = i64::from(run.original_byte_start)
                 + i64::from(run.original_byte_width) * i64::from(run.count);
         }
-        bytes
+        Self {
+            normalized,
+            map: bytes,
+            checkpoints,
+        }
+    }
+
+    pub fn encode_map(&self) -> Vec<u8> {
+        self.map.clone()
     }
 
     pub fn fingerprint(original: &str, normalized: &str, map: &[u8]) -> String {
@@ -138,36 +166,23 @@ impl IndexedText {
             return Err("INVALID_SEARCH_INDEX");
         }
         let original_length = original.encode_utf16().count() as u64;
-        let mut runs = Vec::new();
+        let mut checkpoints = Vec::new();
+        let mut run_count = 0usize;
         let mut expected_normalized = 0u64;
         let mut previous_original = (0u64, 0u64, 0u64, 0u64);
         let mut cursor = 4;
         while cursor < map.len() {
-            if runs.len() >= original.len() {
+            if run_count >= original.len() {
                 return Err("INVALID_SEARCH_INDEX");
             }
-            let mut fields = [0u64; 6];
-            for field in &mut fields {
-                *field = read_varint(map, &mut cursor)?;
-            }
-            let original_start = (previous_original.1 as i64)
-                .checked_add(unzigzag(fields[0]))
-                .and_then(|value| u32::try_from(value).ok())
-                .ok_or("INVALID_SEARCH_INDEX")?;
-            let original_byte_start = (previous_original.3 as i64)
-                .checked_add(unzigzag(fields[1]))
-                .and_then(|value| u32::try_from(value).ok())
-                .ok_or("INVALID_SEARCH_INDEX")?;
-            let number = |value| u32::try_from(value).map_err(|_| "INVALID_SEARCH_INDEX");
-            let run = Run {
-                normalized_start: expected_normalized as u32,
-                original_start,
-                original_byte_start,
-                normalized_width: number(fields[2])?,
-                original_width: number(fields[3])?,
-                original_byte_width: number(fields[4])?,
-                count: number(fields[5])?,
-            };
+            let encoded_offset = cursor;
+            let run = read_run(
+                map,
+                &mut cursor,
+                expected_normalized as u32,
+                previous_original.1 as u32,
+                previous_original.3 as u32,
+            )?;
             let normalized_end = u64::from(run.normalized_start)
                 + u64::from(run.normalized_width) * u64::from(run.count);
             let original_end = u64::from(run.original_start)
@@ -195,6 +210,15 @@ impl IndexedText {
             {
                 return Err("INVALID_SEARCH_INDEX");
             }
+            if run_count.is_multiple_of(16) {
+                checkpoints.push(Checkpoint {
+                    normalized: expected_normalized as u32,
+                    original_end: previous_original.1 as u32,
+                    byte_end: previous_original.3 as u32,
+                    encoded_offset: encoded_offset as u32,
+                });
+            }
+            run_count += 1;
             expected_normalized = normalized_end;
             previous_original = (
                 original_end - u64::from(run.original_width),
@@ -202,26 +226,62 @@ impl IndexedText {
                 byte_end - u64::from(run.original_byte_width),
                 byte_end,
             );
-            runs.push(run);
         }
         if expected_normalized != normalized.len() as u64 {
             return Err("INVALID_SEARCH_INDEX");
         }
-        Ok(Self { normalized, runs })
+        Ok(Self {
+            normalized,
+            map: map.to_vec(),
+            checkpoints,
+        })
     }
+}
 
-    fn at(&self, position: usize) -> Result<Segment, &'static str> {
-        let index = self
-            .runs
-            .partition_point(|run| run.normalized_start as usize <= position);
-        let run = self
-            .runs
-            .get(index.checked_sub(1).ok_or("INVALID_SEARCH_INDEX")?)
-            .ok_or("INVALID_SEARCH_INDEX")?;
-        let offset = (position as u32 - run.normalized_start) / run.normalized_width;
-        if offset >= run.count {
-            return Err("INVALID_SEARCH_INDEX");
+struct MapCursor<'a> {
+    text: &'a IndexedText,
+    current: Option<Run>,
+}
+impl MapCursor<'_> {
+    fn at(&mut self, position: usize) -> Result<Segment, &'static str> {
+        let fits = |run: &Run| {
+            position >= run.normalized_start as usize
+                && position < (run.normalized_start + run.normalized_width * run.count) as usize
+        };
+        if !self.current.as_ref().is_some_and(fits) {
+            let index = self
+                .text
+                .checkpoints
+                .partition_point(|checkpoint| checkpoint.normalized as usize <= position);
+            let checkpoint = self
+                .text
+                .checkpoints
+                .get(index.checked_sub(1).ok_or("INVALID_SEARCH_INDEX")?)
+                .ok_or("INVALID_SEARCH_INDEX")?;
+            let mut encoded = checkpoint.encoded_offset as usize;
+            let mut normalized = checkpoint.normalized;
+            let mut original_end = checkpoint.original_end;
+            let mut byte_end = checkpoint.byte_end;
+            self.current = None;
+            for _ in 0..16 {
+                let run = read_run(
+                    &self.text.map,
+                    &mut encoded,
+                    normalized,
+                    original_end,
+                    byte_end,
+                )?;
+                if fits(&run) {
+                    self.current = Some(run);
+                    break;
+                }
+                normalized = run.normalized_start + run.normalized_width * run.count;
+                original_end = run.original_start + run.original_width * run.count;
+                byte_end = run.original_byte_start + run.original_byte_width * run.count;
+            }
         }
+        let run = self.current.as_ref().ok_or("INVALID_SEARCH_INDEX")?;
+        let offset = (position as u32 - run.normalized_start) / run.normalized_width;
         let original_start = run.original_start + offset * run.original_width;
         let original_byte_start = run.original_byte_start + offset * run.original_byte_width;
         Ok(Segment {
@@ -232,6 +292,37 @@ impl IndexedText {
             original_byte_end: original_byte_start + run.original_byte_width,
         })
     }
+}
+
+fn read_run(
+    map: &[u8],
+    cursor: &mut usize,
+    normalized_start: u32,
+    previous_original: u32,
+    previous_byte: u32,
+) -> Result<Run, &'static str> {
+    let mut fields = [0u64; 6];
+    for field in &mut fields {
+        *field = read_varint(map, cursor)?;
+    }
+    let original_start = i64::from(previous_original)
+        .checked_add(unzigzag(fields[0]))
+        .and_then(|value| u32::try_from(value).ok())
+        .ok_or("INVALID_SEARCH_INDEX")?;
+    let original_byte_start = i64::from(previous_byte)
+        .checked_add(unzigzag(fields[1]))
+        .and_then(|value| u32::try_from(value).ok())
+        .ok_or("INVALID_SEARCH_INDEX")?;
+    let number = |value| u32::try_from(value).map_err(|_| "INVALID_SEARCH_INDEX");
+    Ok(Run {
+        normalized_start,
+        original_start,
+        original_byte_start,
+        normalized_width: number(fields[2])?,
+        original_width: number(fields[3])?,
+        original_byte_width: number(fields[4])?,
+        count: number(fields[5])?,
+    })
 }
 
 fn zigzag(value: i64) -> u64 {
@@ -292,9 +383,13 @@ pub fn find(
     }
     for indexed in blocks {
         let mut previous = None;
+        let mut cursor = MapCursor {
+            text: indexed.text,
+            current: None,
+        };
         for (start, _) in indexed.text.normalized.match_indices(&needle) {
-            let first = indexed.text.at(start)?;
-            let last = indexed.text.at(start + needle.len() - 1)?;
+            let first = cursor.at(start)?;
+            let last = cursor.at(start + needle.len() - 1)?;
             let range = (first.original_start, last.original_end);
             if previous == Some(range) {
                 continue;
@@ -477,6 +572,20 @@ mod tests {
         .unwrap();
         assert_eq!(page.total_matches, 1);
         assert_eq!(page.matches[0].book_order, 999);
+    }
+
+    #[test]
+    fn sparse_maps_preserve_the_persisted_format_and_fit_a_large_book_working_set() {
+        let simple = IndexedText::build("abc").unwrap();
+        assert_eq!(simple.encode_map(), b"SSM1\x00\x00\x01\x01\x01\x03");
+        let original = "טקסט הקשר עברי רגיל לבדיקת ביצועים. ".repeat(300);
+        let built = IndexedText::build(&original).unwrap();
+        let map = built.encode_map();
+        let fingerprint = IndexedText::fingerprint(&original, built.normalized(), &map);
+        let restored =
+            IndexedText::restore(&original, built.normalized().into(), &map, &fingerprint).unwrap();
+        assert_eq!(restored.encode_map(), map);
+        assert!((restored.estimated_bytes() + original.len() + 256) * 1000 < 128 * 1024 * 1024);
     }
 
     #[test]

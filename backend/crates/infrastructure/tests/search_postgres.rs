@@ -421,3 +421,151 @@ async fn malformed_or_exhausted_index_jobs_terminate_without_reclaiming_git_side
         .unwrap();
     assert_eq!(state, "RUNNING");
 }
+
+/// Manual store feasibility gate; excludes HTTP, Git fetches and browser rendering.
+#[sqlx::test(migrations = "../../migrations")]
+#[ignore = "release-mode 20MiB PostgreSQL performance measurement"]
+async fn indexed_store_six_reader_20mib_benchmark(pool: PgPool) {
+    use specspace_application::{
+        book::{BookDocument, BookSnapshot},
+        search::IndexSnapshot,
+    };
+    use specspace_infrastructure::search_index::PgSearchIndex;
+    use std::{sync::Arc, time::Instant};
+    let fixture = create_fixture(&pool).await;
+    let mut actors = vec![fixture.user];
+    for _ in 0..5 {
+        let actor = Uuid::new_v4();
+        sqlx::query("INSERT INTO users(id,issuer,external_subject,display_name) VALUES($1,'fixture',$1::text,'Synthetic performance user')").bind(actor).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO memberships(organization_id,user_id,role) VALUES($1,$2,'CONTRIBUTOR')",
+        )
+        .bind(fixture.organization)
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+        actors.push(actor);
+    }
+    let count = 1000;
+    let target = 20 * 1024 * 1024;
+    let phrase = "טקסט הקשר עברי רגיל לבדיקת ביצועים. ";
+    let mut documents = Vec::with_capacity(count);
+    for index in 0..count {
+        let document_id = format!("DOC-{index:04}");
+        let prefix = format!(
+            "---\ndocument_id: {document_id}\ntitle: Synthetic\nowner_team: TEAM\nschema_version: 1\n---\n<!-- ss:section:SEC-{index:04} -->\n# פרק\n\n"
+        );
+        let suffix = format!("מחיקה מזהה{index:04}");
+        let size = target / count + usize::from(index < target % count);
+        let mut source = prefix.clone();
+        source.push_str(&phrase.repeat((size - prefix.len() - suffix.len()) / phrase.len()));
+        source.push_str(&suffix);
+        source.extend(std::iter::repeat_n('x', size - source.len()));
+        documents.push(BookDocument {
+            document_id,
+            path: format!("docs/{index:04}.md"),
+            content: Some(specspace_document_engine::markdown::parse(&source).unwrap()),
+            error_code: None,
+        });
+    }
+    let book = BookSnapshot {
+        commit: specspace_git_adapter::CommitSha::parse(SHA).unwrap(),
+        updated_at: "2026-11-14T00:00:00Z".into(),
+        documents,
+        findings: vec![],
+    };
+    let source_bytes: usize = book
+        .documents
+        .iter()
+        .map(|doc| doc.content.as_ref().unwrap().source.len())
+        .sum();
+    assert_eq!(source_bytes, target);
+    let start = Instant::now();
+    let snapshot = IndexSnapshot::build(&book).unwrap();
+    let build = start.elapsed().as_secs_f64();
+    let maps: usize = snapshot
+        .blocks()
+        .iter()
+        .map(|block| block.source_map.len())
+        .sum();
+    let store = Arc::new(PgSearchIndex::new(pool));
+    let lease = store.claim(Uuid::new_v4(), 300).await.unwrap().unwrap();
+    let start = Instant::now();
+    store.publish(&lease, &snapshot).await.unwrap();
+    let publish = start.elapsed().as_secs_f64();
+    use tracing::instrument::WithSubscriber;
+    let subscriber = tracing::Dispatch::new(
+        tracing_subscriber::fmt()
+            .with_env_filter("specspace_infrastructure::search_index=debug")
+            .without_time()
+            .with_ansi(false)
+            .finish(),
+    );
+    let start = Instant::now();
+    assert_eq!(
+        store
+            .find(
+                fixture.user,
+                fixture.repository,
+                &book.commit,
+                "מחיקה",
+                0,
+                100
+            )
+            .with_subscriber(subscriber.clone())
+            .await
+            .unwrap()
+            .total_matches,
+        count
+    );
+    let cold = start.elapsed().as_secs_f64();
+    assert!(cold < 2.0, "fresh-index cold-query regression: {cold:.3}s");
+    assert_eq!(
+        store
+            .find(actors[1], fixture.repository, &book.commit, "מחיק", 0, 100)
+            .with_subscriber(subscriber)
+            .await
+            .unwrap()
+            .total_matches,
+        count
+    );
+    let mut readers = tokio::task::JoinSet::new();
+    for (actor, query) in
+        actors
+            .into_iter()
+            .zip(["מחיקה", "מחיק", "מחי", "מח", "מְחיקה", "מ\u{200f}חיקה"])
+    {
+        let store = store.clone();
+        let commit = book.commit.clone();
+        let repository = fixture.repository;
+        readers.spawn(async move {
+            let mut durations = vec![];
+            for _ in 0..20 {
+                let start = Instant::now();
+                let page = store
+                    .find(actor, repository, &commit, query, 0, 100)
+                    .await
+                    .unwrap();
+                assert_eq!(page.total_matches, 1000);
+                assert_eq!(page.matches.len(), 100);
+                durations.push(start.elapsed().as_secs_f64());
+            }
+            durations
+        });
+    }
+    let mut durations = vec![];
+    while let Some(reader) = readers.join_next().await {
+        durations.extend(reader.unwrap());
+    }
+    durations.sort_by(f64::total_cmp);
+    let p95 = durations[durations.len() * 95 / 100 - 1];
+    println!(
+        "source_bytes={source_bytes} documents={count} readers=6 samples={} map_bytes={maps} build_seconds={build:.3} publish_seconds={publish:.3} cold_store_seconds={cold:.3} warm_store_p95_seconds={p95:.3}",
+        durations.len()
+    );
+    assert!(
+        p95 < 1.0,
+        "store-only feasibility target exceeded: {p95:.3}s; HTTP/browser gates remain separate"
+    );
+}

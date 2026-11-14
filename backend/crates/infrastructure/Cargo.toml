@@ -13,6 +13,7 @@ uuid.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 tokio.workspace = true
+tracing.workspace = true
 specspace-application = { path = "../application" }
 async-trait = "0.1"
 sha2 = "0.10"
@@ -23,6 +24,7 @@ specspace-document-engine = { path = "../document-engine" }
 zeroize = "1"
 
 [dev-dependencies]
+tracing-subscriber.workspace = true
 axum.workspace = true
 base64 = "0.22"
 jsonwebtoken = { version = "12", features = ["rust_crypto"] }

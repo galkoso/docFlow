@@ -388,3 +388,22 @@ Checkboxes represent verified work only.
   All workspace tests and Clippy pass. The long-running indexing worker, retries,
   indexed highlights, runtime HTTP routing and DB/HTTP performance gates remain
   pending; the reader still uses its existing computation path at this checkpoint.
+- PostgreSQL performance regression and bounded-memory fix: a manual release test
+  now builds an exact 20MiB source book with 1,000 distinct chapters, publishes it
+  into an isolated database and runs 120 varied-query reads across six distinct
+  active users. Its initial cold read exposed a ~70s candidate-selection delay.
+  Snapshot-key materialization plus a lateral exact-payload lookup removed repeated
+  large-text predicate work without materializing the large strings themselves.
+  Dense decoded maps also exceeded the intended cache working set; maps now retain
+  their compact persisted bytes plus sparse checkpoints and a current-run cursor.
+  The existing SSM1 format, checksums, canonical ranges and match identities remain
+  compatible. A format/working-set regression test covers this representation.
+  The final local run measured build 0.795s, publication 1.518s, cold store read
+  0.872s and warm store p95 0.554s; encoded maps totaled 23,078,000 bytes. A traced
+  follow-up read fetched zero payloads. The cache remains bounded at 128MiB.
+  The manual test enforces cold-read <2s and warm-store p95 <1s; it is ignored by
+  ordinary unit runs and was executed explicitly with `cargo test --release -p
+  specspace-infrastructure --features postgres-tests --test search_postgres
+  indexed_store_six_reader_20mib_benchmark -- --ignored --nocapture` and DATABASE_URL.
+  Full workspace tests and Clippy pass. These are store-only feasibility results;
+  worker/runtime wiring, HTTP timing and browser acceptance remain open.

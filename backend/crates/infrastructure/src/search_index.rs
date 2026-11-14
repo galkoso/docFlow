@@ -80,6 +80,23 @@ struct Payload {
     source_map: Vec<u8>,
 }
 
+// Materialize distinct keys and evaluate substring through an exact payload
+// lookup. Keep large text out of materialized intermediates; the lateral boundary
+// also bounds repeated predicate work when table statistics are still fresh.
+const CANDIDATES: &str = "WITH wanted AS MATERIALIZED (
+  SELECT DISTINCT text_hash FROM search_index_blocks
+  WHERE organization_id=$1 AND repository_id=$2 AND snapshot_sha=$3 AND normalizer_version=$4
+), matching AS MATERIALIZED (
+  SELECT w.text_hash FROM wanted w CROSS JOIN LATERAL (
+    SELECT strpos(t.normalized_text,$5)>0 AS matched FROM search_index_texts t
+    WHERE t.organization_id=$1 AND t.normalizer_version=$4 AND t.text_hash=w.text_hash OFFSET 0
+  ) p WHERE p.matched
+)
+SELECT b.book_order,b.document_id,b.section_id,b.block_id,b.text_hash
+FROM search_index_blocks b JOIN matching m ON m.text_hash=b.text_hash
+WHERE b.organization_id=$1 AND b.repository_id=$2 AND b.snapshot_sha=$3 AND b.normalizer_version=$4
+ORDER BY b.book_order";
+
 pub struct PgSearchIndex {
     pool: PgPool,
     cache: Mutex<VecDeque<CachedText>>,
@@ -309,6 +326,7 @@ impl PgSearchIndex {
         offset: usize,
         limit: usize,
     ) -> Result<MatchPage, IndexError> {
+        let started = std::time::Instant::now();
         let organization = self.authorize(actor, repository).await?;
         let needle = index::normalized_query(query).map_err(IndexError::InvalidQuery)?;
         if !(1..=500).contains(&limit) {
@@ -330,13 +348,30 @@ impl PgSearchIndex {
         if !ready {
             return Err(IndexError::NotReady);
         }
+        tracing::debug!(
+            phase = "ready",
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "search index read"
+        );
         let references = if needle.is_empty() || needle.contains('\0') {
             vec![]
         } else {
-            sqlx::query_as::<_, Reference>("SELECT b.book_order,b.document_id,b.section_id,b.block_id,b.text_hash FROM search_index_blocks b JOIN search_index_texts t ON t.organization_id=b.organization_id AND t.normalizer_version=b.normalizer_version AND t.text_hash=b.text_hash WHERE b.organization_id=$1 AND b.repository_id=$2 AND b.snapshot_sha=$3 AND b.normalizer_version=$4 AND strpos(t.normalized_text,$5)>0 ORDER BY b.book_order")
-                .bind(organization).bind(repository).bind(commit.as_str()).bind(NORMALIZER_VERSION).bind(&needle).fetch_all(&mut *tx).await?
+            sqlx::query_as::<_, Reference>(CANDIDATES)
+                .bind(organization)
+                .bind(repository)
+                .bind(commit.as_str())
+                .bind(NORMALIZER_VERSION)
+                .bind(&needle)
+                .fetch_all(&mut *tx)
+                .await?
         };
         let mut texts = HashMap::new();
+        tracing::debug!(
+            phase = "candidates",
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            blocks = references.len(),
+            "search index read"
+        );
         let mut missing = HashSet::new();
         {
             let mut cache = self.cache.lock().await;
@@ -363,6 +398,12 @@ impl PgSearchIndex {
                 .bind(organization).bind(NORMALIZER_VERSION).bind(&hashes).fetch_all(&mut *tx).await?
         };
         tx.commit().await?;
+        tracing::debug!(
+            phase = "payloads",
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            payloads = payloads.len(),
+            "search index read"
+        );
         let query = query.to_owned();
         let snapshot = commit.as_str().to_owned();
         let (page, fresh) = tokio::task::spawn_blocking(move || {
@@ -405,6 +446,11 @@ impl PgSearchIndex {
         })
         .await
         .map_err(|_| IndexError::Unavailable)??;
+        tracing::debug!(
+            phase = "matched",
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "search index read"
+        );
         {
             let mut cache = self.cache.lock().await;
             let mut used: usize = cache.iter().map(|entry| entry.bytes).sum();
@@ -434,6 +480,11 @@ impl PgSearchIndex {
             }
         }
         self.authorize(actor, repository).await?;
+        tracing::debug!(
+            phase = "complete",
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "search index read"
+        );
         Ok(page)
     }
 }

@@ -21,6 +21,8 @@ pub enum BookError {
     ProcessingUnavailable,
     SearchSnapshotNotReady,
     InvalidQuery(&'static str),
+    RepositoryNotConfigured,
+    InvalidRepositoryConfiguration,
 }
 
 #[async_trait]
@@ -48,6 +50,7 @@ pub struct BookDocument {
 #[derive(Debug)]
 pub struct BookSnapshot {
     pub commit: CommitSha,
+    pub updated_at: String,
     pub documents: Vec<BookDocument>,
     pub findings: Vec<BookFinding>,
 }
@@ -102,6 +105,42 @@ impl BookService {
             .main_head()
             .await
             .map_err(BookError::Provider)?;
+        self.load_commit(actor, commit).await
+    }
+
+    pub async fn load_at(&self, actor: Uuid, commit: CommitSha) -> Result<BookSnapshot, BookError> {
+        if !self
+            .authorization
+            .can_read(actor, self.repository_id)
+            .await?
+        {
+            return Err(BookError::NotFound);
+        }
+        let main = self
+            .provider
+            .main_head()
+            .await
+            .map_err(BookError::Provider)?;
+        if !self
+            .provider
+            .is_ancestor(&commit, &main)
+            .await
+            .map_err(BookError::Provider)?
+        {
+            return Err(BookError::NotFound);
+        }
+        self.load_commit(actor, commit).await
+    }
+
+    async fn load_commit(&self, actor: Uuid, commit: CommitSha) -> Result<BookSnapshot, BookError> {
+        let metadata = self
+            .provider
+            .commit_metadata(&commit)
+            .await
+            .map_err(BookError::Provider)?;
+        if metadata.sha != commit {
+            return Err(BookError::Provider(GitError::InvalidResponse));
+        }
         let files = self
             .provider
             .list_files(&commit)
@@ -232,6 +271,7 @@ impl BookService {
         }
         Ok(BookSnapshot {
             commit,
+            updated_at: metadata.committed_at.to_rfc3339(),
             documents,
             findings,
         })
@@ -245,7 +285,7 @@ mod tests {
     use specspace_git_adapter::{CommitRequest, FileEntry};
     use std::sync::{
         Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     };
 
     const SHA: &str = "1111111111111111111111111111111111111111";
@@ -377,6 +417,7 @@ mod tests {
         let (service, actor) = service(provider.clone(), usize::MAX);
         let book = service.load_main(actor).await.unwrap();
         assert_eq!(book.documents.len(), 6);
+        assert_eq!(book.updated_at, "2026-11-14T10:00:00+00:00");
         assert_eq!(book.documents[0].document_id, "DOC-OVERVIEW");
         assert!(book.findings.is_empty());
         assert_eq!(book.find("מחיקה", 0, 100).unwrap().total_matches, 4);
@@ -429,5 +470,114 @@ mod tests {
             book.find("מחיקה", 0, 100).unwrap_err(),
             BookError::SearchSnapshotNotReady
         );
+    }
+
+    #[tokio::test]
+    async fn arbitrary_branch_commits_cannot_be_read_as_main_history() {
+        let provider = Arc::new(fixtures());
+        let (service, actor) = service(provider.clone(), usize::MAX);
+        let unrelated = CommitSha::parse("2222222222222222222222222222222222222222").unwrap();
+        assert!(matches!(
+            service.load_at(actor, unrelated).await,
+            Err(BookError::NotFound)
+        ));
+        assert!(provider.reads.lock().unwrap().is_empty());
+        assert_eq!(
+            service
+                .load_at(actor, CommitSha::parse(SHA).unwrap())
+                .await
+                .unwrap()
+                .commit
+                .as_str(),
+            SHA
+        );
+    }
+
+    struct ReaderAuthorization {
+        actor: Uuid,
+        repository: Uuid,
+        active: AtomicBool,
+    }
+
+    #[async_trait]
+    impl ReadAuthorization for ReaderAuthorization {
+        async fn can_read(&self, actor: Uuid, repository: Uuid) -> Result<bool, BookError> {
+            Ok(self.active.load(Ordering::SeqCst)
+                && actor == self.actor
+                && repository == self.repository)
+        }
+    }
+
+    struct ReaderSource {
+        provider: Arc<TestProvider>,
+        online: AtomicBool,
+    }
+
+    #[async_trait]
+    impl crate::reader::BookProviderFactory for ReaderSource {
+        async fn provider(&self, _: Uuid) -> Result<Arc<dyn GitProvider>, BookError> {
+            if self.online.load(Ordering::SeqCst) {
+                Ok(self.provider.clone())
+            } else {
+                Err(BookError::Provider(GitError::ProviderUnavailable))
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn cached_books_keep_version_identity_and_never_bypass_current_authorization() {
+        let actor = Uuid::new_v4();
+        let repository = Uuid::new_v4();
+        let authorization = Arc::new(ReaderAuthorization {
+            actor,
+            repository,
+            active: AtomicBool::new(true),
+        });
+        let source = Arc::new(ReaderSource {
+            provider: Arc::new(fixtures()),
+            online: AtomicBool::new(true),
+        });
+        let reader = crate::reader::BookReader::new(authorization.clone(), source.clone());
+        let first = reader.main(actor, repository).await.unwrap();
+        let reads = source.provider.reads.lock().unwrap().len();
+        let again = reader
+            .at(actor, repository, first.commit.clone())
+            .await
+            .unwrap();
+        assert!(Arc::ptr_eq(&first, &again));
+        assert_eq!(source.provider.reads.lock().unwrap().len(), reads);
+        assert!(matches!(
+            reader.at(actor, Uuid::new_v4(), first.commit.clone()).await,
+            Err(BookError::NotFound)
+        ));
+        source.online.store(false, Ordering::SeqCst);
+        assert!(
+            reader
+                .at(actor, repository, first.commit.clone())
+                .await
+                .is_ok()
+        );
+        assert!(matches!(
+            reader.main(actor, repository).await,
+            Err(BookError::Provider(GitError::ProviderUnavailable))
+        ));
+        authorization.active.store(false, Ordering::SeqCst);
+        assert!(matches!(
+            reader.at(actor, repository, first.commit.clone()).await,
+            Err(BookError::NotFound)
+        ));
+        assert!(matches!(
+            reader
+                .find(
+                    actor,
+                    repository,
+                    first.commit.clone(),
+                    "מחיקה".into(),
+                    0,
+                    100
+                )
+                .await,
+            Err(BookError::NotFound)
+        ));
     }
 }

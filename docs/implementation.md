@@ -173,6 +173,12 @@ Checkboxes represent verified work only.
   eight provider tests now pass. A read-only live compare of two docFlow commits
   confirmed page 2 retains ancestry metadata without file patches, including when
   that page has no commits. This is transport evidence, not a live App permission gate.
+- Pinned reader service: five application tests pass. Arbitrary branch commits
+  cannot be loaded as main history; verified main snapshots carry Git commit dates.
+  A four-snapshot, repository-keyed derived cache rechecks current authorization,
+  bounds concurrent loads/search work and does not silently substitute a cached
+  version when a current-main read fails. Durable indexing and worker integration
+  remain open; cached data is disposable and Git remains authoritative.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

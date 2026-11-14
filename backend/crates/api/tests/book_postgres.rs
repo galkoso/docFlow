@@ -4,6 +4,7 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use http_body_util::BodyExt;
 use specspace_api::{AppState, router};
 use specspace_application::{
@@ -246,6 +247,105 @@ fn search(repository: Uuid, commit: &str, cursor: Option<&str>) -> String {
         query.append_pair("cursor", cursor);
     }
     format!("/api/v1/repositories/{repository}/find?{}", query.finish())
+}
+
+fn highlight(repository: Uuid, commit: &str, document: &str, windows: serde_json::Value) -> String {
+    let mut query = url::form_urlencoded::Serializer::new(String::new());
+    query
+        .append_pair("q", "מחיקה")
+        .append_pair("commit", commit)
+        .append_pair(
+            "windows",
+            &URL_SAFE_NO_PAD.encode(serde_json::to_vec(&windows).unwrap()),
+        );
+    format!(
+        "/api/v1/repositories/{repository}/documents/{document}/highlights?{}",
+        query.finish()
+    )
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn visible_highlights_use_paged_identity_and_never_mix_versions_or_access_scopes(
+    pool: PgPool,
+) {
+    let (actor, repository, foreign, token) = setup(&pool).await;
+    let (app, provider) = fixture(&pool);
+    let (_, page) = get(&app, &token, &search(repository, OLD, None)).await;
+    let hit = page["matches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|hit| hit["document_id"] == "DOC-PERMISSIONS")
+        .unwrap();
+    let windows = serde_json::json!([{ "block_id": hit["block_id"], "start_utf16": hit["start_utf16"].as_u64().unwrap() + 1,
+        "end_utf16": hit["end_utf16"].as_u64().unwrap() - 1 }]);
+    provider.version.store(1, Ordering::SeqCst);
+    let uri = highlight(repository, OLD, "DOC-PERMISSIONS", windows.clone());
+    let (status, visible) = get(&app, &token, &uri).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(visible["snapshot_sha"], OLD);
+    assert_eq!(visible["matches"].as_array().unwrap().len(), 1);
+    assert_eq!(visible["matches"][0]["match_id"], hit["match_id"]);
+    assert_eq!(visible["matches"][0]["start_utf16"], hit["start_utf16"]);
+    let (_, changed) = get(
+        &app,
+        &token,
+        &highlight(repository, NEW, "DOC-PERMISSIONS", windows),
+    )
+    .await;
+    assert_eq!(changed["matches"].as_array().unwrap().len(), 0);
+    let malformed = serde_json::json!([{"block_id":"missing", "start_utf16":0, "end_utf16":1}]);
+    let before = provider.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &highlight(foreign, OLD, "DOC-PERMISSIONS", malformed.clone())
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(provider.reads.load(Ordering::SeqCst), before);
+    assert_eq!(get(&app, "", &uri).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &highlight(repository, OLD, "DOC-PERMISSIONS", malformed)
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &highlight(repository, OLD, "missing-document", serde_json::json!([]))
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    let excessive = serde_json::json!(vec![
+        serde_json::json!({"block_id":"block-0", "start_utf16":0, "end_utf16":1});
+        65
+    ]);
+    let (status, error) = get(
+        &app,
+        &token,
+        &highlight(repository, OLD, "DOC-PERMISSIONS", excessive),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(error["error"]["details"]["max_windows"], 64);
+    sqlx::query("UPDATE users SET status = 'DISABLED' WHERE id = $1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(get(&app, &token, &uri).await.0, StatusCode::UNAUTHORIZED);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

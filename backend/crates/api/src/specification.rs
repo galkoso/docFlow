@@ -124,6 +124,23 @@ pub struct SearchResponse {
     pub matches: Vec<SearchHit>,
 }
 
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct HighlightResponse {
+    pub snapshot_sha: String,
+    pub document_id: String,
+    pub query: String,
+    pub matches: Vec<specspace_document_engine::find::Highlight>,
+}
+
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct HighlightQuery {
+    commit: String,
+    q: String,
+    /// Unpadded base64url JSON array of MatchWindow (max 64 windows / 32768 UTF-16 units).
+    windows: String,
+}
+
 #[derive(Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct Selection {
@@ -217,6 +234,10 @@ pub fn routes() -> Router<AppState> {
         )
         .route("/api/v1/repositories/{repository}/find", get(find))
         .route(
+            "/api/v1/repositories/{repository}/documents/{document}/highlights",
+            get(highlights),
+        )
+        .route(
             "/api/v1/repositories/{repository}/assets/{asset}",
             get(asset),
         )
@@ -240,6 +261,9 @@ fn failure(error: BookError) -> Response {
             Some(serde_json::json!({"retry_after_seconds": retry_after}))
         }
         BookError::InvalidCatalog => Some(serde_json::json!({"path": ".specspace/catalog.json"})),
+        BookError::InvalidQuery("HIGHLIGHT_WINDOW_LIMIT") => {
+            Some(serde_json::json!({"max_windows": 64, "max_visible_utf16": 32768}))
+        }
         _ => None,
     };
     let (status, code, message, retryable) = match error {
@@ -653,6 +677,70 @@ pub(crate) async fn find(
             })
             .into_response()
         }
+        Err(error) => failure(error),
+    }
+}
+
+#[utoipa::path(get, path = "/api/v1/repositories/{repository}/documents/{document}/highlights", security(("sessionCookie" = [])),
+    params(("repository" = Uuid, Path), ("document" = String, Path), HighlightQuery),
+    responses((status = 200, body = HighlightResponse), (status = 400, body = ErrorBody), (status = 401, body = ErrorBody),
+        (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 413, body = ErrorBody), (status = 422, body = ErrorBody),
+        (status = 502, body = ErrorBody), (status = 503, body = ErrorBody)))]
+pub(crate) async fn highlights(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<(Uuid, String)>, axum::extract::rejection::PathRejection>,
+    query: Result<Query<HighlightQuery>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let actor = match auth::authenticate(&state, &headers).await {
+        Ok(actor) => actor,
+        Err(error) => return error.into_response(),
+    };
+    let (Ok(Path((repository, document))), Ok(Query(query))) = (path, query) else {
+        return invalid_query();
+    };
+    if let Err(error) = state.books.authorize(actor.user_id, repository).await {
+        return failure(error);
+    }
+    let commit = match CommitSha::parse(query.commit) {
+        Ok(commit) => commit,
+        Err(_) => return invalid_query(),
+    };
+    if query.q.chars().count() > 200 {
+        return failure(BookError::InvalidQuery("QUERY_TOO_LONG"));
+    }
+    if query.windows.len() > 8192 {
+        return failure(BookError::InvalidQuery("HIGHLIGHT_WINDOW_LIMIT"));
+    }
+    let windows = match URL_SAFE_NO_PAD
+        .decode(&query.windows)
+        .ok()
+        .and_then(|bytes| {
+            serde_json::from_slice::<Vec<specspace_document_engine::find::MatchWindow>>(&bytes).ok()
+        }) {
+        Some(windows) if windows.len() <= 64 => windows,
+        Some(_) => return failure(BookError::InvalidQuery("HIGHLIGHT_WINDOW_LIMIT")),
+        _ => return failure(BookError::InvalidQuery("INVALID_HIGHLIGHT_WINDOW")),
+    };
+    match state
+        .books
+        .highlights(
+            actor.user_id,
+            repository,
+            commit.clone(),
+            document.clone(),
+            query.q.clone(),
+            windows,
+        )
+        .await
+    {
+        Ok(matches) => Json(HighlightResponse {
+            snapshot_sha: commit.as_str().into(),
+            document_id: document,
+            query: query.q,
+            matches,
+        })
+        .into_response(),
         Err(error) => failure(error),
     }
 }

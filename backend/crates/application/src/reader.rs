@@ -155,6 +155,32 @@ impl BookReader {
         Ok(page)
     }
 
+    pub async fn highlights(
+        &self,
+        actor: Uuid,
+        repository: Uuid,
+        commit: CommitSha,
+        document: String,
+        query: String,
+        windows: Vec<specspace_document_engine::find::MatchWindow>,
+    ) -> Result<Vec<specspace_document_engine::find::Highlight>, BookError> {
+        let book = self.at(actor, repository, commit).await?;
+        let permit = self
+            .computations
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| BookError::ProcessingUnavailable)?;
+        let highlights = tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            book.highlights(&document, &query, &windows)
+        })
+        .await
+        .map_err(|_| BookError::ProcessingUnavailable)??;
+        self.authorize(actor, repository).await?;
+        Ok(highlights)
+    }
+
     pub async fn asset(
         &self,
         actor: Uuid,

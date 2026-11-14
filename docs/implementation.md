@@ -314,3 +314,12 @@ Checkboxes represent verified work only.
   parity, semantic boundaries and work limits. All twenty-one engine tests and
   workspace Clippy pass. HTTP delivery and viewport rendering are the next steps;
   FIND-05 remains open until those layers are connected and verified.
+- Authorized visible-highlight transport: a commit-required document endpoint
+  accepts bounded base64url MatchWindow lists, uses the complete document's
+  canonical blocks in a bounded processing pool and rechecks access before
+  returning ranges. It shares global search readiness and never mixes versions.
+  PostgreSQL coverage proves paged/visible identity, old/new commit isolation,
+  access checks before malformed windows/provider reads, invalid document/window
+  failures, limits and revocation. API/application tests and workspace Clippy pass.
+  The OpenAPI contract describes windows and compact ranges. Viewport integration
+  and browser performance/visual checks remain open.

@@ -57,6 +57,30 @@ pub struct BookSnapshot {
 }
 
 impl BookSnapshot {
+    pub fn highlights(
+        &self,
+        document_id: &str,
+        query: &str,
+        windows: &[find::MatchWindow],
+    ) -> Result<Vec<find::Highlight>, BookError> {
+        if !self.findings.is_empty() || self.documents.iter().any(|doc| doc.content.is_none()) {
+            return Err(BookError::SearchSnapshotNotReady);
+        }
+        let document = self
+            .documents
+            .iter()
+            .find(|doc| doc.document_id == document_id)
+            .and_then(|doc| doc.content.as_ref())
+            .ok_or(BookError::NotFound)?;
+        find::highlights(
+            self.commit.as_str(),
+            &document.visible_blocks(),
+            query,
+            windows,
+        )
+        .map_err(BookError::InvalidQuery)
+    }
+
     pub fn find(&self, query: &str, offset: usize, limit: usize) -> Result<MatchPage, BookError> {
         if !self.findings.is_empty() || self.documents.iter().any(|doc| doc.content.is_none()) {
             return Err(BookError::SearchSnapshotNotReady);

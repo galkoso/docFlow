@@ -168,6 +168,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repositories/{repository}/documents/{document}/highlights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["highlights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/repositories/{repository}/find": {
         parameters: {
             query?: never;
@@ -249,6 +265,31 @@ export interface components {
         };
         Health: {
             status: string;
+        };
+        Highlight: {
+            block_id: string;
+            /** Format: int32 */
+            end_utf16: number;
+            match_id: string;
+            /** Format: int32 */
+            start_utf16: number;
+        };
+        HighlightResponse: {
+            document_id: string;
+            matches: components["schemas"]["Highlight"][];
+            query: string;
+            snapshot_sha: string;
+        };
+        /**
+         * @description Visible text intervals within one document. Matching uses each entire block,
+         *     so a viewport/formatting boundary never changes literal-search semantics.
+         */
+        MatchWindow: {
+            block_id: string;
+            /** Format: int32 */
+            end_utf16: number;
+            /** Format: int32 */
+            start_utf16: number;
         };
         Membership: {
             /** Format: uuid */
@@ -735,6 +776,97 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    highlights: {
+        parameters: {
+            query: {
+                commit: string;
+                q: string;
+                /** @description Unpadded base64url JSON array of MatchWindow (max 64 windows / 32768 UTF-16 units). */
+                windows: string;
+            };
+            header?: never;
+            path: {
+                repository: string;
+                document: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HighlightResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

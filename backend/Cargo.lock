@@ -1368,6 +1368,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "specspace-document-engine"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "unicode-normalization",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "specspace-domain"
 version = "0.1.0"
 dependencies = [
@@ -1881,6 +1890,12 @@ name = "unicode-properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993ad287eb20e8ba755312801cfe1413e0f25d604075863acaddca10b04c1833"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
 name = "untrusted"

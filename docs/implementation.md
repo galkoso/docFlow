@@ -83,3 +83,10 @@ Checkboxes represent verified work only.
   reviewers, revoked qualification, UI impact and head/target/policy invalidation.
   Content edits demote APPROVED and reject final-state writes. These pure rules
   still need API/persistence integration; merge readiness is not implemented yet.
+- Search engine: four tests pass for literal matching, block boundaries,
+  Hebrew marks/bidi, NFC, whitespace, grapheme-safe UTF-16 highlights, pagination
+  and full-snapshot counts. A release benchmark on this local machine measured
+  engine-only p95 **0.453s**, 20 samples, exactly 20,971,520 bytes / 1,000 synthetic
+  documents. Reproduce with `cargo run --release -p specspace-document-engine
+  --example find_benchmark`. This excludes Markdown extraction, database, HTTP and
+  DOM loading and therefore does not complete AC-02 or the end-to-end latency gate.

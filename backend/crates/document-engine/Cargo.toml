@@ -1,0 +1,13 @@
+[package]
+name = "specspace-document-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+unicode-normalization = "0.1"
+unicode-segmentation = "1.13"
+serde.workspace = true
+
+[lints]
+workspace = true

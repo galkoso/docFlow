@@ -438,3 +438,15 @@ Checkboxes represent verified work only.
   cover historical reads, unknown commits, revoked users and proposal exclusion.
   Full backend tests and Clippy pass (12 durable-index scenarios; the separate
   release performance benchmark remains intentionally ignored in ordinary runs).
+
+- Durable reader query routing: opening a structurally valid book idempotently
+  queues its pinned index; find reads complete persisted snapshots with current
+  ACL checks. A first direct search proves main history and queues missing work.
+  Pending work returns retryable 409 with job/SHA and Retry-After: 2; terminal
+  failures remain explicit and never become zero results. Invalid books keep
+  their existing readable findings and structural search error. Visible highlights
+  retain the canonical bounded renderer path while full-book navigation uses SQL.
+  Six API/PostgreSQL scenarios pass, including pending ticket reuse, publication,
+  search after process/cache loss without a Git round-trip, foreign scope denial,
+  and failed new snapshots alongside a working older version. API tests and
+  workspace Clippy pass. Client polling is the next stage.

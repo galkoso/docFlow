@@ -7,15 +7,12 @@ use axum::{
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use http_body_util::BodyExt;
 use specspace_api::{AppState, router};
-use specspace_application::{
-    book::BookError,
-    reader::{BookProviderFactory, BookReader},
-};
+use specspace_application::{book::BookError, reader::BookProviderFactory};
 use specspace_domain::{BranchName, RepositoryPath};
 use specspace_git_adapter::{
     CommitMetadata, CommitRequest, CommitSha, FileEntry, GitError, GitProvider,
 };
-use specspace_infrastructure::{authorization::PgReadAuthorization, sessions::SessionStore};
+use specspace_infrastructure::{index_worker::IndexWorker, sessions::SessionStore};
 use sqlx::PgPool;
 use std::{
     collections::HashMap,
@@ -180,7 +177,7 @@ async fn setup(pool: &PgPool) -> (Uuid, Uuid, Uuid, String) {
     )
 }
 
-fn fixture(pool: &PgPool) -> (Router, Arc<Provider>) {
+fn fixture(pool: &PgPool) -> (Router, Arc<Provider>, IndexWorker) {
     let root =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures/repository");
     let files = [
@@ -209,11 +206,11 @@ fn fixture(pool: &PgPool) -> (Router, Arc<Provider>) {
         revoke_after_asset: Mutex::new(None),
     });
     let mut state = AppState::new(pool.clone());
-    state.books = Arc::new(BookReader::new(
-        Arc::new(PgReadAuthorization::new(pool.clone())),
-        Arc::new(Source(provider.clone())),
-    ));
-    (router(state), provider)
+    state.configure_book_source(Arc::new(Source(provider.clone())));
+    let worker = state
+        .index_worker(std::time::Duration::from_secs(30))
+        .unwrap();
+    (router(state), provider, worker)
 }
 
 async fn response(app: &Router, token: &str, uri: &str) -> axum::response::Response {
@@ -265,11 +262,75 @@ fn highlight(repository: Uuid, commit: &str, document: &str, windows: serde_json
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn indexed_find_reports_progress_then_survives_restart_and_keeps_failures_explicit(
+    pool: PgPool,
+) {
+    let (_, repository, foreign, token) = setup(&pool).await;
+    let (app, provider, worker) = fixture(&pool);
+    let uri = search(repository, OLD, None);
+    let pending = response(&app, &token, &uri).await;
+    assert_eq!(pending.status(), StatusCode::CONFLICT);
+    assert_eq!(pending.headers()["retry-after"], "2");
+    let pending: serde_json::Value =
+        serde_json::from_slice(&pending.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(pending["error"]["code"], "SEARCH_SNAPSHOT_NOT_READY");
+    assert_eq!(pending["error"]["retryable"], true);
+    assert_eq!(pending["error"]["details"]["snapshot_sha"], OLD);
+    assert!(pending["total_matches"].is_null());
+    let (_, again) = get(&app, &token, &uri).await;
+    assert_eq!(
+        pending["error"]["details"]["job_id"],
+        again["error"]["details"]["job_id"]
+    );
+    let reads = provider.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        get(&app, &token, &search(foreign, OLD, None)).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
+    assert!(matches!(
+        worker.run_once().await.unwrap(),
+        specspace_infrastructure::index_worker::WorkResult::Completed(_)
+    ));
+    // A fresh process needs no Git round-trip for a fully published search.
+    let restarted = router(AppState::new(pool.clone()));
+    let (status, ready) = get(&restarted, &token, &uri).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(ready["total_matches"], 4);
+    assert_eq!(ready["snapshot_sha"], OLD);
+    provider.version.store(1, Ordering::SeqCst);
+    let uri = search(repository, NEW, None);
+    assert_eq!(get(&app, &token, &uri).await.0, StatusCode::CONFLICT);
+    sqlx::query("UPDATE jobs SET state='FAILED' WHERE payload->>'snapshot_sha'=$1")
+        .bind(NEW)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE search_index_snapshots SET state='FAILED',error_code='SOURCE_NOT_AVAILABLE' WHERE repository_id=$1 AND snapshot_sha=$2").bind(repository).bind(NEW).execute(&pool).await.unwrap();
+    let (status, failed) = get(&app, &token, &uri).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(failed["error"]["code"], "SEARCH_SNAPSHOT_FAILED");
+    assert_eq!(failed["error"]["retryable"], false);
+    assert!(failed["total_matches"].is_null());
+    assert_eq!(
+        get(&restarted, &token, &search(repository, OLD, None))
+            .await
+            .0,
+        StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn visible_highlights_use_paged_identity_and_never_mix_versions_or_access_scopes(
     pool: PgPool,
 ) {
     let (actor, repository, foreign, token) = setup(&pool).await;
-    let (app, provider) = fixture(&pool);
+    let (app, provider, _worker) = fixture(&pool);
+    assert_eq!(
+        get(&app, &token, &search(repository, OLD, None)).await.0,
+        StatusCode::CONFLICT
+    );
+    _worker.run_once().await.unwrap();
     let (_, page) = get(&app, &token, &search(repository, OLD, None)).await;
     let hit = page["matches"]
         .as_array()
@@ -351,7 +412,7 @@ async fn visible_highlights_use_paged_identity_and_never_mix_versions_or_access_
 #[sqlx::test(migrations = "../../migrations")]
 async fn book_document_and_search_pages_remain_pinned_when_main_advances(pool: PgPool) {
     let (_, repository, _, token) = setup(&pool).await;
-    let (app, provider) = fixture(&pool);
+    let (app, provider, _worker) = fixture(&pool);
     let (status, catalog) = get(
         &app,
         &token,
@@ -362,6 +423,7 @@ async fn book_document_and_search_pages_remain_pinned_when_main_advances(pool: P
     assert_eq!(catalog["snapshot_sha"], OLD);
     assert_eq!(catalog["documents"].as_array().unwrap().len(), 6);
     assert_eq!(catalog["documents"][0]["document_id"], "DOC-OVERVIEW");
+    _worker.run_once().await.unwrap();
     let (_, first) = get(&app, &token, &search(repository, OLD, None)).await;
     assert_eq!(first["total_matches"], 4);
     assert_eq!(first["matches"].as_array().unwrap().len(), 2);
@@ -403,6 +465,7 @@ async fn book_document_and_search_pages_remain_pinned_when_main_advances(pool: P
         .0,
         StatusCode::BAD_REQUEST
     );
+    _worker.run_once().await.unwrap();
     let (_, changed) = get(&app, &token, &search(repository, NEW, None)).await;
     assert_eq!(changed["total_matches"], 3);
     assert_eq!(
@@ -446,7 +509,7 @@ async fn book_document_and_search_pages_remain_pinned_when_main_advances(pool: P
 #[sqlx::test(migrations = "../../migrations")]
 async fn foreign_repositories_and_revoked_sessions_never_receive_cached_content(pool: PgPool) {
     let (actor, repository, foreign, token) = setup(&pool).await;
-    let (app, provider) = fixture(&pool);
+    let (app, provider, _worker) = fixture(&pool);
     let (_, repositories) = get(&app, &token, "/api/v1/repositories").await;
     assert_eq!(repositories["repositories"].as_array().unwrap().len(), 1);
     assert_eq!(
@@ -511,7 +574,7 @@ async fn image_proxy_is_private_pinned_validated_and_rechecks_access_after_proce
     pool: PgPool,
 ) {
     let (actor, repository, foreign, token) = setup(&pool).await;
-    let (app, provider) = fixture(&pool);
+    let (app, provider, _worker) = fixture(&pool);
     let uri = format!("/api/v1/repositories/{repository}/assets/{ASSET}?commit={OLD}");
     // Invalid asset names must not expose an inaccessible repository's existence.
     assert_eq!(

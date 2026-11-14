@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 use specspace_application::book::{BookError, BookSnapshot};
 use specspace_document_engine::markdown::TextBlock;
 use specspace_git_adapter::{CommitSha, GitError};
+use specspace_infrastructure::search_index::{IndexError, IndexStatus};
 use uuid::Uuid;
 
 #[derive(Serialize, sqlx::FromRow, utoipa::ToSchema)]
@@ -460,7 +461,19 @@ pub(crate) async fn specification(
         None => state.books.main(actor.user_id, repository).await,
     };
     match result {
-        Ok(book) => Json(metadata(repository, &book, selected)).into_response(),
+        Ok(book) => {
+            // Invalid books retain readable placeholders/findings and never get
+            // an incomplete search index that could claim zero matches.
+            if book.find("", 0, 1).is_ok()
+                && let Err(error) = state
+                    .search_index
+                    .enqueue(actor.user_id, repository, &book.commit)
+                    .await
+            {
+                return index_failure(error);
+            }
+            Json(metadata(repository, &book, selected)).into_response()
+        }
         Err(error) => failure(error),
     }
 }
@@ -633,18 +646,56 @@ pub(crate) async fn find(
             Err(code) => return failure(BookError::InvalidQuery(code)),
         },
     };
-    match state
-        .books
+    let page = match state
+        .search_index
         .find(
             actor.user_id,
             repository,
-            commit,
-            query.q.clone(),
+            &commit,
+            &query.q,
             offset,
             query.limit.unwrap_or(100),
         )
         .await
     {
+        Ok(page) => Ok(page),
+        Err(IndexError::NotReady) => {
+            let book = match state
+                .books
+                .at(actor.user_id, repository, commit.clone())
+                .await
+            {
+                Ok(book) => book,
+                Err(error) => return failure(error),
+            };
+            if let Err(error) = book.find("", 0, 1) {
+                return failure(error);
+            }
+            match state
+                .search_index
+                .enqueue(actor.user_id, repository, &commit)
+                .await
+            {
+                Ok(status) if status.state == "READY" => {
+                    state
+                        .search_index
+                        .find(
+                            actor.user_id,
+                            repository,
+                            &commit,
+                            &query.q,
+                            offset,
+                            query.limit.unwrap_or(100),
+                        )
+                        .await
+                }
+                Ok(status) => return index_progress(status, &commit),
+                Err(error) => Err(error),
+            }
+        }
+        Err(error) => Err(error),
+    };
+    match page {
         Ok(page) => {
             let cursor = match page
                 .next_offset
@@ -677,8 +728,34 @@ pub(crate) async fn find(
             })
             .into_response()
         }
-        Err(error) => failure(error),
+        Err(error) => index_failure(error),
     }
+}
+
+fn index_failure(error: IndexError) -> Response {
+    failure(match error {
+        IndexError::NotFound => BookError::NotFound,
+        IndexError::InvalidQuery(code) => BookError::InvalidQuery(code),
+        IndexError::NotReady | IndexError::InvalidSnapshot => BookError::SearchSnapshotNotReady,
+        IndexError::LeaseLost | IndexError::Unavailable => BookError::ProcessingUnavailable,
+    })
+}
+
+fn index_progress(status: IndexStatus, commit: &CommitSha) -> Response {
+    let pending = status.state == "PENDING";
+    let mut response = (StatusCode::CONFLICT, Json(ErrorBody { error: ApiError {
+        code: if pending { "SEARCH_SNAPSHOT_NOT_READY" } else { "SEARCH_SNAPSHOT_FAILED" },
+        message_he: if pending { "אינדקס החיפוש לגרסה זו נמצא בהכנה. החיפוש יתחדש אוטומטית." } else { "הכנת אינדקס החיפוש נכשלה. יש לפנות למנהל המאגר." },
+        trace_id: Uuid::new_v4(), retryable: pending, field_errors: serde_json::json!({}),
+        details: Some(serde_json::json!({ "job_id": status.job_id, "snapshot_sha": commit.as_str(), "state": status.state, "reason": status.error_code, "retry_after_seconds": if pending { Some(2) } else { None } })),
+    }})).into_response();
+    if pending {
+        response.headers_mut().insert(
+            axum::http::header::RETRY_AFTER,
+            axum::http::HeaderValue::from_static("2"),
+        );
+    }
+    response
 }
 
 #[utoipa::path(get, path = "/api/v1/repositories/{repository}/documents/{document}/highlights", security(("sessionCookie" = [])),

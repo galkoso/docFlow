@@ -1,4 +1,5 @@
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -12,12 +13,14 @@ pub struct VisibleBlock<'a> {
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct Match {
+    pub match_id: String,
     pub document_id: String,
     pub section_id: String,
     pub block_id: String,
     pub start_utf16: u32,
     pub end_utf16: u32,
     pub book_order: usize,
+    pub excerpt: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -32,6 +35,8 @@ struct Segment {
     normalized_start: usize,
     original_start: u32,
     original_end: u32,
+    original_byte_start: u32,
+    original_byte_end: u32,
 }
 
 fn ignored(c: char) -> bool {
@@ -46,7 +51,7 @@ fn normalize(text: &str) -> (String, Vec<Segment>) {
     let mut segments: Vec<Segment> = Vec::new();
     let mut original_offset = 0;
     let mut last_space = false;
-    for grapheme in text.graphemes(true) {
+    for (byte_start, grapheme) in text.grapheme_indices(true) {
         let start = original_offset;
         original_offset += grapheme.encode_utf16().count() as u32;
         for c in grapheme.nfc().filter(|&c| !ignored(c)) {
@@ -58,6 +63,7 @@ fn normalize(text: &str) -> (String, Vec<Segment>) {
             if c == ' ' && last_space {
                 if let Some(segment) = segments.last_mut() {
                     segment.original_end = original_offset;
+                    segment.original_byte_end = (byte_start + grapheme.len()) as u32;
                 }
                 continue;
             }
@@ -65,6 +71,8 @@ fn normalize(text: &str) -> (String, Vec<Segment>) {
                 normalized_start: normalized.len(),
                 original_start: start,
                 original_end: original_offset,
+                original_byte_start: byte_start as u32,
+                original_byte_end: (byte_start + grapheme.len()) as u32,
             });
             normalized.push(c);
             last_space = c == ' ';
@@ -100,6 +108,9 @@ pub fn find(
         return Ok(page);
     }
     for (book_order, block) in blocks.iter().enumerate() {
+        if block.text.len() > 2 * 1024 * 1024 {
+            return Err("FILE_TOO_LARGE");
+        }
         let (haystack, map) = normalize(block.text);
         let mut previous_range = None;
         for (start, _) in haystack.match_indices(&needle) {
@@ -114,13 +125,40 @@ pub fn find(
             let index = page.total_matches;
             page.total_matches += 1;
             if index >= offset && page.matches.len() < limit {
+                let byte_start = map[first].original_byte_start as usize;
+                let byte_end = map[last].original_byte_end as usize;
+                let excerpt_start = block.text[..byte_start]
+                    .grapheme_indices(true)
+                    .rev()
+                    .take(60)
+                    .last()
+                    .map_or(byte_start, |(start, _)| start);
+                let excerpt_end = block.text[byte_end..]
+                    .grapheme_indices(true)
+                    .take(60)
+                    .last()
+                    .map_or(byte_end, |(start, text)| byte_end + start + text.len());
+                let mut identity = Sha256::new();
+                for part in [
+                    snapshot_sha,
+                    block.document_id,
+                    block.section_id,
+                    block.block_id,
+                ] {
+                    identity.update(part.as_bytes());
+                    identity.update([0]);
+                }
+                identity.update(range.0.to_le_bytes());
+                identity.update(range.1.to_le_bytes());
                 page.matches.push(Match {
+                    match_id: format!("{:x}", identity.finalize()),
                     document_id: block.document_id.into(),
                     section_id: block.section_id.into(),
                     block_id: block.block_id.into(),
                     start_utf16: range.0,
                     end_utf16: range.1,
                     book_order,
+                    excerpt: block.text[excerpt_start..excerpt_end].into(),
                 });
             }
         }
@@ -218,5 +256,19 @@ mod tests {
         assert_eq!(second.matches[0].book_order, 1);
         assert_eq!(second.matches[1].book_order, 2);
         assert_eq!(second.next_offset, None);
+    }
+
+    #[test]
+    fn excerpts_surround_the_match_without_cutting_graphemes_and_ids_are_snapshot_bound() {
+        let text = format!("{} מְחִיקָה {}", "👩‍👩‍👧‍👦".repeat(100), "😀".repeat(100));
+        let first = find("sha-one", &[block(&text)], "מחיקה", 0, 100).unwrap();
+        let again = find("sha-one", &[block(&text)], "מחיקה", 0, 100).unwrap();
+        let next = find("sha-two", &[block(&text)], "מחיקה", 0, 100).unwrap();
+        assert_eq!(first.matches[0].match_id, again.matches[0].match_id);
+        assert_ne!(first.matches[0].match_id, next.matches[0].match_id);
+        assert!(first.matches[0].excerpt.contains("מְחִיקָה"));
+        assert!(first.matches[0].excerpt.starts_with("👩‍👩‍👧‍👦"));
+        assert!(first.matches[0].excerpt.ends_with('😀'));
+        assert!(first.matches[0].excerpt.graphemes(true).count() < 150);
     }
 }

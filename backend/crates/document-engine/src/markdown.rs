@@ -24,6 +24,7 @@ pub struct TextBlock {
     pub block_id: String,
     pub section_id: String,
     pub kind: &'static str,
+    pub heading_level: Option<u8>,
     pub text: String,
     pub source_start: usize,
     pub source_end: usize,
@@ -171,6 +172,11 @@ pub fn parse(source: &str) -> Result<Document, &'static str> {
                 }
             }
             Event::Start(tag) => {
+                let heading_level = if let Tag::Heading { level, .. } = &tag {
+                    Some(*level as u8)
+                } else {
+                    None
+                };
                 let kind = match tag {
                     Tag::Heading { level, .. } => {
                         if !matches!(
@@ -214,6 +220,7 @@ pub fn parse(source: &str) -> Result<Document, &'static str> {
                 if let Some(kind) = kind {
                     flush(&mut current, &mut document.blocks, start);
                     current = Some(TextBlock {
+                        heading_level,
                         block_id: String::new(),
                         section_id: section_id.clone(),
                         kind,

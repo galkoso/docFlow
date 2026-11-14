@@ -189,6 +189,11 @@ Checkboxes represent verified work only.
   is bounded and respects configuration changes/expiry. Three infrastructure unit
   tests and eleven PostgreSQL tests pass. Foreign repository IDs remain hidden
   before configuration lookup. API startup wiring is the next step.
+- Reader transport data: search hits now have stable SHA-bound IDs and bounded
+  grapheme-safe excerpts; parsed headings retain their levels for the table of
+  contents. Eleven document-engine tests pass. The updated 20MiB / 1,000-document
+  benchmark measured engine-only p95 **0.529s** over 20 samples on this machine.
+  HTTP and browser latency are not included in that result.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

@@ -195,11 +195,15 @@ impl GitHub {
         CommitSha::parse(sha)
     }
 
-    async fn full_blob_text(
+    async fn full_blob(
         &self,
         blob: &CommitSha,
         expected_size: u64,
-    ) -> Result<String, GitError> {
+        max_bytes: usize,
+    ) -> Result<Vec<u8>, GitError> {
+        if expected_size > max_bytes as u64 {
+            return Err(GitError::ResponseTooLarge);
+        }
         let response = self
             .client
             .get(format!(
@@ -218,19 +222,22 @@ impl GitHub {
         {
             return Err(GitError::InvalidResponse);
         }
-        let encoded: String = data["content"]
-            .as_str()
-            .ok_or(GitError::InvalidResponse)?
+        let content = data["content"].as_str().ok_or(GitError::InvalidResponse)?;
+        if content.bytes().filter(|c| !c.is_ascii_whitespace()).count() > max_bytes.div_ceil(3) * 4
+        {
+            return Err(GitError::ResponseTooLarge);
+        }
+        let encoded: String = content
             .chars()
             .filter(|c| !c.is_ascii_whitespace())
             .collect();
         let bytes = STANDARD
             .decode(encoded)
             .map_err(|_| GitError::InvalidResponse)?;
-        if bytes.len() as u64 != expected_size || bytes.len() > 2 * 1024 * 1024 {
+        if bytes.len() as u64 != expected_size || bytes.len() > max_bytes {
             return Err(GitError::InvalidResponse);
         }
-        String::from_utf8(bytes).map_err(|_| GitError::InvalidResponse)
+        Ok(bytes)
     }
 
     fn commit_input(&self, request: &CommitRequest<'_>) -> Result<Value, GitError> {
@@ -370,12 +377,14 @@ impl GitProvider for GitHub {
         }
         if blob["isTruncated"] == true {
             let oid = CommitSha::parse(blob["oid"].as_str().ok_or(GitError::InvalidResponse)?)?;
-            return self
-                .full_blob_text(
+            let bytes = self
+                .full_blob(
                     &oid,
                     blob["byteSize"].as_u64().ok_or(GitError::InvalidResponse)?,
+                    2 * 1024 * 1024,
                 )
-                .await;
+                .await?;
+            return String::from_utf8(bytes).map_err(|_| GitError::InvalidResponse);
         }
         if blob["isTruncated"] != false {
             return Err(GitError::InvalidResponse);
@@ -388,6 +397,27 @@ impl GitProvider for GitHub {
             })
             .map(str::to_owned)
             .ok_or(GitError::InvalidResponse)
+    }
+
+    async fn read_bytes(
+        &self,
+        commit: &CommitSha,
+        path: &RepositoryPath,
+        max_bytes: usize,
+    ) -> Result<Vec<u8>, GitError> {
+        if max_bytes == 0 || max_bytes > 5 * 1024 * 1024 {
+            return Err(GitError::InvalidInput);
+        }
+        let data = self.graphql(
+            "query($owner: String!, $name: String!, $expression: String!) { repository(owner: $owner, name: $name) { object(expression: $expression) { ... on Blob { oid byteSize } } } }",
+            json!({"owner": self.owner, "name": self.name, "expression": format!("{}:{}", commit.as_str(), path.as_str())}), false,
+        ).await?;
+        let blob = data
+            .pointer("/data/repository/object")
+            .ok_or(GitError::InvalidResponse)?;
+        let oid = CommitSha::parse(blob["oid"].as_str().ok_or(GitError::InvalidResponse)?)?;
+        let size = blob["byteSize"].as_u64().ok_or(GitError::InvalidResponse)?;
+        self.full_blob(&oid, size, max_bytes).await
     }
 
     async fn list_files(&self, commit: &CommitSha) -> Result<Vec<FileEntry>, GitError> {
@@ -595,7 +625,17 @@ mod tests {
         Json(json!({"object": {"sha": OLD}}))
     }
 
-    async fn blob() -> Json<Value> {
+    async fn blob(State(state): State<Arc<ProviderState>>) -> Json<Value> {
+        if state.mode.load(Ordering::SeqCst) == 7 {
+            return Json(
+                json!({"sha": OLD, "size": 5, "encoding": "base64", "content": STANDARD.encode([255, 0, 1, 2, 3])}),
+            );
+        }
+        if state.mode.load(Ordering::SeqCst) == 8 {
+            return Json(
+                json!({"sha": NEW, "size": 5, "encoding": "base64", "content": STANDARD.encode("hello")}),
+            );
+        }
         Json(
             json!({"sha": OLD, "size": 5, "encoding": "base64", "content": STANDARD.encode("hello")}),
         )
@@ -770,6 +810,34 @@ mod tests {
         assert_eq!(
             fixture.adapter.read_text(&head, &path).await.unwrap(),
             "hello"
+        );
+    }
+
+    #[tokio::test]
+    async fn raw_blob_reads_preserve_binary_bytes_and_enforce_size_and_identity() {
+        let fixture = fixture().await;
+        let commit = CommitSha::parse(OLD).unwrap();
+        let path = RepositoryPath::parse("docs/a.md").unwrap();
+        fixture.state.mode.store(7, Ordering::SeqCst);
+        assert_eq!(
+            fixture.adapter.read_bytes(&commit, &path, 5).await.unwrap(),
+            [255, 0, 1, 2, 3]
+        );
+        assert_eq!(
+            fixture.adapter.read_bytes(&commit, &path, 4).await,
+            Err(GitError::ResponseTooLarge)
+        );
+        assert_eq!(
+            fixture
+                .adapter
+                .read_bytes(&commit, &path, 5 * 1024 * 1024 + 1)
+                .await,
+            Err(GitError::InvalidInput)
+        );
+        fixture.state.mode.store(8, Ordering::SeqCst);
+        assert_eq!(
+            fixture.adapter.read_bytes(&commit, &path, 5).await,
+            Err(GitError::InvalidResponse)
         );
     }
 

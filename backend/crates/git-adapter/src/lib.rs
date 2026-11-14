@@ -98,6 +98,13 @@ pub trait GitProvider: Send + Sync {
         commit: &CommitSha,
         path: &RepositoryPath,
     ) -> Result<String, GitError>;
+    /// Raw commit-pinned blob, bounded before fetching/decoding (maximum 5MiB).
+    async fn read_bytes(
+        &self,
+        commit: &CommitSha,
+        path: &RepositoryPath,
+        max_bytes: usize,
+    ) -> Result<Vec<u8>, GitError>;
     async fn list_files(&self, commit: &CommitSha) -> Result<Vec<FileEntry>, GitError>;
     async fn commit_metadata(&self, commit: &CommitSha) -> Result<CommitMetadata, GitError>;
     async fn is_ancestor(

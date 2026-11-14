@@ -37,6 +37,14 @@ struct Provider {
 
 #[async_trait]
 impl GitProvider for Provider {
+    async fn read_bytes(
+        &self,
+        _: &CommitSha,
+        _: &RepositoryPath,
+        _: usize,
+    ) -> Result<Vec<u8>, GitError> {
+        Err(GitError::ProviderRejected)
+    }
     async fn main_head(&self) -> Result<CommitSha, GitError> {
         CommitSha::parse(if self.version.load(Ordering::SeqCst) == 0 {
             OLD

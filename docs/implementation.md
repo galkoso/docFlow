@@ -263,3 +263,10 @@ Checkboxes represent verified work only.
   even when their chapters are visible. All-visible highlighting, result-context
   navigation, durable indexing, large-hit/large-chapter browser performance and
   the six-user p95 target remain open; this checkpoint is not search acceptance.
+- Binary provider stage: GitProvider now exposes explicitly bounded, commit-pinned
+  raw blob reads. GitHub resolves the requested commit/path to an immutable blob,
+  validates metadata size before the REST fetch, then verifies returned identity,
+  encoding and decoded size. Binary data is not coerced through UTF-8. The new
+  provider test covers non-UTF-8 bytes, size bounds and mismatched blob identity;
+  all ten adapter tests and workspace Clippy pass. Image validation and serving
+  are separate next steps; no public asset path is exposed by this checkpoint.

@@ -306,6 +306,14 @@ mod tests {
 
     #[async_trait]
     impl GitProvider for TestProvider {
+        async fn read_bytes(
+            &self,
+            _: &CommitSha,
+            _: &RepositoryPath,
+            _: usize,
+        ) -> Result<Vec<u8>, GitError> {
+            Err(GitError::ProviderRejected)
+        }
         async fn commit_metadata(
             &self,
             commit: &CommitSha,

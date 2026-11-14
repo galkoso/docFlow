@@ -270,3 +270,15 @@ Checkboxes represent verified work only.
   provider test covers non-UTF-8 bytes, size bounds and mismatched blob identity;
   all ten adapter tests and workspace Clippy pass. Image validation and serving
   are separate next steps; no public asset path is exposed by this checkpoint.
+- Image display validation stage: canonical content-hashed PNG/JPEG/WebP inputs
+  are checked against their bytes and actual codec, decoded under dimension/pixel
+  and allocation limits, oriented from EXIF and resized to at most 2048px per side.
+  A fresh PNG encoder copies pixels only, omitting source EXIF/ICC metadata; output
+  writes are bounded to 16MiB. Three media tests verify supported formats, hash/
+  extension mismatch, disallowed content, byte/dimension limits, resizing and a
+  synthetic private EXIF marker's removal while preserving orientation. All
+  seventeen engine tests and workspace Clippy pass. Decoder allocation limits are
+  best-effort in the codec library; strict dimensions/pixel checks also apply.
+  Reference: https://docs.rs/image/0.25.10/image/struct.Limits.html . The HTTP proxy
+  and UI integration remain the next checkpoint; upload/original retention policy
+  is still part of the later proposal/media workflow.

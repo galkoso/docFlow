@@ -71,3 +71,10 @@ Checkboxes represent verified work only.
   tests pass. API binds to loopback by default, uses a bounded SQLx pool, disables
   response caching and shuts down on Ctrl+C. Readiness currently checks PostgreSQL
   only; provider/storage checks remain pending with their respective adapters.
+- PostgreSQL core: six database integration tests pass for concurrent job leasing,
+  lease fencing, expired-side-effect handling, append-only audit, case-insensitive
+  branch reservations (including closed proposals), tenant foreign keys and
+  operation idempotency uniqueness. Core migrations include memberships, teams,
+  repositories, proposals, buffers, operations, jobs, outbox and webhook dedupe.
+  Review/bundle/search persistence, authorization enforcement and the recovery
+  reconciler are still pending; uniqueness alone is not an idempotent use case.

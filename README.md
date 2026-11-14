@@ -29,3 +29,11 @@ from `backend`. It binds to `127.0.0.1:3000` by default; set
 `APP_LISTEN_ADDRESS` to change this. `/api/v1/health/live` reports process health;
 `/api/v1/health/ready` checks PostgreSQL and returns 503 when unavailable.
 These are infrastructure endpoints; product routes are still being implemented.
+
+For local PostgreSQL, run `docker compose up -d --wait`. Copy `.env.example` to
+`.env` and load its values into your shell. From `backend`, run
+`cargo run -p specspace-infrastructure --bin migrate` to apply migrations, and
+`cargo test --workspace --all-features --locked` to include PostgreSQL integration
+tests. Integration tests create and remove isolated databases; use a dedicated
+development database role with database-creation privileges, as provided by Compose.
+The default test command runs unit checks without requiring PostgreSQL.

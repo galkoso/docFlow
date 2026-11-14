@@ -1372,6 +1372,16 @@ name = "specspace-domain"
 version = "0.1.0"
 
 [[package]]
+name = "specspace-infrastructure"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"

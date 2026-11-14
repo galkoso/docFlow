@@ -17,8 +17,8 @@ export class BookApi {
   document(repository: string, commit: string, document: string) {
     return this.http.get<BookDocument>(`${this.base(repository)}/documents/${encodeURIComponent(document)}`, { params: { commit } });
   }
-  find(repository: string, commit: string, q: string, cursor?: string) {
-    return this.http.get<SearchPage>(`${this.base(repository)}/find`, { params: { commit, q, limit: '100', ...(cursor ? { cursor } : {}) } });
+  find(repository: string, commit: string, q: string, startAt = 0) {
+    return this.http.get<SearchPage>(`${this.base(repository)}/find`, { params: { commit, q, limit: '100', start_at: String(startAt) } });
   }
   private base(repository: string) { return `/api/v1/repositories/${encodeURIComponent(repository)}`; }
 }

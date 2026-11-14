@@ -251,3 +251,15 @@ Checkboxes represent verified work only.
   after main advances, stable match identity and conflicting-input rejection.
   API tests and workspace Clippy pass. This enables bounded backward wrap-around;
   the Angular find controller and all-visible-result highlighting remain open.
+- Paged find controls: the reader now supports Ctrl/Cmd+F, Escape, Enter,
+  Shift+Enter and arrow navigation, accessible full-snapshot counts and wrap
+  announcements. Queries debounce for 200ms, cancel superseded requests, bind all
+  pages to one commit and retain only three pages. Navigating to a match loads its
+  chapter before scrolling; retained results are highlighted across formatted text.
+  Five controller tests plus reader shortcut coverage prove cancellation, direct
+  backward wrap, cache limits, denied access, version mismatch and code-point query
+  limits. Production build and twenty-one frontend tests pass.
+  FIND-05 remains partial: matches outside retained result pages are not yet marked
+  even when their chapters are visible. All-visible highlighting, result-context
+  navigation, durable indexing, large-hit/large-chapter browser performance and
+  the six-user p95 target remain open; this checkpoint is not search acceptance.

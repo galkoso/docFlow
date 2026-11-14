@@ -15,5 +15,9 @@ button, select { border: 1px solid #cdd7df; background: white; border-radius: 5p
 .chapter-heading span { color: #7b8899; font-size: .8rem; }
 .chapter-heading h2 { margin: .3rem 0 0; font-size: 1.3rem; }
 .load-chapter { width: 100%; padding: 1.5rem; }
+.find-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .75rem; background: #edf2ff; border: 1px solid #b8c8eb; }
+.find-bar input { min-width: 0; flex: 1; width: 12rem; padding: .4rem; border: 1px solid #aab9d4; border-radius: 4px; }
+.find-bar p { flex-basis: 100%; margin: .25rem 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 900px) { .book-layout { grid-template-columns: 1fr; gap: 1rem; } .toc { position: static; max-height: 240px; border: 1px solid #dce2eb; padding: 1rem; } }
 @media (max-width: 500px) { .chapter { padding: 1rem; } .book-heading { align-items: start; flex-direction: column; } .version-bar { gap: .5rem; } }

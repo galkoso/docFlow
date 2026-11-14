@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { SessionState } from '../../core/auth/session-state';
 import { Specification } from './specification';
@@ -18,6 +18,7 @@ describe('Authorized reader page', () => {
         { provide: ActivatedRoute, useValue: { queryParamMap: params, snapshot: { queryParamMap: params.value } } }],
     }).compileComponents();
     const fixture = TestBed.createComponent(Specification);
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     const http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
     http.expectOne('/api/v1/repositories').flush({ repositories: [{ repository_id: 'repo', default_branch: 'main' }] });
@@ -31,6 +32,21 @@ describe('Authorized reader page', () => {
       ],
     });
     await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('תוכן מורשה פרטי');
+    const shortcut = new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, cancelable: true });
+    document.dispatchEvent(shortcut);
+    fixture.detectChanges();
+    expect(shortcut.defaultPrevented).toBe(true);
+    expect(fixture.nativeElement.querySelector('#book-find')).not.toBeNull();
+    const externalInput = document.createElement('input');
+    document.body.append(externalInput);
+    const externalShortcut = new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, cancelable: true, bubbles: true });
+    externalInput.dispatchEvent(externalShortcut);
+    expect(externalShortcut.defaultPrevented).toBe(false);
+    externalInput.remove();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('#book-find')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('תוכן מורשה פרטי');
     params.next(convertToParamMap({ repo: 'repo', doc: 'D2', section: 'S2' }));
     fixture.detectChanges();

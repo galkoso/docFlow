@@ -332,3 +332,17 @@ Checkboxes represent verified work only.
   tests prove batching, cancellation, cache eviction, mismatch/denial handling,
   empty-query clearing and Unicode-safe chunking. Build and all twenty-seven
   frontend tests pass. Renderer observation and visual mark integration follow.
+- Visible mark integration: native text leaves are now observed as grapheme-safe
+  windows. The renderer requests canonical ranges for all nearby text independently
+  of retained navigation pages, merges stable IDs, and marks cross-format matches
+  without re-normalizing text in JavaScript. Line-break matches have addressable,
+  visible marks too. Parts are computed once per range/tree change rather than
+  rescanning every text leaf on active-selection changes. Query clearing removes
+  marks; denied highlight access clears the reader, and observation/request state
+  is disposed with each chapter. A DOM/HTTP regression verifies nonpaged Hebrew
+  matches across bold text, active styling, query clearing and observer teardown;
+  another verifies line-break targets. Build and twenty-nine frontend tests pass.
+  FIND-05's retained-page highlighting gap is implemented across engine/API/UI.
+  Real-browser visual/scroll acceptance, dense-document DOM performance, durable
+  indexes and the six-user p95 target remain open; full search acceptance is not
+  claimed from DOM tests alone.

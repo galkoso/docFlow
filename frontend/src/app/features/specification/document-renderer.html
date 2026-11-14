@@ -3,14 +3,15 @@
 } @else {
   <ng-container *ngTemplateOutlet="nodes; context: { $implicit: tree().nodes, header: false }" />
 }
+@if (visible.error(); as error) {<p role="alert" class="unsupported">לא כל הסימונים זמינים: {{ error }} <button (click)="visible.retry()">ניסיון נוסף</button></p>}
 <ng-template #nodes let-items let-header="header">
   @for (node of items; track $index) {
     @let event = node.event;
     @switch (event.kind) {
       @case ('text') {
-        <span [attr.data-block-id]="event.block_id" [attr.data-offset-utf16]="event.offset_utf16">@for (part of parts(event, hits()); track $index) {@if (part.matchId) {<mark [class.active]="part.matchId === activeMatch()" [attr.data-match-id]="part.matchId">{{ part.text }}</mark>} @else {{{ part.text }}}}</span>
+        @for (chunk of node.chunks; track $index) {<ng-container *ngTemplateOutlet="leaf; context: { $implicit: chunk }" />}
       }
-      @case ('break') { @if (event.hard_break) {<br>} @else {{{ '\n' }}} }
+      @case ('break') { @for (chunk of node.chunks; track $index) {<ng-container *ngTemplateOutlet="leaf; context: { $implicit: chunk }" />} @if (event.hard_break) {<br>} }
       @case ('rule') { <hr> }
       @case ('task_marker') { <input type="checkbox" disabled [checked]="event.checked" aria-label="מצב משימה"> }
       @case ('image') {
@@ -60,4 +61,7 @@
       }
     }
   }
+</ng-template>
+<ng-template #leaf let-chunk>
+  <span appTextWindow [window]="chunk.window" [attr.data-block-id]="chunk.event.block_id" [attr.data-offset-utf16]="chunk.event.offset_utf16">@for (part of parts().get(chunk.event); track $index) {@if (part.matchId) {<mark [class.active]="part.matchId === activeMatch()" [class.line-break]="chunk.event.kind === 'break'" [attr.data-match-id]="part.matchId">{{ part.text }}</mark>} @else {{{ part.text }}}}</span>
 </ng-template>

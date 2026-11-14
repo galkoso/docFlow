@@ -107,6 +107,10 @@ export class Specification implements OnDestroy {
   retry() { this.state.open(this.params().get('repo') ?? undefined, this.params().get('commit') ?? undefined); }
   latest() { void this.router.navigate([], { relativeTo: this.route, queryParams: { commit: null }, queryParamsHandling: 'merge' }); }
   selectRepository(value: string) { void this.router.navigate([], { relativeTo: this.route, queryParams: { repo: value } }); }
+  denyAccess() {
+    this.state.clear(); this.find.clear();
+    this.state.error.set('הגישה לספר אינה זמינה. יש להתחבר או לטעון אותו מחדש.');
+  }
   openFind() {
     if (!this.findOpen() && window.document.activeElement instanceof HTMLElement) this.findReturnFocus = window.document.activeElement;
     this.findOpen.set(true);

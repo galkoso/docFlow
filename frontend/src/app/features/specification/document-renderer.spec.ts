@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { DocumentRenderer } from './document-renderer';
 import { assetSource, externalLink, renderTree, RenderEvent, SearchHit } from './render-model';
 
@@ -9,7 +11,7 @@ const close = (tag: RenderEvent['tag']) => event('close', { tag });
 const text = (value: string, offset = 0) => event('text', { text: value, block_id: 'b1', offset_utf16: offset });
 
 describe('Canonical document renderer', () => {
-  beforeEach(() => TestBed.configureTestingModule({ imports: [DocumentRenderer] }));
+  beforeEach(() => TestBed.configureTestingModule({ imports: [DocumentRenderer], providers: [provideHttpClient(), provideHttpClientTesting()] }));
 
   it('creates native table, list and code elements without component wrappers', async () => {
     const fixture = TestBed.createComponent(DocumentRenderer);
@@ -98,5 +100,64 @@ describe('Canonical document renderer', () => {
     fixture.componentRef.setInput('events', [open('paragraph')]);
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelector('[role=alert]')?.textContent).toContain('מבנה התוכן אינו תקין');
+  });
+
+  it('marks every returned visible match even when it is absent from retained navigation pages', async () => {
+    let callback!: IntersectionObserverCallback;
+    const observed = new Set<Element>();
+    const disconnect = vi.fn();
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(value: IntersectionObserverCallback, options: IntersectionObserverInit) {
+        callback = value; expect(options.rootMargin).toBe('300px 0px');
+      }
+      observe(element: Element) { observed.add(element); }
+      disconnect = disconnect;
+    });
+    try {
+      const fixture = TestBed.createComponent(DocumentRenderer);
+      const http = TestBed.inject(HttpTestingController);
+      const context = { repository: 'repository', commit: 'a'.repeat(40), document: 'D1' };
+      fixture.componentRef.setInput('highlightContext', context);
+      fixture.componentRef.setInput('query', 'מחיקה');
+      fixture.componentRef.setInput('events', [open('paragraph'), text('🙂 מְ'), open('strong'), text('חיקה', 5), close('strong'),
+        text(' מחיקה', 9), close('paragraph')]);
+      await fixture.whenStable();
+      expect(observed.size).toBe(3);
+      callback([...observed].map(target => ({ target, isIntersecting: true }) as IntersectionObserverEntry), {} as IntersectionObserver);
+      await new Promise(resolve => setTimeout(resolve, 220));
+      const request = http.expectOne(req => req.url.endsWith('/D1/highlights'));
+      const windows = JSON.parse(atob(request.request.params.get('windows')!.replaceAll('-', '+').replaceAll('_', '/')));
+      expect(windows).toHaveLength(3);
+      const matches = [{ match_id: 'b'.repeat(64), block_id: 'b1', start_utf16: 3, end_utf16: 9 },
+        { match_id: 'c'.repeat(64), block_id: 'b1', start_utf16: 10, end_utf16: 15 }];
+      request.flush({ snapshot_sha: context.commit, document_id: 'D1', query: 'מחיקה', matches });
+      fixture.componentRef.setInput('activeMatch', matches[1].match_id);
+      await fixture.whenStable();
+      const element: HTMLElement = fixture.nativeElement;
+      expect([...element.querySelectorAll('mark')].map(mark => mark.textContent).join('')).toBe('מְחיקהמחיקה');
+      expect(element.querySelector('mark.active')?.textContent).toBe('מחיקה');
+      expect(element.querySelector('strong > span > mark')?.textContent).toBe('חיקה');
+      expect(fixture.componentInstance.hits()).toEqual([]);
+      fixture.componentRef.setInput('query', '');
+      await fixture.whenStable();
+      expect(element.querySelector('mark')).toBeNull();
+      fixture.destroy();
+      expect(disconnect).toHaveBeenCalledOnce();
+      http.verify();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it('keeps line-break matches addressable and visibly distinct from plain text', async () => {
+    const fixture = TestBed.createComponent(DocumentRenderer);
+    fixture.componentRef.setInput('events', [open('paragraph'), text('alpha'),
+      event('break', { text: '\n', block_id: 'b1', offset_utf16: 5, hard_break: true }), text('beta', 6), close('paragraph')]);
+    fixture.componentRef.setInput('hits', [{ block_id: 'b1', document_id: 'D1', section_id: 'S1', match_id: 'line',
+      start_utf16: 5, end_utf16: 6, book_order: 0, excerpt: 'alpha\nbeta' }]);
+    fixture.componentRef.setInput('activeMatch', 'line');
+    await fixture.whenStable();
+    const element: HTMLElement = fixture.nativeElement;
+    expect(element.querySelector('p')?.textContent).toBe('alpha\nbeta');
+    expect(element.querySelectorAll('br')).toHaveLength(1);
+    expect(element.querySelector('mark.active.line-break')?.getAttribute('data-match-id')).toBe('line');
   });
 });

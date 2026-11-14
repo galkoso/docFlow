@@ -63,6 +63,8 @@
             @if (document.error_code || document.render_error) {<p role="alert">לא ניתן להציג את הפרק: <code>{{ document.error_code || document.render_error }}</code></p>}
             @else {<app-document-renderer [events]="document.render_events" [sectionPrefix]="sectionId(chapter.document_id)" [internalLinks]="links()"
               [assetContext]="{ repository: book.repository_id, commit: book.snapshot_sha }"
+              [highlightContext]="{ repository: book.repository_id, commit: book.snapshot_sha, document: chapter.document_id }" [query]="find.query()"
+              (accessDenied)="denyAccess()"
               [hits]="chapterHits()[chapter.document_id] || []" [activeMatch]="find.current()?.match_id || null" />}
           } @else if (state.loadingDocuments().has(chapter.document_id)) {<p role="status">טוענים את הפרק…</p>}
           @else {

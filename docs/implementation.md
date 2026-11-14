@@ -209,6 +209,12 @@ Checkboxes represent verified work only.
   PNG/JPEG/WebP asset references are accepted. All fourteen engine tests and
   workspace Clippy pass. HTTP delivery, Angular rendering and asset byte serving
   are the next integration steps; no visual acceptance is claimed yet.
+- Canonical render delivery: document responses now include typed render events
+  and explicit render errors. Rendering/JSON encoding runs in a bounded blocking
+  pool, followed by a fresh permission check. Render-limit findings also prevent
+  a misleading search-ready state. API/PostgreSQL tests verify event delivery and
+  indexed text offsets, while application tests and workspace Clippy pass.
+  Angular native rendering and authorized image bytes remain to be connected.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

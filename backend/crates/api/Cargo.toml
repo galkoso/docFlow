@@ -20,7 +20,7 @@ uuid.workspace = true
 specspace-infrastructure = { path = "../infrastructure" }
 specspace-application = { path = "../application" }
 specspace-git-adapter = { path = "../git-adapter" }
-specspace-document-engine = { path = "../document-engine" }
+specspace-document-engine = { path = "../document-engine", features = ["openapi"] }
 base64 = "0.22"
 sha2 = "0.10"
 cookie = "0.18"

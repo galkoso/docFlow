@@ -251,6 +251,22 @@ async fn book_document_and_search_pages_remain_pinned_when_main_advances(pool: P
     )
     .await;
     assert!(old_doc["markdown"].as_str().unwrap().contains("מחיקה"));
+    assert!(old_doc["render_error"].is_null());
+    assert!(
+        old_doc["render_events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| event["kind"] == "open" && event["tag"] == "table")
+    );
+    assert!(
+        old_doc["render_events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|event| event["kind"] == "text")
+            .all(|event| event["block_id"].is_string() && event["offset_utf16"].is_number())
+    );
     let (_, new_doc) = get(
         &app,
         &token,

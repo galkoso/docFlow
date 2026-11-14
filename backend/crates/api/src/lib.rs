@@ -25,6 +25,7 @@ pub struct AppState {
     pub oidc: Option<Arc<Oidc>>,
     pub cookies: auth::CookiePolicy,
     pub books: Arc<BookReader>,
+    pub render_slots: Arc<tokio::sync::Semaphore>,
 }
 
 impl AppState {
@@ -38,6 +39,7 @@ impl AppState {
             oidc: None,
             cookies: auth::CookiePolicy::unconfigured(),
             books,
+            render_slots: Arc::new(tokio::sync::Semaphore::new(2)),
         }
     }
 

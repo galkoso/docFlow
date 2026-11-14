@@ -94,6 +94,8 @@ pub struct DocumentResponse {
     pub sha256: Option<String>,
     pub error_code: Option<String>,
     pub blocks: Vec<DocumentBlock>,
+    pub render_events: Vec<specspace_document_engine::render::RenderEvent>,
+    pub render_error: Option<String>,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -439,17 +441,46 @@ pub(crate) async fn document(
         Ok(book) => book,
         Err(error) => return failure(error),
     };
+    let permit = match state.render_slots.clone().acquire_owned().await {
+        Ok(permit) => permit,
+        Err(_) => return failure(BookError::ProcessingUnavailable),
+    };
+    let response = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        render_document(&book, &document)
+    })
+    .await;
+    if let Err(error) = state.books.authorize(actor.user_id, repository).await {
+        return failure(error);
+    }
+    match response {
+        Ok(Ok(response)) => response,
+        Ok(Err(error)) => failure(error),
+        Err(_) => failure(BookError::ProcessingUnavailable),
+    }
+}
+
+fn render_document(book: &BookSnapshot, document: &str) -> Result<Response, BookError> {
     let matching: Vec<_> = book
         .documents
         .iter()
         .filter(|doc| doc.document_id == document)
         .collect();
     let doc = match matching.as_slice() {
-        [] => return failure(BookError::NotFound),
+        [] => return Err(BookError::NotFound),
         [doc] => doc,
-        _ => return failure(BookError::InvalidCatalog),
+        _ => return Err(BookError::InvalidCatalog),
     };
-    Json(DocumentResponse {
+    let (render_events, render_error) = match doc
+        .content
+        .as_ref()
+        .map(specspace_document_engine::render::events)
+        .transpose()
+    {
+        Ok(events) => (events.unwrap_or_default(), None),
+        Err(code) => (vec![], Some(code.to_owned())),
+    };
+    Ok(Json(DocumentResponse {
         snapshot_sha: book.commit.as_str().into(),
         document_id: doc.document_id.clone(),
         title: doc.content.as_ref().map_or_else(
@@ -462,8 +493,10 @@ pub(crate) async fn document(
         blocks: doc.content.as_ref().map_or_else(Vec::new, |content| {
             content.blocks.iter().map(DocumentBlock::from).collect()
         }),
+        render_events,
+        render_error,
     })
-    .into_response()
+    .into_response())
 }
 
 #[utoipa::path(get, path = "/api/v1/repositories/{repository}/find", security(("sessionCookie" = [])), params(("repository" = Uuid, Path), FindQuery), responses((status = 200, body = SearchResponse), (status = 400, body = ErrorBody), (status = 401, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 413, body = ErrorBody), (status = 422, body = ErrorBody), (status = 502, body = ErrorBody), (status = 503, body = ErrorBody)))]

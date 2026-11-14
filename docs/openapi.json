@@ -759,7 +759,8 @@
           "snapshot_sha",
           "document_id",
           "title",
-          "blocks"
+          "blocks",
+          "render_events"
         ],
         "properties": {
           "blocks": {
@@ -782,6 +783,18 @@
               "string",
               "null"
             ]
+          },
+          "render_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "render_events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderEvent"
+            }
           },
           "sha256": {
             "type": [
@@ -956,6 +969,142 @@
             "minimum": 0
           }
         }
+      },
+      "RenderEvent": {
+        "type": "object",
+        "required": [
+          "kind",
+          "source_start_byte",
+          "source_end_byte"
+        ],
+        "properties": {
+          "alignments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "block_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "checked": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hard_break": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RenderKind"
+          },
+          "level": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "list_start": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "offset_utf16": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "section_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source_start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tag": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RenderTag"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RenderKind": {
+        "type": "string",
+        "enum": [
+          "open",
+          "close",
+          "text",
+          "break",
+          "rule",
+          "image",
+          "unsupported",
+          "task_marker"
+        ]
+      },
+      "RenderTag": {
+        "type": "string",
+        "enum": [
+          "paragraph",
+          "heading",
+          "quote",
+          "list",
+          "item",
+          "table",
+          "table_head",
+          "table_row",
+          "table_cell",
+          "emphasis",
+          "strong",
+          "strike",
+          "code_block",
+          "inline_code",
+          "link"
+        ]
       },
       "RepositoryList": {
         "type": "object",

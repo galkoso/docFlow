@@ -43,17 +43,29 @@ pub enum RenderTag {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RenderEvent {
     pub kind: RenderKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tag: Option<RenderTag>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub block_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub offset_utf16: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub section_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub level: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub list_start: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub destination: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub alignments: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub checked: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hard_break: Option<bool>,
     pub source_start_byte: usize,
     pub source_end_byte: usize,

@@ -197,7 +197,15 @@ impl BookService {
                     .map_err(|_| BookError::ProcessingUnavailable)?;
                 tokio::task::spawn_blocking(move || {
                     let _slot = slot;
-                    markdown::parse(&source)
+                    let mut document = markdown::parse(&source)?;
+                    if let Err(code) = specspace_document_engine::render::events(&document) {
+                        document.findings.push(markdown::Finding {
+                            code,
+                            source_start: 0,
+                            source_end: source.len(),
+                        });
+                    }
+                    Ok(document)
                 })
                 .await
                 .map_err(|_| BookError::ProcessingUnavailable)?

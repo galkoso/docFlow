@@ -215,6 +215,8 @@ export interface components {
             document_id: string;
             error_code?: string | null;
             markdown?: string | null;
+            render_error?: string | null;
+            render_events: components["schemas"]["RenderEvent"][];
             sha256?: string | null;
             snapshot_sha: string;
             title: string;
@@ -258,6 +260,30 @@ export interface components {
             source_end_byte?: number | null;
             source_start_byte?: number | null;
         };
+        RenderEvent: {
+            alignments?: string[];
+            block_id?: string | null;
+            checked?: boolean | null;
+            destination?: string | null;
+            hard_break?: boolean | null;
+            kind: components["schemas"]["RenderKind"];
+            /** Format: int32 */
+            level?: number | null;
+            /** Format: int64 */
+            list_start?: number | null;
+            /** Format: int32 */
+            offset_utf16?: number | null;
+            section_id?: string | null;
+            source_end_byte: number;
+            source_start_byte: number;
+            tag?: components["schemas"]["RenderTag"] | null;
+            text?: string | null;
+            title?: string | null;
+        };
+        /** @enum {string} */
+        RenderKind: "open" | "close" | "text" | "break" | "rule" | "image" | "unsupported" | "task_marker";
+        /** @enum {string} */
+        RenderTag: "paragraph" | "heading" | "quote" | "list" | "item" | "table" | "table_head" | "table_row" | "table_cell" | "emphasis" | "strong" | "strike" | "code_block" | "inline_code" | "link";
         RepositoryList: {
             repositories: components["schemas"]["RepositorySummary"][];
         };

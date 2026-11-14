@@ -1,5 +1,6 @@
 use specspace_application::book::ReadAuthorization;
 use specspace_infrastructure::authorization::PgReadAuthorization;
+use specspace_infrastructure::login_flows::LoginFlowStore;
 use specspace_infrastructure::sessions::SessionStore;
 use specspace_infrastructure::{complete_job, lease_job};
 use sqlx::PgPool;
@@ -319,6 +320,50 @@ async fn expiration_and_disabled_users_invalidate_existing_sessions(pool: PgPool
     assert!(
         sessions
             .authenticate("invalid-input")
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn login_state_requires_its_browser_binding_and_can_be_used_only_once(pool: PgPool) {
+    let flows = LoginFlowStore::new(pool.clone());
+    let state = "synthetic-state-token-at-least-sixteen";
+    let verifier = "v".repeat(43);
+    let binding = flows
+        .begin(state, "synthetic-nonce", &verifier)
+        .await
+        .unwrap();
+    assert!(
+        flows
+            .consume(state, &"0".repeat(64))
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let (a, b) = tokio::join!(
+        flows.consume(state, &binding),
+        flows.consume(state, &binding)
+    );
+    let a = a.unwrap();
+    let b = b.unwrap();
+    assert_ne!(a.is_some(), b.is_some());
+    let consumed = a.or(b).unwrap();
+    assert_eq!(consumed.nonce, "synthetic-nonce");
+    assert_eq!(consumed.pkce_verifier, verifier);
+    assert!(flows.consume(state, &binding).await.unwrap().is_none());
+    let expired_binding = flows
+        .begin("another-synthetic-state-token", "nonce", &verifier)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE oidc_login_flows SET expires_at = now() - interval '1 second'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        flows
+            .consume("another-synthetic-state-token", &expired_binding)
             .await
             .unwrap()
             .is_none()

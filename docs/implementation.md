@@ -134,6 +134,10 @@ Checkboxes represent verified work only.
   tokens, per-session CSRF secrets, expiry, logout isolation and immediate account
   disablement. OIDC flow/session tables are migrated in tests. Login callbacks,
   cookie attributes and HTTP CSRF enforcement are still pending.
+- Login-flow persistence: a tenth PostgreSQL test verifies browser binding,
+  concurrent single-use state consumption and expiry. An incorrect binding cannot
+  consume another browser's valid flow. OIDC signature verification and callback
+  routing still need integration with these records.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

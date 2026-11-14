@@ -14,7 +14,7 @@ describe('Canonical document renderer', () => {
   it('creates native table, list and code elements without component wrappers', async () => {
     const fixture = TestBed.createComponent(DocumentRenderer);
     fixture.componentRef.setInput('events', [
-      open('table'), open('table_head'), open('table_cell'), text('כותרת'), close('table_cell'), close('table_head'),
+      open('table', { alignments: ['center'] }), open('table_head'), open('table_cell'), text('כותרת'), close('table_cell'), close('table_head'),
       open('table_row'), open('table_cell'), text('תא'), close('table_cell'), close('table_row'), close('table'),
       open('list', { list_start: 3 }), open('item'), text('פריט'), close('item'), close('list'),
       open('code_block'), text('<script>alert(1)</script>'), close('code_block'),
@@ -23,6 +23,8 @@ describe('Canonical document renderer', () => {
     const element: HTMLElement = fixture.nativeElement;
     expect(element.querySelector('table > thead > tr > th')?.textContent).toBe('כותרת');
     expect(element.querySelector('table > tr > td')?.textContent).toBe('תא');
+    expect(element.querySelector('th')?.style.textAlign).toBe('center');
+    expect(element.querySelector('td')?.style.textAlign).toBe('center');
     expect(element.querySelector('ol')?.start).toBe(3);
     expect(element.querySelector('pre > code')?.textContent).toContain('<script>');
     expect(element.querySelector('script')).toBeNull();

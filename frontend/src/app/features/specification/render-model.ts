@@ -2,7 +2,7 @@ import type { components } from '../../core/api/generated/schema';
 
 export type RenderEvent = components['schemas']['RenderEvent'];
 export type SearchHit = components['schemas']['SearchHit'];
-export interface RenderNode { event: RenderEvent; children: RenderNode[]; }
+export interface RenderNode { event: RenderEvent; children: RenderNode[]; alignment?: 'left' | 'center' | 'right'; }
 export interface TextPart { text: string; matchId?: string; }
 
 /** A bounded tree of inert events; markup is created only by the Angular template. */
@@ -16,6 +16,12 @@ export function renderTree(events: RenderEvent[]): RenderNode[] {
       continue;
     }
     const node: RenderNode = { event, children: [] };
+    if (event.kind === 'open' && event.tag === 'table_cell') {
+      const table = [...stack].reverse().find(parent => parent.event.tag === 'table');
+      const column = stack.at(-1)?.children.length ?? 0;
+      const alignment = table?.event.alignments?.[column];
+      if (alignment === 'left' || alignment === 'center' || alignment === 'right') node.alignment = alignment;
+    }
     (stack.at(-1)?.children ?? root).push(node);
     if (event.kind === 'open') {
       if (!event.tag || stack.length >= 64) throw new Error('RENDER_DEPTH_LIMIT');

@@ -5,10 +5,11 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { SessionState } from '../../core/auth/session-state';
 import { BookState } from './book-state';
 import { DocumentRenderer } from './document-renderer';
+import { ChapterViewport } from './chapter-viewport';
 
 @Component({
   selector: 'app-specification',
-  imports: [DatePipe, RouterLink, DocumentRenderer],
+  imports: [DatePipe, RouterLink, DocumentRenderer, ChapterViewport],
   providers: [BookState],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './specification.html',
@@ -19,6 +20,7 @@ export class Specification implements OnDestroy {
   readonly state = inject(BookState);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private lastJump = '';
   readonly params = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
   private readonly selection = computed(() => JSON.stringify([this.params().get('repo'), this.params().get('commit')]));
   readonly links = computed(() => {
@@ -49,13 +51,17 @@ export class Specification implements OnDestroy {
       const section = this.params().get('section') ?? '';
       const book = this.state.book();
       const loaded = this.state.documents();
-      if (!document || !book?.documents.some(item => item.document_id === document)) return;
+      if (!document) { this.lastJump = ''; return; }
+      if (!book?.documents.some(item => item.document_id === document)) return;
       if (!loaded[document]) untracked(() => this.state.loadDocument(document));
-      else requestAnimationFrame(() => {
+      else if (this.lastJump !== `${book.snapshot_sha}/${document}/${section}`) {
+        this.lastJump = `${book.snapshot_sha}/${document}/${section}`;
+        requestAnimationFrame(() => {
         const target = window.document.getElementById(this.sectionId(document, section));
         target?.scrollIntoView({ block: 'start' });
         target?.focus({ preventScroll: true });
-      });
+        });
+      }
     });
   }
 

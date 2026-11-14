@@ -38,8 +38,8 @@
           @case ('table_head') { <thead><tr><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children, header: true }" /></tr></thead> }
           @case ('table_row') { <tr><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></tr> }
           @case ('table_cell') {
-            @if (header) { <th scope="col"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></th> }
-            @else { <td><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></td> }
+            @if (header) { <th scope="col" [style.text-align]="node.alignment"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></th> }
+            @else { <td [style.text-align]="node.alignment"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></td> }
           }
           @case ('emphasis') { <em><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></em> }
           @case ('strong') { <strong><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></strong> }

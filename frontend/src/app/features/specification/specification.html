@@ -38,7 +38,9 @@
     </nav>
     <div class="book-pages" aria-label="ספר האפיון">
       @for (chapter of book.documents; track chapter.document_id) {
-        <article class="chapter" tabindex="-1" [id]="sectionId(chapter.document_id)" [attr.aria-label]="chapter.title">
+        <article class="chapter" tabindex="-1" appChapterViewport [loaded]="!!state.documents()[chapter.document_id] || !!chapter.error_code"
+          [placeholderHeight]="state.heights()[chapter.document_id] || 320" (near)="state.viewport(chapter.document_id, $event)"
+          (measured)="state.measure(chapter.document_id, $event)" [id]="sectionId(chapter.document_id)" [attr.aria-label]="chapter.title">
           <header class="chapter-heading"><span>פרק {{ $index + 1 }} / {{ book.documents.length }}</span><h2>{{ chapter.title }}</h2></header>
           @if (chapter.error_code) {<p role="alert">פרק זה אינו זמין: <code>{{ chapter.error_code }}</code></p>}
           @else if (state.documents()[chapter.document_id]; as document) {

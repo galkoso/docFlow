@@ -236,3 +236,11 @@ Checkboxes represent verified work only.
   changes and logout with an outstanding chapter request. Build and fourteen
   frontend tests pass. Automatic viewport loading/eviction, full find controls,
   image delivery and visual desktop/mobile verification remain open.
+- Bounded viewport reader: nearby chapters load through IntersectionObserver with
+  at most two concurrent requests and eight retained document responses. Chapters
+  outside the viewport are evicted while measured heights preserve their place in
+  the continuous book; TOC targets take priority. Observers disconnect on teardown.
+  Tests exercise request/cache limits, height retention, observer lifecycle and
+  GFM table alignment. Production build and all sixteen frontend tests pass.
+  Real-browser scroll/320px checks and worst-case large-chapter DOM performance
+  remain open; no browser performance acceptance is claimed.

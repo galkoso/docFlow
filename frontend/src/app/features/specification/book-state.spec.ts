@@ -24,10 +24,10 @@ describe('Disposable pinned book state', () => {
   });
   afterEach(() => { state.clear(); http.verify(); });
 
-  function open() {
+  function open(selected = book) {
     state.open();
     http.expectOne('/api/v1/repositories').flush({ repositories: [{ repository_id: repository, default_branch: 'main' }] });
-    http.expectOne(`${base}/specification`).flush(book);
+    http.expectOne(`${base}/specification`).flush(selected);
   }
 
   it('pins each chapter to the metadata SHA and deduplicates concurrent loads', () => {
@@ -75,5 +75,29 @@ describe('Disposable pinned book state', () => {
     http.expectNone(`${base}/specification`);
     expect(state.book()).toBeNull();
     expect(state.error()).toBe('המאגר לא נמצא');
+  });
+
+  it('bounds requests to two and cached chapters to eight while retaining measured placeholders', () => {
+    const documents = Array.from({ length: 10 }, (_, index) => ({ ...book.documents[0], document_id: `D${index + 1}` }));
+    open({ ...book, documents });
+    for (let index = 1; index <= 9; index++) state.viewport(`D${index}`, true);
+    const initial = http.match(request => request.url.includes('/documents/'));
+    expect(initial.map(request => request.request.url.split('/').at(-1))).toEqual(['D1', 'D2']);
+    initial[0].flush(document);
+    initial[1].flush({ ...document, document_id: 'D2' });
+    for (let index = 3; index <= 8; index++) {
+      http.expectOne(`${base}/documents/D${index}?commit=${sha}`).flush({ ...document, document_id: `D${index}` });
+    }
+    http.expectNone(`${base}/documents/D9?commit=${sha}`);
+    expect(Object.keys(state.documents())).toHaveLength(8);
+    state.measure('D2', 1200);
+    state.viewport('D2', false);
+    http.expectOne(`${base}/documents/D9?commit=${sha}`).flush({ ...document, document_id: 'D9' });
+    expect(state.documents()['D2']).toBeUndefined();
+    expect(state.documents()['D9']).toBeDefined();
+    expect(state.heights()['D2']).toBe(1200);
+    expect(Object.keys(state.documents())).toHaveLength(8);
+    state.clear();
+    expect(state.heights()).toEqual({});
   });
 });

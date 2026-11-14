@@ -236,6 +236,31 @@ async fn book_document_and_search_pages_remain_pinned_when_main_advances(pool: P
     assert_eq!(second["snapshot_sha"], OLD);
     assert_eq!(second["total_matches"], 4);
     assert_eq!(second["matches"][1]["document_id"], "DOC-OPERATIONS");
+    assert_eq!(second["start_at"], 2);
+    let (_, last) = get(
+        &app,
+        &token,
+        &format!("{}&start_at=3", search(repository, OLD, None)),
+    )
+    .await;
+    assert_eq!(last["start_at"], 3);
+    assert_eq!(last["total_matches"], 4);
+    assert_eq!(last["matches"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        last["matches"][0]["match_id"],
+        second["matches"][1]["match_id"]
+    );
+    assert!(last["next_cursor"].is_null());
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!("{}&start_at=0", search(repository, OLD, Some(cursor)))
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
     let (_, changed) = get(&app, &token, &search(repository, NEW, None)).await;
     assert_eq!(changed["total_matches"], 3);
     assert_eq!(

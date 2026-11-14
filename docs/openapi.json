@@ -464,6 +464,16 @@
             }
           },
           {
+            "name": "start_at",
+            "in": "query",
+            "description": "Zero-based match position, mutually exclusive with cursor.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -1186,6 +1196,7 @@
           "query",
           "snapshot_sha",
           "total_matches",
+          "start_at",
           "matches"
         ],
         "properties": {
@@ -1206,6 +1217,10 @@
           },
           "snapshot_sha": {
             "type": "string"
+          },
+          "start_at": {
+            "type": "integer",
+            "minimum": 0
           },
           "total_matches": {
             "type": "integer",

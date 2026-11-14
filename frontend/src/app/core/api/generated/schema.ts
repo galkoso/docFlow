@@ -309,6 +309,7 @@ export interface components {
             next_cursor?: string | null;
             query: string;
             snapshot_sha: string;
+            start_at: number;
             total_matches: number;
         };
         SectionSummary: {
@@ -681,6 +682,8 @@ export interface operations {
                 q: string;
                 commit: string;
                 cursor?: string;
+                /** @description Zero-based match position, mutually exclusive with cursor. */
+                start_at?: number;
                 limit?: number;
             };
             header?: never;

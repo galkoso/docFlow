@@ -115,6 +115,7 @@ pub struct SearchResponse {
     pub query: String,
     pub snapshot_sha: String,
     pub total_matches: usize,
+    pub start_at: usize,
     pub next_cursor: Option<String>,
     pub matches: Vec<SearchHit>,
 }
@@ -137,6 +138,9 @@ pub(crate) struct FindQuery {
     q: String,
     commit: String,
     cursor: Option<String>,
+    /// Zero-based match position, mutually exclusive with cursor.
+    #[param(minimum = 0)]
+    start_at: Option<usize>,
     #[param(minimum = 1, maximum = 500, default = 100)]
     limit: Option<usize>,
 }
@@ -526,9 +530,13 @@ pub(crate) async fn find(
     if !(1..=500).contains(&query.limit.unwrap_or(100)) {
         return failure(BookError::InvalidQuery("INVALID_LIMIT"));
     }
-    let offset = match offset(query.cursor.as_deref(), repository, &commit, &query.q) {
-        Ok(offset) => offset,
-        Err(code) => return failure(BookError::InvalidQuery(code)),
+    let offset = match (query.cursor.as_deref(), query.start_at) {
+        (Some(_), Some(_)) => return failure(BookError::InvalidQuery("AMBIGUOUS_SEARCH_POSITION")),
+        (None, Some(position)) => position,
+        (cursor, None) => match offset(cursor, repository, &commit, &query.q) {
+            Ok(offset) => offset,
+            Err(code) => return failure(BookError::InvalidQuery(code)),
+        },
     };
     match state
         .books
@@ -555,6 +563,7 @@ pub(crate) async fn find(
                 query: query.q,
                 snapshot_sha: page.snapshot_sha,
                 total_matches: page.total_matches,
+                start_at: offset,
                 next_cursor: cursor,
                 matches: page
                     .matches

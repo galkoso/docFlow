@@ -244,3 +244,10 @@ Checkboxes represent verified work only.
   GFM table alignment. Production build and all sixteen frontend tests pass.
   Real-browser scroll/320px checks and worst-case large-chapter DOM performance
   remain open; no browser performance acceptance is claimed.
+- Direct search positioning: the find API accepts a zero-based start_at as an
+  alternative to its snapshot/query-bound cursor and returns the page's starting
+  position. Conflicting cursor/position inputs fail explicitly after authorization.
+  PostgreSQL HTTP coverage verifies last-result seeking against the old snapshot
+  after main advances, stable match identity and conflicting-input rejection.
+  API tests and workspace Clippy pass. This enables bounded backward wrap-around;
+  the Angular find controller and all-visible-result highlighting remain open.

@@ -85,7 +85,7 @@ impl IndexedText {
         &self.normalized
     }
     pub fn estimated_bytes(&self) -> usize {
-        self.normalized.len() + self.runs.len() * std::mem::size_of::<Run>()
+        self.normalized.capacity() + self.runs.capacity() * std::mem::size_of::<Run>()
     }
 
     pub fn encode_map(&self) -> Vec<u8> {

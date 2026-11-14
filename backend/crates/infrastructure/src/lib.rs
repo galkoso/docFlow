@@ -3,6 +3,7 @@ pub mod authorization;
 pub mod github_source;
 pub mod login_flows;
 pub mod oidc;
+pub mod search_index;
 pub mod secrets;
 pub mod sessions;
 use sqlx::{FromRow, PgPool};
@@ -33,7 +34,7 @@ pub async fn lease_job(
     sqlx::query_as::<_, LeasedJob>(
         "WITH candidate AS (
           SELECT id FROM jobs
-          WHERE state = 'QUEUED' AND available_at <= now() AND attempts < max_attempts
+          WHERE state = 'QUEUED' AND kind <> 'INDEX_SNAPSHOT' AND available_at <= now() AND attempts < max_attempts
           ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1
         )
         UPDATE jobs SET state = 'RUNNING', lease_owner = $1,

@@ -370,3 +370,21 @@ Checkboxes represent verified work only.
   organization/version isolation and concurrent publication fencing. Migration
   applied locally; all workspace tests and Clippy pass. The snapshot publisher,
   query store, index worker and runtime readiness wiring are still pending.
+- Durable snapshot publisher/query store: prepared index snapshots bind source
+  hashes, document order and complete canonical blocks before a database write.
+  Authorized enqueue is idempotent per repository/SHA/version. Index-only leases
+  support heartbeat, bounded expired-lease recovery and terminal malformed/exhausted
+  jobs; generic Git-operation leasing excludes index jobs and never reclaims their
+  unrelated side effects. Publication fences the current owner and pending job,
+  verifies immutable shared payload reuse byte-for-byte, and commits READY plus
+  job success together. Conflicting payloads roll back without a readiness marker.
+  PostgreSQL literal `strpos` selects candidates from one repeatable-read snapshot;
+  restored canonical maps produce counts/pages/identities with a 128MiB, 4,096-entry
+  disposable payload cache and fresh ACL checks before/after each read. Allocation
+  accounting includes buffer capacities. Four added PostgreSQL scenarios verify
+  literal/Unicode parity, pinned old/new pages, sharing, revoked/foreign access,
+  idempotent enqueue, heartbeat/stale-owner fencing, rollback and job termination.
+  Two application tests cover prepared source identity and rejected incomplete data.
+  All workspace tests and Clippy pass. The long-running indexing worker, retries,
+  indexed highlights, runtime HTTP routing and DB/HTTP performance gates remain
+  pending; the reader still uses its existing computation path at this checkpoint.

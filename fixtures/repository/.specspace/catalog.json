@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "documents": [
+    { "document_id": "DOC-OVERVIEW", "path": "docs/overview.md" },
+    { "document_id": "DOC-PERMISSIONS", "path": "docs/permissions.md" },
+    { "document_id": "DOC-MEDIA", "path": "docs/media.md" },
+    { "document_id": "DOC-RECORDINGS", "path": "docs/recordings.md" },
+    { "document_id": "DOC-PLAYER", "path": "docs/player.md" },
+    { "document_id": "DOC-OPERATIONS", "path": "docs/operations.md" }
+  ]
+}

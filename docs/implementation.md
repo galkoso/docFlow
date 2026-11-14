@@ -95,3 +95,8 @@ Checkboxes represent verified work only.
   search boundaries, hidden metadata/destinations and located validation findings.
   Raw HTML is reported rather than rendered. This is source preservation during
   parsing, not yet proof of rich-editor round-trip or full catalog/link validation.
+- Catalog foundation: three additional tests pass for ordered composition,
+  uncatalogued files, duplicate document/section identities and a six-document
+  Hebrew/English fixture searched as one book. Fixture search finds four instances
+  across four documents, including pointed Hebrew. This verifies engine composition;
+  Git-backed loading, browser rendering and internal-link validation remain open.

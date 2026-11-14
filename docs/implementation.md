@@ -218,3 +218,10 @@ Checkboxes represent verified work only.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.
+- Native Angular render stage: a bounded event tree produces semantic headings,
+  lists, tables, code, links and task markers through Angular templates. Text is
+  interpolated, raw HTML remains a located notice, and no image URL is fetched.
+  Four renderer tests verify native table structure, executable-content rejection,
+  cross-format UTF-16 highlights including Hebrew niqqud/emoji, and malformed/deep
+  input failures. Production build and all nine frontend tests pass. Reader page
+  wiring, catalog links, table alignment and authorized image delivery remain open.

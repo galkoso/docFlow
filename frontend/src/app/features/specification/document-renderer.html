@@ -1,0 +1,58 @@
+@if (tree().error) {
+  <p role="alert">לא ניתן להציג את הפרק: מבנה התוכן אינו תקין.</p>
+} @else {
+  <ng-container *ngTemplateOutlet="nodes; context: { $implicit: tree().nodes, header: false }" />
+}
+<ng-template #nodes let-items let-header="header">
+  @for (node of items; track $index) {
+    @let event = node.event;
+    @switch (event.kind) {
+      @case ('text') {
+        <span [attr.data-block-id]="event.block_id" [attr.data-offset-utf16]="event.offset_utf16">@for (part of parts(event, hits()); track $index) {@if (part.matchId) {<mark [class.active]="part.matchId === activeMatch()" [attr.data-match-id]="part.matchId">{{ part.text }}</mark>} @else {{{ part.text }}}}</span>
+      }
+      @case ('break') { @if (event.hard_break) {<br>} @else {{{ '\n' }}} }
+      @case ('rule') { <hr> }
+      @case ('task_marker') { <input type="checkbox" disabled [checked]="event.checked" aria-label="מצב משימה"> }
+      @case ('image') { <span class="unsupported" role="img" [attr.aria-label]="event.text || 'תמונה'">תמונה: {{ event.text || 'ללא תיאור' }} — התצוגה עדיין אינה זמינה</span> }
+      @case ('unsupported') { <span class="unsupported">תוכן לא נתמך (מקור {{ event.source_start_byte }}–{{ event.source_end_byte }})</span> }
+      @case ('open') {
+        @switch (event.tag) {
+          @case ('paragraph') { <p><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></p> }
+          @case ('heading') {
+            @switch (event.level) {
+              @case (1) { <h1 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h1> }
+              @case (2) { <h2 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h2> }
+              @case (3) { <h3 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h3> }
+              @case (4) { <h4 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h4> }
+              @case (5) { <h5 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h5> }
+              @default { <h6 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h6> }
+            }
+          }
+          @case ('quote') { <blockquote><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></blockquote> }
+          @case ('list') {
+            @if (event.list_start != null) { <ol [start]="event.list_start"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></ol> }
+            @else { <ul><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></ul> }
+          }
+          @case ('item') { <li><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></li> }
+          @case ('table') { <div class="table-scroll" tabindex="0" role="region" aria-label="טבלה"><table><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></table></div> }
+          @case ('table_head') { <thead><tr><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children, header: true }" /></tr></thead> }
+          @case ('table_row') { <tr><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></tr> }
+          @case ('table_cell') {
+            @if (header) { <th scope="col"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></th> }
+            @else { <td><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></td> }
+          }
+          @case ('emphasis') { <em><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></em> }
+          @case ('strong') { <strong><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></strong> }
+          @case ('strike') { <del><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></del> }
+          @case ('code_block') { <pre><code><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></code></pre> }
+          @case ('inline_code') { <code><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></code> }
+          @case ('link') {
+            @if (internal(event.destination); as href) { <a [href]="href"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></a> }
+            @else if (external(event.destination); as href) { <a [href]="href" target="_blank" rel="noopener noreferrer"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></a> }
+            @else { <ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /> }
+          }
+        }
+      }
+    }
+  }
+</ng-template>

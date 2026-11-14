@@ -1,3 +1,5 @@
+pub mod auth;
+
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, State},
@@ -7,12 +9,26 @@ use axum::{
     routing::get,
 };
 use serde::Serialize;
+use specspace_infrastructure::oidc::Oidc;
 use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AppState {
     pub database: PgPool,
+    pub oidc: Option<Arc<Oidc>>,
+    pub cookies: auth::CookiePolicy,
+}
+
+impl AppState {
+    pub fn new(database: PgPool) -> Self {
+        Self {
+            database,
+            oidc: None,
+            cookies: auth::CookiePolicy::unconfigured(),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -36,6 +52,7 @@ pub struct ApiError {
 
 pub fn router(state: AppState) -> Router {
     Router::new()
+        .merge(auth::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))
         .fallback(not_found)
@@ -94,6 +111,10 @@ async fn security_headers(request: axum::extract::Request, next: Next) -> Respon
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static("default-src 'none'; frame-ancestors 'none'"),
     );
+    headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
     response
 }
 
@@ -111,7 +132,7 @@ mod tests {
             .acquire_timeout(Duration::from_millis(50))
             .connect_lazy("postgres://invalid:invalid@127.0.0.1:1/specspace")
             .unwrap();
-        router(AppState { database })
+        router(AppState::new(database))
     }
 
     #[tokio::test]

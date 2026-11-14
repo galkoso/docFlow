@@ -255,6 +255,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be95d4a884358a21a199689323c29e9256b4a1b315e22f183d155422041d3a9a"
 
 [[package]]
+name = "cookie"
+version = "0.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a373e3602691c3cdea496d2f0ee5935151e6168fe87739483c463db1b2f2f87"
+dependencies = [
+ "time",
+ "version_check",
+]
+
+[[package]]
 name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2394,14 +2404,17 @@ name = "specspace-api"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "cookie",
  "http-body-util",
  "serde",
  "serde_json",
+ "specspace-infrastructure",
  "sqlx",
  "tokio",
  "tower",
  "tracing",
  "tracing-subscriber",
+ "url",
  "uuid",
 ]
 

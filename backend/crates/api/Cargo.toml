@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+postgres-tests = []
+
 [dependencies]
 axum.workspace = true
 tokio.workspace = true
@@ -13,10 +16,17 @@ sqlx.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
+specspace-infrastructure = { path = "../infrastructure" }
+cookie = "0.18"
+url = "2"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
+
+[[test]]
+name = "auth_postgres"
+required-features = ["postgres-tests"]
 
 [lints]
 workspace = true

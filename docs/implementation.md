@@ -144,6 +144,13 @@ Checkboxes represent verified work only.
   Production requires HTTPS, local HTTP is loopback-only, redirects/retries are
   disabled and fresh JWKS are loaded per login operation. This module returns
   verified issuer/subject only; HTTP callbacks and session cookies remain open.
+- Authentication HTTP stage: login/callback/profile/logout are wired to the OIDC
+  verifier, single-use flow store and hashed sessions. Two unit checks verify
+  host-scoped Secure/HttpOnly/SameSite cookies and duplicate-cookie refusal. Two
+  PostgreSQL HTTP checks verify session-derived identity (ignoring injected roles),
+  Origin+CSRF enforcement and logout isolation. API unit/integration checks and
+  workspace Clippy pass. Callback-to-browser validation against a configured real
+  identity provider, `/me` capability expansion and frontend sign-in remain open.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

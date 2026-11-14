@@ -37,3 +37,21 @@ For local PostgreSQL, run `docker compose up -d --wait`. Copy `.env.example` to
 tests. Integration tests create and remove isolated databases; use a dedicated
 development database role with database-creation privileges, as provided by Compose.
 The default test command runs unit checks without requiring PostgreSQL.
+
+## Identity configuration
+
+Set `APP_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` in
+the server environment. Register the exact redirect URI
+`<APP_PUBLIC_URL>/api/v1/auth/callback` with the identity provider. Users must be
+pre-provisioned in `users` and `memberships` using the provider's exact issuer and
+stable subject; email addresses and browser-supplied roles do not grant access.
+
+Production is the default `APP_ENV` and requires HTTPS for public/identity URLs.
+`APP_ENV=development` permits loopback HTTP and requires a loopback API listener.
+Serve frontend and `/api` at the same origin. Session cookies are HttpOnly;
+write requests require the configured Origin and an `X-XSRF-TOKEN` header matching
+the server session. OAuth tokens are never returned to the browser.
+
+Endpoints implemented so far: `/api/v1/auth/login`, `/api/v1/auth/callback`,
+`/api/v1/auth/logout` and `/api/v1/me`. Identity-provider setup and the full browser
+login flow still require environment validation; see the delivery ledger.

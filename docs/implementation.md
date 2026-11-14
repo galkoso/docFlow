@@ -123,3 +123,10 @@ Checkboxes represent verified work only.
   and rejects truncated trees. Truncated GraphQL text falls back to a pinned Git
   blob read with size/encoding/identity checks. Five HTTP transport tests plus the
   two App authentication tests pass. Live provider and book-service wiring remain open.
+- Book application service: three tests pass for a complete commit-pinned book,
+  catalog ordering, all-document search, malformed-chapter placeholders, orphan
+  diagnostics and permission revocation before publication. A seventh PostgreSQL
+  test verifies current membership/disabled-user/tenant checks. Parsing runs in a
+  bounded blocking pool; declared and actual text-size limits are checked.
+  The full Rust suite now passes **37 tests**, including seven PostgreSQL tests,
+  and workspace Clippy passes with warnings denied. HTTP/UI/OIDC wiring is pending.

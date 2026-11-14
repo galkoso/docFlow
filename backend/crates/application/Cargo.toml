@@ -1,0 +1,18 @@
+[package]
+name = "specspace-application"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+specspace-domain = { path = "../domain" }
+specspace-document-engine = { path = "../document-engine" }
+specspace-git-adapter = { path = "../git-adapter" }
+async-trait = "0.1"
+tokio.workspace = true
+uuid.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

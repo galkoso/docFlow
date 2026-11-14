@@ -2093,6 +2093,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "specspace-application"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "specspace-document-engine",
+ "specspace-domain",
+ "specspace-git-adapter",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "specspace-document-engine"
 version = "0.1.0"
 dependencies = [
@@ -2135,7 +2149,9 @@ dependencies = [
 name = "specspace-infrastructure"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "serde_json",
+ "specspace-application",
  "sqlx",
  "tokio",
  "uuid",

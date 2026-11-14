@@ -1,3 +1,5 @@
+use specspace_application::book::ReadAuthorization;
+use specspace_infrastructure::authorization::PgReadAuthorization;
 use specspace_infrastructure::{complete_job, lease_job};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -213,4 +215,30 @@ async fn operation_idempotency_rejects_duplicate_actor_kind_and_key(pool: PgPool
         error.as_database_error().unwrap().code().as_deref(),
         Some("23505")
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn repository_authorization_uses_current_membership_and_tenant_scope(pool: PgPool) {
+    let a = proposal_fixture(&pool).await;
+    let b = proposal_fixture(&pool).await;
+    let authorization = PgReadAuthorization::new(pool.clone());
+    assert!(authorization.can_read(a.1, a.3).await.unwrap());
+    assert!(!authorization.can_read(a.1, b.3).await.unwrap());
+    sqlx::query("UPDATE users SET status = 'DISABLED' WHERE id = $1")
+        .bind(a.1)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(!authorization.can_read(a.1, a.3).await.unwrap());
+    sqlx::query("UPDATE users SET status = 'ACTIVE' WHERE id = $1")
+        .bind(a.1)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM memberships WHERE user_id = $1")
+        .bind(a.1)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(!authorization.can_read(a.1, a.3).await.unwrap());
 }

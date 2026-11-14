@@ -138,6 +138,12 @@ Checkboxes represent verified work only.
   concurrent single-use state consumption and expiry. An incorrect binding cannot
   consume another browser's valid flow. OIDC signature verification and callback
   routing still need integration with these records.
+- OIDC identity verification: two tests pass against a local discovery/JWKS/token
+  server with an ephemeral RSA key. Authorization Code + S256 PKCE succeeds;
+  invalid signature, issuer, audience, nonce, expiry and access-token hash fail.
+  Production requires HTTPS, local HTTP is loopback-only, redirects/retries are
+  disabled and fresh JWKS are loaded per login operation. This module returns
+  verified issuer/subject only; HTTP callbacks and session cookies remain open.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

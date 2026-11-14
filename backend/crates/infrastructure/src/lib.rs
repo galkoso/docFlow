@@ -1,6 +1,7 @@
 //! PostgreSQL persistence primitives; provider calls never hold a DB transaction.
 pub mod authorization;
 pub mod login_flows;
+pub mod oidc;
 pub mod sessions;
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;

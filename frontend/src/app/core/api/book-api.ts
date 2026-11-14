@@ -6,6 +6,9 @@ export type Book = components['schemas']['Specification'];
 export type BookDocument = components['schemas']['DocumentResponse'];
 export type RepositoryList = components['schemas']['RepositoryList'];
 export type SearchPage = components['schemas']['SearchResponse'];
+export type MatchWindow = components['schemas']['MatchWindow'];
+export type Highlight = components['schemas']['Highlight'];
+export type HighlightResponse = components['schemas']['HighlightResponse'];
 
 @Injectable({ providedIn: 'root' })
 export class BookApi {
@@ -19,6 +22,12 @@ export class BookApi {
   }
   find(repository: string, commit: string, q: string, startAt = 0) {
     return this.http.get<SearchPage>(`${this.base(repository)}/find`, { params: { commit, q, limit: '100', start_at: String(startAt) } });
+  }
+  highlights(repository: string, commit: string, document: string, q: string, windows: MatchWindow[]) {
+    const bytes = new TextEncoder().encode(JSON.stringify(windows));
+    const encoded = btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+    return this.http.get<HighlightResponse>(`${this.base(repository)}/documents/${encodeURIComponent(document)}/highlights`,
+      { params: { commit, q, windows: encoded } });
   }
   private base(repository: string) { return `/api/v1/repositories/${encodeURIComponent(repository)}`; }
 }

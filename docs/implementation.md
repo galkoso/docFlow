@@ -323,3 +323,12 @@ Checkboxes represent verified work only.
   failures, limits and revocation. API/application tests and workspace Clippy pass.
   The OpenAPI contract describes windows and compact ranges. Viewport integration
   and browser performance/visual checks remain open.
+- Viewport highlight controller: a disposable Angular controller batches at most
+  32 text windows per request, keeps one request outstanding per rendered chapter,
+  cancels on query/version changes, rejects mismatched ranges and retains at most
+  128 offscreen windows in addition to currently visible ones. Text leaves split
+  at grapheme boundaries into 1,024 UTF-16 windows; even a very large grapheme uses
+  a bounded request interval while preserving its original display text. Five new
+  tests prove batching, cancellation, cache eviction, mismatch/denial handling,
+  empty-query clearing and Unicode-safe chunking. Build and all twenty-seven
+  frontend tests pass. Renderer observation and visual mark integration follow.

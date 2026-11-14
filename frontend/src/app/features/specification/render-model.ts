@@ -2,9 +2,37 @@ import type { components } from '../../core/api/generated/schema';
 
 export type RenderEvent = components['schemas']['RenderEvent'];
 export type SearchHit = components['schemas']['SearchHit'];
-export interface RenderNode { event: RenderEvent; children: RenderNode[]; alignment?: 'left' | 'center' | 'right'; }
+export type TextHighlight = Pick<SearchHit, 'block_id' | 'start_utf16' | 'end_utf16' | 'match_id'>;
+export type MatchWindow = components['schemas']['MatchWindow'];
+export const TEXT_WINDOW_UTF16 = 1024;
+export interface TextChunk { event: RenderEvent; window: MatchWindow | null; }
+export interface RenderNode { event: RenderEvent; children: RenderNode[]; chunks?: TextChunk[]; alignment?: 'left' | 'center' | 'right'; }
 export interface TextPart { text: string; matchId?: string; }
 export interface AssetContext { repository: string; commit: string; }
+
+/** Split display leaves without splitting graphemes. A giant grapheme needs only
+ * one short request window: canonical matches cover its entire original range. */
+export function textChunks(event: RenderEvent): TextChunk[] {
+  const text = event.text ?? '';
+  const chunks: TextChunk[] = [];
+  const add = (start: number, end: number) => {
+    const offset = event.offset_utf16 == null ? null : event.offset_utf16 + start;
+    const leaf = { ...event, text: text.slice(start, end), offset_utf16: offset };
+    const window = event.block_id && offset != null && end > start
+      ? { block_id: event.block_id, start_utf16: offset, end_utf16: offset + Math.min(TEXT_WINDOW_UTF16, end - start) } : null;
+    chunks.push({ event: leaf, window });
+  };
+  if (text.length <= TEXT_WINDOW_UTF16) { add(0, text.length); return chunks; }
+  let start = 0;
+  let end = 0;
+  for (const grapheme of new Intl.Segmenter('und', { granularity: 'grapheme' }).segment(text)) {
+    const next = grapheme.index + grapheme.segment.length;
+    if (next - start > TEXT_WINDOW_UTF16 && end > start) { add(start, end); start = end; }
+    end = next;
+  }
+  add(start, end);
+  return chunks;
+}
 
 export function assetSource(context: AssetContext | null, destination?: string | null): string | null {
   if (!context || !destination || !/^assets\/[a-f0-9]{64}\.(png|jpg|jpeg|webp)$/.test(destination)
@@ -24,6 +52,7 @@ export function renderTree(events: RenderEvent[]): RenderNode[] {
       continue;
     }
     const node: RenderNode = { event, children: [] };
+    if (event.kind === 'text' || event.kind === 'break') node.chunks = textChunks(event);
     if (event.kind === 'open' && event.tag === 'table_cell') {
       const table = [...stack].reverse().find(parent => parent.event.tag === 'table');
       const column = stack.at(-1)?.children.length ?? 0;
@@ -41,7 +70,7 @@ export function renderTree(events: RenderEvent[]): RenderNode[] {
 }
 
 /** Intersect server UTF-16 ranges with each text leaf, including formatted leaves. */
-export function textParts(event: RenderEvent, hits: SearchHit[]): TextPart[] {
+export function textParts(event: RenderEvent, hits: TextHighlight[]): TextPart[] {
   const text = event.text ?? '';
   const start = event.offset_utf16;
   if (start == null || !event.block_id) return [{ text }];

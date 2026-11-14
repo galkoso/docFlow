@@ -225,3 +225,14 @@ Checkboxes represent verified work only.
   cross-format UTF-16 highlights including Hebrew niqqud/emoji, and malformed/deep
   input failures. Production build and all nine frontend tests pass. Reader page
   wiring, catalog links, table alignment and authorized image delivery remain open.
+- Connected reader checkpoint: repository discovery now opens the real ordered
+  book, shows its commit/update metadata and source findings, and loads chapters
+  using that exact SHA. A continuous document surface and section TOC replace the
+  placeholder. Stable catalog links preserve repository/commit/document/section;
+  source images still show an explicit unavailable placeholder. Private book state
+  is component-scoped and cancelled/reset on account/version changes or denied
+  chapter access. Five additional HTTP/DOM tests cover pinned requests, duplicate
+  loads, stale responses, explicit inaccessible repositories, section-only route
+  changes and logout with an outstanding chapter request. Build and fourteen
+  frontend tests pass. Automatic viewport loading/eviction, full find controls,
+  image delivery and visual desktop/mobile verification remain open.

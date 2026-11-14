@@ -1,0 +1,56 @@
+<header class="book-heading">
+  <div><p class="eyebrow">מקור הידע המשותף</p><h1>האפיון המאושר</h1></div>
+  @if (state.repositories().length > 1) {
+    <label>מאגר <select #repository [value]="state.book()?.repository_id" (change)="selectRepository(repository.value)">
+      @for (item of state.repositories(); track item.repository_id) {<option [value]="item.repository_id">{{ item.repository_id }}</option>}
+    </select></label>
+  }
+</header>
+@if (!session.profile()) {
+  <section class="empty-state"><h2>כניסה לספר האפיון</h2><p>יש להתחבר כדי לקרוא את מאגרי האפיון המורשים לחשבון.</p><a class="button" routerLink="/settings">הגדרות וחיבור</a></section>
+} @else if (state.loading()) {
+  <p role="status" class="empty-state">טוענים את ספר האפיון…</p>
+} @else if (state.error(); as error) {
+  <section class="empty-state" role="alert"><p>{{ error }}</p><button class="button" (click)="retry()">ניסיון נוסף</button></section>
+} @else if (state.book(); as book) {
+  <div class="version-bar">
+    <span>ענף <bdi>{{ book.branch }}</bdi></span>
+    <span>עדכון: {{ book.updated_at | date:'dd/MM/yyyy HH:mm' }}</span>
+    <span>גרסה <code [title]="book.snapshot_sha">{{ book.snapshot_sha.slice(0, 12) }}</code></span>
+    <button (click)="book.version_selected ? latest() : retry()">{{ book.version_selected ? 'מעבר לגרסה העדכנית' : 'בדיקת עדכונים' }}</button>
+  </div>
+  @if (book.version_selected) {<p class="notice" role="status">מוצגת גרסה שנבחרה לפי Commit, לקריאה בלבד.</p>}
+  @if (book.findings.length) {
+    <details class="notice"><summary>נמצאו {{ book.findings.length }} בעיות במקור הספר</summary>
+      <ul>@for (finding of book.findings; track $index) {<li><bdi>{{ finding.path }}</bdi>: <code>{{ finding.code }}</code></li>}</ul>
+    </details>
+  }
+  <div class="book-layout">
+    <nav class="toc" aria-label="תוכן עניינים">
+      <h2>תוכן עניינים</h2>
+      <ol>@for (chapter of book.documents; track chapter.document_id) {
+        <li><button (click)="jump(chapter.document_id)">{{ chapter.title }}</button>
+          <ul>@for (section of chapter.sections; track section.section_id) {
+            <li><button (click)="jump(chapter.document_id, section.section_id)">{{ section.title }}</button></li>
+          }</ul>
+        </li>
+      }</ol>
+    </nav>
+    <div class="book-pages" aria-label="ספר האפיון">
+      @for (chapter of book.documents; track chapter.document_id) {
+        <article class="chapter" tabindex="-1" [id]="sectionId(chapter.document_id)" [attr.aria-label]="chapter.title">
+          <header class="chapter-heading"><span>פרק {{ $index + 1 }} / {{ book.documents.length }}</span><h2>{{ chapter.title }}</h2></header>
+          @if (chapter.error_code) {<p role="alert">פרק זה אינו זמין: <code>{{ chapter.error_code }}</code></p>}
+          @else if (state.documents()[chapter.document_id]; as document) {
+            @if (document.error_code || document.render_error) {<p role="alert">לא ניתן להציג את הפרק: <code>{{ document.error_code || document.render_error }}</code></p>}
+            @else {<app-document-renderer [events]="document.render_events" [sectionPrefix]="sectionId(chapter.document_id)" [internalLinks]="links()" />}
+          } @else if (state.loadingDocuments().has(chapter.document_id)) {<p role="status">טוענים את הפרק…</p>}
+          @else {
+            @if (state.documentErrors()[chapter.document_id]; as error) {<p role="alert">{{ error }}</p>}
+            <button class="load-chapter" (click)="state.loadDocument(chapter.document_id)">טעינת הפרק</button>
+          }
+        </article>
+      } @empty {<p class="empty-state">אין פרקים בספר זה.</p>}
+    </div>
+  </div>
+}

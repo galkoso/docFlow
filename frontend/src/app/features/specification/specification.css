@@ -1,0 +1,19 @@
+.book-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+.eyebrow { color: #697586; font-size: .85rem; margin: 0; }
+.version-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.5rem; color: #526479; font-size: .85rem; padding-block: .75rem; border-block: 1px solid #dce2eb; }
+button, select { border: 1px solid #cdd7df; background: white; border-radius: 5px; padding: .4rem .7rem; color: #23324b; cursor: pointer; }
+.book-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 2rem; margin-top: 1.5rem; align-items: start; }
+.toc { position: sticky; top: 1rem; max-height: 85vh; overflow-y: auto; font-size: .9rem; }
+.toc h2 { font-size: 1rem; margin: 0 0 .75rem; }
+.toc ol, .toc ul { padding-inline-start: 1rem; }
+.toc button { background: transparent; border: 0; text-align: start; padding: .3rem 0; }
+.toc button:hover { text-decoration: underline; }
+.toc ul { list-style: none; border-inline-start: 1px solid #dce2eb; margin-inline-start: .25rem; font-size: .85rem; }
+.book-pages { min-width: 0; max-width: 900px; background: white; border: 1px solid #e0e5ec; }
+.chapter { padding: 2rem 2.5rem; border-bottom: 1px solid #e0e5ec; scroll-margin-top: 2rem; }
+.chapter-heading { border-bottom: 1px solid #edf0f4; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+.chapter-heading span { color: #7b8899; font-size: .8rem; }
+.chapter-heading h2 { margin: .3rem 0 0; font-size: 1.3rem; }
+.load-chapter { width: 100%; padding: 1.5rem; }
+@media (max-width: 900px) { .book-layout { grid-template-columns: 1fr; gap: 1rem; } .toc { position: static; max-height: 240px; border: 1px solid #dce2eb; padding: 1rem; } }
+@media (max-width: 500px) { .chapter { padding: 1rem; } .book-heading { align-items: start; flex-direction: column; } .version-bar { gap: .5rem; } }

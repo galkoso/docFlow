@@ -20,12 +20,12 @@
           @case ('paragraph') { <p><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></p> }
           @case ('heading') {
             @switch (event.level) {
-              @case (1) { <h1 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h1> }
-              @case (2) { <h2 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h2> }
-              @case (3) { <h3 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h3> }
-              @case (4) { <h4 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h4> }
-              @case (5) { <h5 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h5> }
-              @default { <h6 [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h6> }
+              @case (1) { <h1 tabindex="-1" [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h1> }
+              @case (2) { <h2 tabindex="-1" [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h2> }
+              @case (3) { <h3 tabindex="-1" [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h3> }
+              @case (4) { <h4 tabindex="-1" [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h4> }
+              @case (5) { <h5 tabindex="-1" [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h5> }
+              @default { <h6 tabindex="-1" [id]="sectionPrefix() + event.section_id"><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></h6> }
             }
           }
           @case ('quote') { <blockquote><ng-container *ngTemplateOutlet="nodes; context: { $implicit: node.children }" /></blockquote> }

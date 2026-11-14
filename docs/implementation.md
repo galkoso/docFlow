@@ -90,3 +90,8 @@ Checkboxes represent verified work only.
   documents. Reproduce with `cargo run --release -p specspace-document-engine
   --example find_benchmark`. This excludes Markdown extraction, database, HTTP and
   DOM loading and therefore does not complete AC-02 or the end-to-end latency gate.
+- Markdown extraction: three additional tests pass for exact source retention,
+  stable section IDs across heading renames, code/list/table text, independent
+  search boundaries, hidden metadata/destinations and located validation findings.
+  Raw HTML is reported rather than rendered. This is source preservation during
+  parsing, not yet proof of rich-editor round-trip or full catalog/link validation.

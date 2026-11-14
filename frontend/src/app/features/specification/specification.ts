@@ -29,6 +29,7 @@ export class Specification implements OnDestroy {
   private readonly router = inject(Router);
   private lastJump = '';
   private lastMatch = '';
+  private findReturnFocus?: HTMLElement;
   readonly chapterHits = computed(() => {
     const result: Record<string, SearchHit[]> = {};
     for (const hit of this.find.hits()) (result[hit.document_id] ??= []).push(hit);
@@ -58,6 +59,7 @@ export class Specification implements OnDestroy {
       const profile = this.session.profile();
       this.selection();
       untracked(() => {
+        this.findReturnFocus = undefined;
         if (profile) this.retry();
         else { this.state.clear(); this.find.clear(); this.findOpen.set(false); }
       });
@@ -106,12 +108,16 @@ export class Specification implements OnDestroy {
   latest() { void this.router.navigate([], { relativeTo: this.route, queryParams: { commit: null }, queryParamsHandling: 'merge' }); }
   selectRepository(value: string) { void this.router.navigate([], { relativeTo: this.route, queryParams: { repo: value } }); }
   openFind() {
+    if (!this.findOpen() && window.document.activeElement instanceof HTMLElement) this.findReturnFocus = window.document.activeElement;
     this.findOpen.set(true);
     requestAnimationFrame(() => { this.findInput()?.nativeElement.focus(); this.findInput()?.nativeElement.select(); });
   }
   closeFind() {
     this.findOpen.set(false);
     this.updateQuery('');
+    const target = this.findReturnFocus?.isConnected ? this.findReturnFocus : window.document.getElementById('main-content');
+    this.findReturnFocus = undefined;
+    target?.focus({ preventScroll: true });
   }
   updateQuery(query: string) {
     this.find.search(query);

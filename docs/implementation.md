@@ -298,3 +298,10 @@ Checkboxes represent verified work only.
   frontend tests pass; OpenAPI and generated client types include the image route.
   Real-browser image/layout verification, upload validation/retention policy and
   pre-merge media/link checks remain open; FILE-01–04 are not fully accepted yet.
+- Find focus correction: opening find remembers the initiating focus target;
+  closing it restores that target without scrolling, with the main-content region
+  as fallback. Focus references are dropped on account/version reset and after
+  restoration. Reader DOM coverage now verifies shortcut opening, external-field
+  exclusion, Escape closing and focus return. The production build and all
+  twenty-two frontend tests pass. Browser discovery was retried after image
+  integration and still returned no connected browser; visual gates remain open.

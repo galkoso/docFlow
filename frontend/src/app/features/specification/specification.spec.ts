@@ -33,6 +33,8 @@ describe('Authorized reader page', () => {
     });
     await fixture.whenStable();
     expect(fixture.nativeElement.textContent).toContain('תוכן מורשה פרטי');
+    const findButton: HTMLButtonElement = fixture.nativeElement.querySelector('.version-bar button');
+    findButton.focus();
     const shortcut = new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, cancelable: true });
     document.dispatchEvent(shortcut);
     fixture.detectChanges();
@@ -47,6 +49,7 @@ describe('Authorized reader page', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('#book-find')).toBeNull();
+    expect(document.activeElement).toBe(findButton);
     expect(fixture.nativeElement.textContent).toContain('תוכן מורשה פרטי');
     params.next(convertToParamMap({ repo: 'repo', doc: 'D2', section: 'S2' }));
     fixture.detectChanges();

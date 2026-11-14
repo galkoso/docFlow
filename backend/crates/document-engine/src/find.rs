@@ -1,5 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -37,6 +38,107 @@ struct Segment {
     original_end: u32,
     original_byte_start: u32,
     original_byte_end: u32,
+}
+
+/// Visible text intervals within one document. Matching uses each entire block,
+/// so a viewport/formatting boundary never changes literal-search semantics.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MatchWindow {
+    pub block_id: String,
+    pub start_utf16: u32,
+    pub end_utf16: u32,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct Highlight {
+    pub match_id: String,
+    pub block_id: String,
+    pub start_utf16: u32,
+    pub end_utf16: u32,
+}
+
+pub fn highlights(
+    snapshot: &str,
+    blocks: &[VisibleBlock<'_>],
+    query: &str,
+    windows: &[MatchWindow],
+) -> Result<Vec<Highlight>, &'static str> {
+    if query.chars().count() > 200 {
+        return Err("QUERY_TOO_LONG");
+    }
+    if windows.len() > 64 {
+        return Err("HIGHLIGHT_WINDOW_LIMIT");
+    }
+    let by_id: HashMap<_, _> = blocks.iter().map(|block| (block.block_id, block)).collect();
+    if by_id.len() != blocks.len() {
+        return Err("INVALID_HIGHLIGHT_BLOCKS");
+    }
+    let mut selected: HashMap<&str, Vec<(u32, u32)>> = HashMap::new();
+    let mut lengths = HashMap::new();
+    let mut total = 0u64;
+    for window in windows {
+        let block = by_id
+            .get(window.block_id.as_str())
+            .ok_or("INVALID_HIGHLIGHT_WINDOW")?;
+        if block.text.len() > 2 * 1024 * 1024 {
+            return Err("FILE_TOO_LARGE");
+        }
+        let length = *lengths
+            .entry(block.block_id)
+            .or_insert_with(|| block.text.encode_utf16().count() as u32);
+        if window.start_utf16 >= window.end_utf16 || window.end_utf16 > length {
+            return Err("INVALID_HIGHLIGHT_WINDOW");
+        }
+        total += u64::from(window.end_utf16 - window.start_utf16);
+        if total > 32768 {
+            return Err("HIGHLIGHT_WINDOW_LIMIT");
+        }
+        selected
+            .entry(block.block_id)
+            .or_default()
+            .push((window.start_utf16, window.end_utf16));
+    }
+    let needle = normalize(query).0;
+    if needle.is_empty() {
+        return Ok(vec![]);
+    }
+    let mut output = vec![];
+    for block in blocks {
+        let Some(windows) = selected.get_mut(block.block_id) else {
+            continue;
+        };
+        windows.sort_unstable();
+        let mut merged: Vec<(u32, u32)> = vec![];
+        for &(start, end) in windows.iter() {
+            if let Some(last) = merged.last_mut().filter(|last| last.1 >= start) {
+                last.1 = last.1.max(end);
+            } else {
+                merged.push((start, end));
+            }
+        }
+        visit_matches(block.text, &needle, |first, last| {
+            let index = merged.partition_point(|window| window.1 <= first.original_start);
+            if merged
+                .get(index)
+                .is_some_and(|window| window.0 < last.original_end)
+                && output.len() <= 40000
+            {
+                output.push(Highlight {
+                    match_id: match_id(snapshot, block, first.original_start, last.original_end),
+                    block_id: block.block_id.into(),
+                    start_utf16: first.original_start,
+                    end_utf16: last.original_end,
+                });
+            }
+        });
+        if output.len() > 40000 {
+            return Err("HIGHLIGHT_WINDOW_LIMIT");
+        }
+    }
+    Ok(output)
 }
 
 fn ignored(c: char) -> bool {
@@ -81,6 +183,38 @@ fn normalize(text: &str) -> (String, Vec<Segment>) {
     (normalized, segments)
 }
 
+fn visit_matches(text: &str, needle: &str, mut visit: impl FnMut(&Segment, &Segment)) {
+    let (haystack, map) = normalize(text);
+    let mut previous_range = None;
+    for (start, _) in haystack.match_indices(needle) {
+        let end = start + needle.len();
+        let first = map.partition_point(|segment| segment.normalized_start <= start) - 1;
+        let last = map.partition_point(|segment| segment.normalized_start < end) - 1;
+        let range = (map[first].original_start, map[last].original_end);
+        if previous_range == Some(range) {
+            continue;
+        }
+        previous_range = Some(range);
+        visit(&map[first], &map[last]);
+    }
+}
+
+fn match_id(snapshot: &str, block: &VisibleBlock<'_>, start: u32, end: u32) -> String {
+    let mut identity = Sha256::new();
+    for part in [
+        snapshot,
+        block.document_id,
+        block.section_id,
+        block.block_id,
+    ] {
+        identity.update(part.as_bytes());
+        identity.update([0]);
+    }
+    identity.update(start.to_le_bytes());
+    identity.update(end.to_le_bytes());
+    format!("{:x}", identity.finalize())
+}
+
 /// Blocks must come from one complete authorized snapshot, in catalog order.
 /// Normalization maps are released per block; only the requested page is retained.
 /// The service layer binds the offset to query+snapshot in an opaque cursor.
@@ -111,22 +245,13 @@ pub fn find(
         if block.text.len() > 2 * 1024 * 1024 {
             return Err("FILE_TOO_LARGE");
         }
-        let (haystack, map) = normalize(block.text);
-        let mut previous_range = None;
-        for (start, _) in haystack.match_indices(&needle) {
-            let end = start + needle.len();
-            let first = map.partition_point(|segment| segment.normalized_start <= start) - 1;
-            let last = map.partition_point(|segment| segment.normalized_start < end) - 1;
-            let range = (map[first].original_start, map[last].original_end);
-            if previous_range == Some(range) {
-                continue;
-            }
-            previous_range = Some(range);
+        visit_matches(block.text, &needle, |first, last| {
+            let range = (first.original_start, last.original_end);
             let index = page.total_matches;
             page.total_matches += 1;
             if index >= offset && page.matches.len() < limit {
-                let byte_start = map[first].original_byte_start as usize;
-                let byte_end = map[last].original_byte_end as usize;
+                let byte_start = first.original_byte_start as usize;
+                let byte_end = last.original_byte_end as usize;
                 let excerpt_start = block.text[..byte_start]
                     .grapheme_indices(true)
                     .rev()
@@ -138,20 +263,8 @@ pub fn find(
                     .take(60)
                     .last()
                     .map_or(byte_end, |(start, text)| byte_end + start + text.len());
-                let mut identity = Sha256::new();
-                for part in [
-                    snapshot_sha,
-                    block.document_id,
-                    block.section_id,
-                    block.block_id,
-                ] {
-                    identity.update(part.as_bytes());
-                    identity.update([0]);
-                }
-                identity.update(range.0.to_le_bytes());
-                identity.update(range.1.to_le_bytes());
                 page.matches.push(Match {
-                    match_id: format!("{:x}", identity.finalize()),
+                    match_id: match_id(snapshot_sha, block, range.0, range.1),
                     document_id: block.document_id.into(),
                     section_id: block.section_id.into(),
                     block_id: block.block_id.into(),
@@ -161,7 +274,7 @@ pub fn find(
                     excerpt: block.text[excerpt_start..excerpt_end].into(),
                 });
             }
-        }
+        });
     }
     if offset.saturating_add(page.matches.len()) < page.total_matches {
         page.next_offset = Some(offset.saturating_add(page.matches.len()));
@@ -188,6 +301,147 @@ mod tests {
                 [found.start_utf16 as usize..found.end_utf16 as usize],
         )
         .unwrap()
+    }
+
+    #[test]
+    fn visible_windows_mark_results_beyond_api_pages_with_the_same_stable_identity() {
+        let text = "match ".repeat(2000);
+        let blocks = [block(&text)];
+        let global = find("sha", &blocks, "match", 1500, 1).unwrap();
+        let target = &global.matches[0];
+        let window = MatchWindow {
+            block_id: "block-1".into(),
+            start_utf16: target.start_utf16 + 1,
+            end_utf16: target.end_utf16 - 1,
+        };
+        let visible = highlights("sha", &blocks, "match", &[window.clone(), window]).unwrap();
+        assert_eq!(global.total_matches, 2000);
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].match_id, target.match_id);
+        assert_eq!(
+            (visible[0].start_utf16, visible[0].end_utf16),
+            (target.start_utf16, target.end_utf16)
+        );
+    }
+
+    #[test]
+    fn highlight_windows_preserve_grapheme_ranges_and_semantic_block_boundaries() {
+        for (text, query) in [
+            ("😀 \u{200f}מְחִיקָה", "מחיקה"),
+            ("👩‍👩‍👧‍👦", "👩"),
+            ("Cafe\u{301} A\t \nB", "a b"),
+            ("[x]* <tag>", "[x]*"),
+        ] {
+            let blocks = [block(text)];
+            let global = find("sha", &blocks, query, 0, 100).unwrap();
+            let target = &global.matches[0];
+            let window = MatchWindow {
+                block_id: "block-1".into(),
+                start_utf16: target.start_utf16 + 1,
+                end_utf16: target.start_utf16 + 2,
+            };
+            let visible = highlights("sha", &blocks, query, &[window]).unwrap();
+            assert_eq!(visible[0].match_id, target.match_id);
+            assert_eq!(
+                (visible[0].start_utf16, visible[0].end_utf16),
+                (target.start_utf16, target.end_utf16)
+            );
+        }
+        let blocks = [
+            block("alpha"),
+            VisibleBlock {
+                block_id: "block-2",
+                ..block("beta")
+            },
+        ];
+        let windows = [
+            MatchWindow {
+                block_id: "block-1".into(),
+                start_utf16: 0,
+                end_utf16: 5,
+            },
+            MatchWindow {
+                block_id: "block-2".into(),
+                start_utf16: 0,
+                end_utf16: 4,
+            },
+        ];
+        assert!(
+            highlights("sha", &blocks, "alphabeta", &windows)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(highlights("sha", &blocks, "", &windows).unwrap().is_empty());
+    }
+
+    #[test]
+    fn highlight_work_and_output_are_bounded_by_validated_visible_intervals() {
+        let text = "x".repeat(100_000);
+        let blocks = [block(&text)];
+        let window = MatchWindow {
+            block_id: "block-1".into(),
+            start_utf16: 100,
+            end_utf16: 1124,
+        };
+        assert_eq!(
+            highlights("sha", &blocks, "x", std::slice::from_ref(&window))
+                .unwrap()
+                .len(),
+            1024
+        );
+        assert_eq!(
+            highlights("sha", &blocks, "x", &vec![window.clone(); 65]),
+            Err("HIGHLIGHT_WINDOW_LIMIT")
+        );
+        assert_eq!(
+            highlights(
+                "sha",
+                &blocks,
+                "x",
+                &[MatchWindow {
+                    end_utf16: 40000,
+                    ..window.clone()
+                }]
+            ),
+            Err("HIGHLIGHT_WINDOW_LIMIT")
+        );
+        assert_eq!(
+            highlights(
+                "sha",
+                &blocks,
+                "x",
+                &[MatchWindow {
+                    block_id: "missing".into(),
+                    ..window.clone()
+                }]
+            ),
+            Err("INVALID_HIGHLIGHT_WINDOW")
+        );
+        assert_eq!(
+            highlights(
+                "sha",
+                &blocks,
+                "x",
+                &[MatchWindow {
+                    start_utf16: 1,
+                    end_utf16: 1,
+                    ..window.clone()
+                }]
+            ),
+            Err("INVALID_HIGHLIGHT_WINDOW")
+        );
+        assert_eq!(
+            highlights(
+                "sha",
+                &blocks,
+                "x",
+                &[MatchWindow {
+                    end_utf16: 100001,
+                    ..window
+                }]
+            ),
+            Err("INVALID_HIGHLIGHT_WINDOW")
+        );
     }
 
     #[test]

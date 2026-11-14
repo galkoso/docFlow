@@ -305,3 +305,12 @@ Checkboxes represent verified work only.
   exclusion, Escape closing and focus return. The production build and all
   twenty-two frontend tests pass. Browser discovery was retried after image
   integration and still returned no connected browser; visual gates remain open.
+- Canonical visible-highlight engine: viewport intervals now select highlight
+  ranges from the same normalized whole-block scan and stable identity function
+  used by global find. Formatting/viewport boundaries cannot change matching.
+  Requests are limited to 64 windows and 32,768 UTF-16 units; results are bounded,
+  ordered and deduplicated across overlapping windows. Three new tests verify a
+  match beyond result 1,500 against paged identity, Hebrew/emoji/whitespace/literal
+  parity, semantic boundaries and work limits. All twenty-one engine tests and
+  workspace Clippy pass. HTTP delivery and viewport rendering are the next steps;
+  FIND-05 remains open until those layers are connected and verified.

@@ -130,3 +130,10 @@ Checkboxes represent verified work only.
   bounded blocking pool; declared and actual text-size limits are checked.
   The full Rust suite now passes **37 tests**, including seven PostgreSQL tests,
   and workspace Clippy passes with warnings denied. HTTP/UI/OIDC wiring is pending.
+- Server-session storage: two additional PostgreSQL tests pass for hashed bearer
+  tokens, per-session CSRF secrets, expiry, logout isolation and immediate account
+  disablement. OIDC flow/session tables are migrated in tests. Login callbacks,
+  cookie attributes and HTTP CSRF enforcement are still pending.
+- Browser verification attempt: the Browser runtime reported no available browser
+  and discovery returned an empty list. Desktop/320px visual verification remains
+  open; the Angular development server starts successfully on loopback port 4200.

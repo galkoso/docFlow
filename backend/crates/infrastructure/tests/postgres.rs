@@ -1,5 +1,6 @@
 use specspace_application::book::ReadAuthorization;
 use specspace_infrastructure::authorization::PgReadAuthorization;
+use specspace_infrastructure::sessions::SessionStore;
 use specspace_infrastructure::{complete_job, lease_job};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -241,4 +242,85 @@ async fn repository_authorization_uses_current_membership_and_tenant_scope(pool:
         .await
         .unwrap();
     assert!(!authorization.can_read(a.1, a.3).await.unwrap());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn session_tokens_are_hashed_and_csrf_is_bound_to_the_session(pool: PgPool) {
+    let ids = proposal_fixture(&pool).await;
+    let sessions = SessionStore::new(pool.clone());
+    let credentials = sessions.mint(ids.1, 3600).await.unwrap();
+    let identity = sessions
+        .authenticate(credentials.session_cookie_value())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(identity.user_id, ids.1);
+    assert!(identity.verify_csrf(credentials.csrf_cookie_value()));
+    assert!(!identity.verify_csrf(credentials.session_cookie_value()));
+    let other = sessions.mint(ids.1, 3600).await.unwrap();
+    assert!(!identity.verify_csrf(other.csrf_cookie_value()));
+    let stored: Vec<u8> = sqlx::query_scalar("SELECT token_hash FROM sessions WHERE id = $1")
+        .bind(identity.session_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(stored.len(), 32);
+    assert_ne!(stored, credentials.session_cookie_value().as_bytes());
+    sessions
+        .revoke(credentials.session_cookie_value())
+        .await
+        .unwrap();
+    assert!(
+        sessions
+            .authenticate(credentials.session_cookie_value())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        sessions
+            .authenticate(other.session_cookie_value())
+            .await
+            .unwrap()
+            .is_some()
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn expiration_and_disabled_users_invalidate_existing_sessions(pool: PgPool) {
+    let ids = proposal_fixture(&pool).await;
+    let sessions = SessionStore::new(pool.clone());
+    let expired = sessions.mint(ids.1, 3600).await.unwrap();
+    sqlx::query("UPDATE sessions SET expires_at = now() - interval '1 second'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        sessions
+            .authenticate(expired.session_cookie_value())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let active = sessions.mint(ids.1, 3600).await.unwrap();
+    sqlx::query("UPDATE users SET status = 'DISABLED' WHERE id = $1")
+        .bind(ids.1)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        sessions
+            .authenticate(active.session_cookie_value())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(sessions.mint(ids.1, 3600).await.is_err());
+    assert!(
+        sessions
+            .authenticate("invalid-input")
+            .await
+            .unwrap()
+            .is_none()
+    );
 }

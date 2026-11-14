@@ -1,5 +1,6 @@
 [package]
 name = "specspace-api"
+default-run = "specspace-api"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -19,6 +20,7 @@ uuid.workspace = true
 specspace-infrastructure = { path = "../infrastructure" }
 cookie = "0.18"
 url = "2"
+utoipa = { version = "6", features = ["uuid"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

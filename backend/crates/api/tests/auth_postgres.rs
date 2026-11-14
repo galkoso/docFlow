@@ -71,6 +71,9 @@ async fn me_uses_server_session_and_ignores_client_identity_headers(pool: PgPool
         serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
     assert_eq!(body["user_id"], user.to_string());
     assert_eq!(body["memberships"][0]["role"], "READER");
+    assert_eq!(body["capabilities"]["read_specification"], true);
+    assert_eq!(body["capabilities"]["merge"], false);
+    assert_eq!(body["capabilities"]["manage_policy"], false);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

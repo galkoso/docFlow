@@ -151,6 +151,12 @@ Checkboxes represent verified work only.
   Origin+CSRF enforcement and logout isolation. API unit/integration checks and
   workspace Clippy pass. Callback-to-browser validation against a configured real
   identity provider, `/me` capability expansion and frontend sign-in remain open.
+- API contract: Rust derives now generate `docs/openapi.json` for all current
+  endpoints, profile capabilities and structured errors. Backend CI regenerates
+  and compares the artifact. `/me` returns capabilities derived from current
+  memberships; reader HTTP tests prove merge/admin capabilities remain false.
+  The public auth-status endpoint reports whether login is configured. Future
+  product endpoints and their request/response schemas remain to be implemented.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

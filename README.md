@@ -55,3 +55,8 @@ the server session. OAuth tokens are never returned to the browser.
 Endpoints implemented so far: `/api/v1/auth/login`, `/api/v1/auth/callback`,
 `/api/v1/auth/logout` and `/api/v1/me`. Identity-provider setup and the full browser
 login flow still require environment validation; see the delivery ledger.
+
+The current API schema is [docs/openapi.json](docs/openapi.json), generated from
+Rust types and routes. Regenerate from `backend` with
+`cargo run --quiet -p specspace-api --bin export-openapi > ../docs/openapi.json`.
+Backend CI checks that this artifact matches the source contract.

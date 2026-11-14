@@ -81,6 +81,7 @@ impl CookiePolicy {
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/v1/auth/login", get(login))
+        .route("/api/v1/auth/status", get(availability))
         .route("/api/v1/auth/callback", get(callback))
         .route("/api/v1/auth/logout", post(logout))
         .route("/api/v1/me", get(me))
@@ -129,7 +130,8 @@ fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
 
 fn set_cookie(response: &mut Response, cookie: Cookie<'_>) {
     // Cookies contain only server-generated hex secrets and constant attributes.
-    if let Ok(value) = HeaderValue::from_str(&cookie.to_string()) {
+    if let Ok(mut value) = HeaderValue::from_str(&cookie.to_string()) {
+        value.set_sensitive(true);
         response.headers_mut().append(header::SET_COOKIE, value);
     }
 }
@@ -199,7 +201,8 @@ pub(crate) fn verify_write(
     Ok(())
 }
 
-async fn login(State(state): State<AppState>) -> Response {
+#[utoipa::path(get, path = "/api/v1/auth/login", responses((status = 307, description = "Redirect to the configured identity provider"), (status = 503, body = ErrorBody)))]
+pub(crate) async fn login(State(state): State<AppState>) -> Response {
     let Some(oidc) = &state.oidc else {
         return error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -229,12 +232,15 @@ async fn login(State(state): State<AppState>) -> Response {
 }
 
 #[derive(Deserialize)]
-struct Callback {
+pub(crate) struct Callback {
     state: String,
     code: Option<String>,
 }
 
-async fn callback(
+#[utoipa::path(get, path = "/api/v1/auth/callback",
+    params(("state" = String, Query), ("code" = Option<String>, Query)),
+    responses((status = 303, description = "Session cookies issued; redirect to specification"), (status = 400, body = ErrorBody), (status = 401, body = ErrorBody), (status = 403, body = ErrorBody), (status = 503, body = ErrorBody)))]
+pub(crate) async fn callback(
     State(state): State<AppState>,
     headers: HeaderMap,
     query: Result<Query<Callback>, axum::extract::rejection::QueryRejection>,
@@ -349,7 +355,10 @@ async fn callback(
     response
 }
 
-async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
+#[utoipa::path(post, path = "/api/v1/auth/logout", security(("sessionCookie" = [])),
+    params(("Origin" = String, Header), ("X-XSRF-TOKEN" = String, Header)),
+    responses((status = 204, description = "Current session revoked"), (status = 401, body = ErrorBody), (status = 403, body = ErrorBody), (status = 503, body = ErrorBody)))]
+pub(crate) async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let identity = match authenticate(&state, &headers).await {
         Ok(identity) => identity,
         Err(error) => return error.into_response(),
@@ -379,14 +388,44 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
     response
 }
 
-#[derive(Serialize, FromRow)]
-struct Membership {
+#[derive(Serialize, FromRow, utoipa::ToSchema)]
+pub struct Membership {
     organization_id: Uuid,
     role: String,
     review_domains: Vec<String>,
 }
 
-async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct ProfileCapabilities {
+    read_specification: bool,
+    create_proposal: bool,
+    review: bool,
+    merge: bool,
+    manage_policy: bool,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct Profile {
+    user_id: Uuid,
+    display_name: String,
+    memberships: Vec<Membership>,
+    capabilities: ProfileCapabilities,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct AuthAvailability {
+    login_available: bool,
+}
+
+#[utoipa::path(get, path = "/api/v1/auth/status", responses((status = 200, body = AuthAvailability)))]
+pub(crate) async fn availability(State(state): State<AppState>) -> Json<AuthAvailability> {
+    Json(AuthAvailability {
+        login_available: state.oidc.is_some(),
+    })
+}
+
+#[utoipa::path(get, path = "/api/v1/me", security(("sessionCookie" = [])), responses((status = 200, body = Profile), (status = 401, body = ErrorBody), (status = 503, body = ErrorBody)))]
+pub(crate) async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let identity = match authenticate(&state, &headers).await {
         Ok(identity) => identity,
         Err(error) => return error.into_response(),
@@ -411,7 +450,34 @@ async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let memberships = match sqlx::query_as::<_, Membership>("SELECT organization_id, role, review_domains FROM memberships WHERE user_id = $1 ORDER BY organization_id").bind(identity.user_id).fetch_all(&state.database).await {
         Ok(memberships) => memberships, Err(_) => return database_error(),
     };
-    Json(serde_json::json!({"user_id": identity.user_id, "display_name": name, "memberships": memberships})).into_response()
+    if memberships.is_empty() {
+        return AuthFailure::Expired.into_response();
+    }
+    let capabilities = ProfileCapabilities {
+        read_specification: true,
+        create_proposal: memberships
+            .iter()
+            .any(|membership| membership.role != "READER"),
+        review: memberships.iter().any(|membership| {
+            matches!(
+                membership.role.as_str(),
+                "REVIEWER" | "MAINTAINER" | "ADMIN"
+            ) && !membership.review_domains.is_empty()
+        }),
+        merge: memberships
+            .iter()
+            .any(|membership| matches!(membership.role.as_str(), "MAINTAINER" | "ADMIN")),
+        manage_policy: memberships
+            .iter()
+            .any(|membership| membership.role == "ADMIN"),
+    };
+    Json(Profile {
+        user_id: identity.user_id,
+        display_name: name,
+        memberships,
+        capabilities,
+    })
+    .into_response()
 }
 
 #[cfg(test)]

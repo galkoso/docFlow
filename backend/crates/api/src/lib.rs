@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod contract;
 
 use axum::{
     Json, Router,
@@ -31,17 +32,17 @@ impl AppState {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct Health {
     status: &'static str,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ErrorBody {
     pub error: ApiError,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ApiError {
     pub code: &'static str,
     pub message_he: &'static str,
@@ -61,12 +62,14 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
+#[utoipa::path(get, path = "/api/v1/health/live", responses((status = 200, body = Health)))]
 async fn live() -> Json<Health> {
     Json(Health { status: "live" })
 }
 
 /// Readiness currently covers the API's database dependency only.
 /// Provider and storage readiness must be included when those adapters are wired.
+#[utoipa::path(get, path = "/api/v1/health/ready", responses((status = 200, body = Health), (status = 503, body = Health)))]
 async fn ready(State(state): State<AppState>) -> (StatusCode, Json<Health>) {
     let available = sqlx::query("SELECT 1")
         .execute(&state.database)

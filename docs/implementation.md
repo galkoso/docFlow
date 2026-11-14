@@ -168,6 +168,11 @@ Checkboxes represent verified work only.
   A live local proxy check returns JSON auth status (200), unauthenticated profile
   (401) and database readiness (200), rather than a fallback HTML page. Full browser
   sign-in and visual/accessibility verification remain pending.
+- Historical-read foundation: GitHub commit metadata validates the requested SHA
+  and normalizes commit dates to UTC. Ancestry checks reject divergent commits;
+  eight provider tests now pass. A read-only live compare of two docFlow commits
+  confirmed page 2 retains ancestry metadata without file patches, including when
+  that page has no commits. This is transport evidence, not a live App permission gate.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

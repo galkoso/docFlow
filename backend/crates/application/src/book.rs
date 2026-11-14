@@ -258,6 +258,22 @@ mod tests {
 
     #[async_trait]
     impl GitProvider for TestProvider {
+        async fn commit_metadata(
+            &self,
+            commit: &CommitSha,
+        ) -> Result<specspace_git_adapter::CommitMetadata, GitError> {
+            Ok(specspace_git_adapter::CommitMetadata {
+                sha: commit.clone(),
+                committed_at: "2026-11-14T10:00:00Z".parse().unwrap(),
+            })
+        }
+        async fn is_ancestor(
+            &self,
+            ancestor: &CommitSha,
+            descendant: &CommitSha,
+        ) -> Result<bool, GitError> {
+            Ok(ancestor == descendant)
+        }
         async fn main_head(&self) -> Result<CommitSha, GitError> {
             self.main_reads.fetch_add(1, Ordering::SeqCst);
             CommitSha::parse(SHA)

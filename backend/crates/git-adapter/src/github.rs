@@ -1,4 +1,6 @@
-use crate::{CommitRequest, CommitSha, FileChange, FileEntry, GitError, GitProvider};
+use crate::{
+    CommitMetadata, CommitRequest, CommitSha, FileChange, FileEntry, GitError, GitProvider,
+};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use reqwest::{
@@ -429,6 +431,71 @@ impl GitProvider for GitHub {
         }
         Ok(files)
     }
+
+    async fn commit_metadata(&self, commit: &CommitSha) -> Result<CommitMetadata, GitError> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/repos/{}/git/commits/{}",
+                self.rest_base,
+                self.repository,
+                commit.as_str()
+            ))
+            .send()
+            .await
+            .map_err(|_| GitError::ProviderUnavailable)?;
+        let data = Self::response(response, false).await?;
+        let sha = CommitSha::parse(data["sha"].as_str().ok_or(GitError::InvalidResponse)?)?;
+        if sha != *commit {
+            return Err(GitError::InvalidResponse);
+        }
+        let committed_at = chrono::DateTime::parse_from_rfc3339(
+            data["committer"]["date"]
+                .as_str()
+                .ok_or(GitError::InvalidResponse)?,
+        )
+        .map_err(|_| GitError::InvalidResponse)?
+        .with_timezone(&chrono::Utc);
+        Ok(CommitMetadata { sha, committed_at })
+    }
+
+    async fn is_ancestor(
+        &self,
+        ancestor: &CommitSha,
+        descendant: &CommitSha,
+    ) -> Result<bool, GitError> {
+        if ancestor == descendant {
+            return Ok(true);
+        }
+        let response = self
+            .client
+            .get(format!(
+                "{}/repos/{}/compare/{}...{}",
+                self.rest_base,
+                self.repository,
+                ancestor.as_str(),
+                descendant.as_str()
+            ))
+            .query(&[("per_page", "1"), ("page", "2")])
+            .send()
+            .await
+            .map_err(|_| GitError::ProviderUnavailable)?;
+        let data = Self::response(response, false).await?;
+        let base = data["base_commit"]["sha"]
+            .as_str()
+            .ok_or(GitError::InvalidResponse)?;
+        let merge_base = data["merge_base_commit"]["sha"]
+            .as_str()
+            .ok_or(GitError::InvalidResponse)?;
+        if base != ancestor.as_str() {
+            return Err(GitError::InvalidResponse);
+        }
+        match data["status"].as_str() {
+            Some("ahead") => Ok(merge_base == ancestor.as_str()),
+            Some("behind" | "diverged") => Ok(false),
+            _ => Err(GitError::InvalidResponse),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -543,6 +610,19 @@ mod tests {
         )
     }
 
+    async fn metadata(State(state): State<Arc<ProviderState>>) -> Json<Value> {
+        Json(
+            json!({"sha": if state.mode.load(Ordering::SeqCst) == 5 { NEW } else { OLD }, "committer": {"date": "2026-11-14T10:00:00+02:00"}}),
+        )
+    }
+
+    async fn comparison(State(state): State<Arc<ProviderState>>) -> Json<Value> {
+        let diverged = state.mode.load(Ordering::SeqCst) == 6;
+        Json(
+            json!({"base_commit": {"sha": OLD}, "merge_base_commit": {"sha": if diverged { NEW } else { OLD }}, "status": if diverged { "diverged" } else { "ahead" }}),
+        )
+    }
+
     async fn fixture() -> Fixture {
         let state = Arc::new(ProviderState {
             head: Mutex::new(OLD.into()),
@@ -554,6 +634,14 @@ mod tests {
             .route("/repos/synthetic/book/git/refs", post(create_ref))
             .route(&format!("/repos/synthetic/book/git/blobs/{OLD}"), get(blob))
             .route(&format!("/repos/synthetic/book/git/trees/{OLD}"), get(tree))
+            .route(
+                &format!("/repos/synthetic/book/git/commits/{OLD}"),
+                get(metadata),
+            )
+            .route(
+                &format!("/repos/synthetic/book/compare/{OLD}...{NEW}"),
+                get(comparison),
+            )
             .with_state(state.clone());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
@@ -697,6 +785,24 @@ mod tests {
             fixture.adapter.list_files(&head).await,
             Err(GitError::ResponseTooLarge)
         ));
+    }
+
+    #[tokio::test]
+    async fn history_requires_an_ancestor_and_metadata_identity_matches_the_requested_commit() {
+        let fixture = fixture().await;
+        let old = CommitSha::parse(OLD).unwrap();
+        let new = CommitSha::parse(NEW).unwrap();
+        assert!(fixture.adapter.is_ancestor(&old, &new).await.unwrap());
+        assert!(fixture.adapter.is_ancestor(&old, &old).await.unwrap());
+        let info = fixture.adapter.commit_metadata(&old).await.unwrap();
+        assert_eq!(info.committed_at.to_rfc3339(), "2026-11-14T08:00:00+00:00");
+        fixture.state.mode.store(5, Ordering::SeqCst);
+        assert!(matches!(
+            fixture.adapter.commit_metadata(&old).await,
+            Err(GitError::InvalidResponse)
+        ));
+        fixture.state.mode.store(6, Ordering::SeqCst);
+        assert!(!fixture.adapter.is_ancestor(&old, &new).await.unwrap());
     }
 
     #[tokio::test]

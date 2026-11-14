@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use specspace_domain::{BranchName, RepositoryPath};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CommitSha(String);
 
 impl CommitSha {
@@ -67,6 +67,11 @@ pub struct FileEntry {
     pub size: u64,
 }
 
+pub struct CommitMetadata {
+    pub sha: CommitSha,
+    pub committed_at: chrono::DateTime<chrono::Utc>,
+}
+
 pub struct CommitRequest<'a> {
     pub operation_id: Uuid,
     pub branch: &'a BranchName,
@@ -94,4 +99,10 @@ pub trait GitProvider: Send + Sync {
         path: &RepositoryPath,
     ) -> Result<String, GitError>;
     async fn list_files(&self, commit: &CommitSha) -> Result<Vec<FileEntry>, GitError>;
+    async fn commit_metadata(&self, commit: &CommitSha) -> Result<CommitMetadata, GitError>;
+    async fn is_ancestor(
+        &self,
+        ancestor: &CommitSha,
+        descendant: &CommitSha,
+    ) -> Result<bool, GitError>;
 }

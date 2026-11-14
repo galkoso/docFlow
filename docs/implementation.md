@@ -359,3 +359,14 @@ Checkboxes represent verified work only.
   and does not prove the complete performance gate. Run with `cargo run --release
   -p specspace-document-engine --example find_benchmark -- --indexed`.
   PostgreSQL persistence, worker scheduling and runtime use are still pending.
+- PostgreSQL derived-index schema: snapshots now bind repository/SHA/normalizer
+  version to a scoped job, readiness metadata and a complete ordered block set.
+  Text payloads deduplicate only within an organization/version; their normalized
+  text, original text and source maps are immutable. A READY transition validates
+  contiguous ordering, counts and byte totals; block writes take a parent lock so
+  publication cannot race a partial write. READY blocks/snapshot metadata cannot
+  mutate; deleting a derived snapshot cascades its references for safe rebuilding.
+  Three PostgreSQL scenarios prove atomic/immutable/rebuildable publication,
+  organization/version isolation and concurrent publication fencing. Migration
+  applied locally; all workspace tests and Clippy pass. The snapshot publisher,
+  query store, index worker and runtime readiness wiring are still pending.

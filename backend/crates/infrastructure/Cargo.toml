@@ -18,6 +18,7 @@ sha2 = "0.10"
 subtle = "2.6"
 openidconnect = "4.1"
 specspace-git-adapter = { path = "../git-adapter" }
+specspace-document-engine = { path = "../document-engine" }
 zeroize = "1"
 
 [dev-dependencies]
@@ -27,6 +28,10 @@ jsonwebtoken = { version = "12", features = ["rust_crypto"] }
 
 [[test]]
 name = "postgres"
+required-features = ["postgres-tests"]
+
+[[test]]
+name = "search_postgres"
 required-features = ["postgres-tests"]
 
 [lints]

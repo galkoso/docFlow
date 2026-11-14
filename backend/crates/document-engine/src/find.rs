@@ -32,12 +32,12 @@ pub struct MatchPage {
     pub next_offset: Option<usize>,
 }
 
-struct Segment {
-    normalized_start: usize,
-    original_start: u32,
-    original_end: u32,
-    original_byte_start: u32,
-    original_byte_end: u32,
+pub(crate) struct Segment {
+    pub(crate) normalized_start: usize,
+    pub(crate) original_start: u32,
+    pub(crate) original_end: u32,
+    pub(crate) original_byte_start: u32,
+    pub(crate) original_byte_end: u32,
 }
 
 /// Visible text intervals within one document. Matching uses each entire block,
@@ -148,7 +148,7 @@ fn ignored(c: char) -> bool {
         '\u{200e}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
 }
 
-fn normalize(text: &str) -> (String, Vec<Segment>) {
+pub(crate) fn normalize(text: &str) -> (String, Vec<Segment>) {
     let mut normalized = String::with_capacity(text.len());
     let mut segments: Vec<Segment> = Vec::new();
     let mut original_offset = 0;
@@ -199,7 +199,7 @@ fn visit_matches(text: &str, needle: &str, mut visit: impl FnMut(&Segment, &Segm
     }
 }
 
-fn match_id(snapshot: &str, block: &VisibleBlock<'_>, start: u32, end: u32) -> String {
+pub(crate) fn match_id(snapshot: &str, block: &VisibleBlock<'_>, start: u32, end: u32) -> String {
     let mut identity = Sha256::new();
     for part in [
         snapshot,
@@ -213,6 +213,38 @@ fn match_id(snapshot: &str, block: &VisibleBlock<'_>, start: u32, end: u32) -> S
     identity.update(start.to_le_bytes());
     identity.update(end.to_le_bytes());
     format!("{:x}", identity.finalize())
+}
+
+pub(crate) fn matched(
+    snapshot_sha: &str,
+    block: &VisibleBlock<'_>,
+    book_order: usize,
+    first: &Segment,
+    last: &Segment,
+) -> Match {
+    let byte_start = first.original_byte_start as usize;
+    let byte_end = last.original_byte_end as usize;
+    let excerpt_start = block.text[..byte_start]
+        .grapheme_indices(true)
+        .rev()
+        .take(60)
+        .last()
+        .map_or(byte_start, |(start, _)| start);
+    let excerpt_end = block.text[byte_end..]
+        .grapheme_indices(true)
+        .take(60)
+        .last()
+        .map_or(byte_end, |(start, text)| byte_end + start + text.len());
+    Match {
+        match_id: match_id(snapshot_sha, block, first.original_start, last.original_end),
+        document_id: block.document_id.into(),
+        section_id: block.section_id.into(),
+        block_id: block.block_id.into(),
+        start_utf16: first.original_start,
+        end_utf16: last.original_end,
+        book_order,
+        excerpt: block.text[excerpt_start..excerpt_end].into(),
+    }
 }
 
 /// Blocks must come from one complete authorized snapshot, in catalog order.
@@ -246,33 +278,11 @@ pub fn find(
             return Err("FILE_TOO_LARGE");
         }
         visit_matches(block.text, &needle, |first, last| {
-            let range = (first.original_start, last.original_end);
             let index = page.total_matches;
             page.total_matches += 1;
             if index >= offset && page.matches.len() < limit {
-                let byte_start = first.original_byte_start as usize;
-                let byte_end = last.original_byte_end as usize;
-                let excerpt_start = block.text[..byte_start]
-                    .grapheme_indices(true)
-                    .rev()
-                    .take(60)
-                    .last()
-                    .map_or(byte_start, |(start, _)| start);
-                let excerpt_end = block.text[byte_end..]
-                    .grapheme_indices(true)
-                    .take(60)
-                    .last()
-                    .map_or(byte_end, |(start, text)| byte_end + start + text.len());
-                page.matches.push(Match {
-                    match_id: match_id(snapshot_sha, block, range.0, range.1),
-                    document_id: block.document_id.into(),
-                    section_id: block.section_id.into(),
-                    block_id: block.block_id.into(),
-                    start_utf16: range.0,
-                    end_utf16: range.1,
-                    book_order,
-                    excerpt: block.text[excerpt_start..excerpt_end].into(),
-                });
+                page.matches
+                    .push(matched(snapshot_sha, block, book_order, first, last));
             }
         });
     }

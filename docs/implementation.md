@@ -346,3 +346,16 @@ Checkboxes represent verified work only.
   Real-browser visual/scroll acceptance, dense-document DOM performance, durable
   indexes and the six-user p95 target remain open; full search acceptance is not
   claimed from DOM tests alone.
+- Persistable canonical index text: normalized blocks now have a versioned compact
+  source-map format with checksums, structural/allocation validation and explicit
+  corruption failures. Grapheme mappings use regular runs with delta/varint storage;
+  persisted matching shares direct-search match identities and excerpt construction.
+  Four new tests cover pagination/Unicode parity, 256 deterministic mixed-Unicode
+  cases, compact regular runs, candidate book order and corrupted/versioned data.
+  All twenty-five engine tests and workspace Clippy pass.
+  The release indexed benchmark (20MiB, 1,000 documents, six concurrent readers,
+  120 samples) measured 0.005s engine p95, 0.512s construction and 23,200,000 bytes
+  of encoded maps on this machine. This excludes PostgreSQL, HTTP and browser work
+  and does not prove the complete performance gate. Run with `cargo run --release
+  -p specspace-document-engine --example find_benchmark -- --indexed`.
+  PostgreSQL persistence, worker scheduling and runtime use are still pending.

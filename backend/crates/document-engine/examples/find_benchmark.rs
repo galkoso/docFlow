@@ -30,6 +30,62 @@ fn main() {
             text,
         })
         .collect();
+    if std::env::args().any(|argument| argument == "--indexed") {
+        use specspace_document_engine::index::{self, IndexedBlock, IndexedText};
+        let build_start = Instant::now();
+        let texts: Vec<_> = contents
+            .iter()
+            .map(|text| IndexedText::build(text).unwrap())
+            .collect();
+        let build_seconds = build_start.elapsed().as_secs_f64();
+        let map_bytes: usize = texts.iter().map(|text| text.encode_map().len()).sum();
+        let indexed: Vec<_> = blocks
+            .iter()
+            .zip(&texts)
+            .enumerate()
+            .map(|(book_order, (block, text))| IndexedBlock {
+                block: VisibleBlock {
+                    document_id: block.document_id,
+                    section_id: block.section_id,
+                    block_id: block.block_id,
+                    text: block.text,
+                },
+                book_order,
+                text,
+            })
+            .collect();
+        let mut durations = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..6)
+                .map(|_| {
+                    let indexed = &indexed;
+                    scope.spawn(move || {
+                        (0..20)
+                            .map(|_| {
+                                let start = Instant::now();
+                                let page =
+                                    index::find("synthetic-snapshot", indexed, "מחיקה", 0, 100)
+                                        .unwrap();
+                                assert_eq!(page.total_matches, document_count);
+                                assert_eq!(page.matches.len(), 100);
+                                start.elapsed().as_secs_f64()
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .flat_map(|handle| handle.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        durations.sort_by(f64::total_cmp);
+        println!(
+            "documents={document_count} bytes={target_bytes} readers=6 samples={} build_seconds={build_seconds:.3} map_bytes={map_bytes} indexed_engine_p95_seconds={:.3}",
+            durations.len(),
+            durations[durations.len() * 95 / 100 - 1]
+        );
+        return;
+    }
     let mut durations = vec![];
     for _ in 0..20 {
         let start = Instant::now();

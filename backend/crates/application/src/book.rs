@@ -23,6 +23,7 @@ pub enum BookError {
     InvalidQuery(&'static str),
     RepositoryNotConfigured,
     InvalidRepositoryConfiguration,
+    InvalidAsset(&'static str),
 }
 
 #[async_trait]

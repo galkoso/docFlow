@@ -4,6 +4,14 @@ export type RenderEvent = components['schemas']['RenderEvent'];
 export type SearchHit = components['schemas']['SearchHit'];
 export interface RenderNode { event: RenderEvent; children: RenderNode[]; alignment?: 'left' | 'center' | 'right'; }
 export interface TextPart { text: string; matchId?: string; }
+export interface AssetContext { repository: string; commit: string; }
+
+export function assetSource(context: AssetContext | null, destination?: string | null): string | null {
+  if (!context || !destination || !/^assets\/[a-f0-9]{64}\.(png|jpg|jpeg|webp)$/.test(destination)
+    || !/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(context.repository)
+    || !/^[a-f0-9]{40,128}$/.test(context.commit) || context.commit.length % 2 !== 0) return null;
+  return `/api/v1/repositories/${context.repository}/assets/${destination.slice(7)}?commit=${context.commit}`;
+}
 
 /** A bounded tree of inert events; markup is created only by the Angular template. */
 export function renderTree(events: RenderEvent[]): RenderNode[] {

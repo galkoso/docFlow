@@ -7,7 +7,7 @@ use utoipa::{
 #[openapi(
     info(title = "SpecSpace API", version = "0.1.0"),
     paths(crate::live, crate::ready, crate::auth::login, crate::auth::availability, crate::auth::callback, crate::auth::logout, crate::auth::me,
-        crate::specification::repositories, crate::specification::specification, crate::specification::document, crate::specification::find),
+        crate::specification::repositories, crate::specification::specification, crate::specification::document, crate::specification::find, crate::specification::asset),
     components(schemas(crate::Health, crate::ErrorBody, crate::ApiError, crate::auth::Profile, crate::auth::Membership, crate::auth::ProfileCapabilities, crate::auth::AuthAvailability)),
     modifiers(&SessionSecurity)
 )]

@@ -370,6 +370,9 @@ impl GitProvider for GitHub {
         let blob = data
             .pointer("/data/repository/object")
             .ok_or(GitError::InvalidResponse)?;
+        if blob.is_null() {
+            return Err(GitError::FileMissing);
+        }
         if blob["isBinary"] != false
             || blob["byteSize"].as_u64().ok_or(GitError::InvalidResponse)? > 2 * 1024 * 1024
         {
@@ -415,9 +418,20 @@ impl GitProvider for GitHub {
         let blob = data
             .pointer("/data/repository/object")
             .ok_or(GitError::InvalidResponse)?;
+        if blob.is_null() {
+            return Err(GitError::FileMissing);
+        }
         let oid = CommitSha::parse(blob["oid"].as_str().ok_or(GitError::InvalidResponse)?)?;
         let size = blob["byteSize"].as_u64().ok_or(GitError::InvalidResponse)?;
-        self.full_blob(&oid, size, max_bytes).await
+        self.full_blob(&oid, size, max_bytes)
+            .await
+            .map_err(|error| {
+                if error == GitError::BranchMissing {
+                    GitError::FileMissing
+                } else {
+                    error
+                }
+            })
     }
 
     async fn list_files(&self, commit: &CommitSha) -> Result<Vec<FileEntry>, GitError> {
@@ -606,6 +620,9 @@ mod tests {
         }
         if body["variables"].get("expression").is_some() {
             assert_eq!(body["variables"]["expression"], format!("{OLD}:docs/a.md"));
+            if state.mode.load(Ordering::SeqCst) == 9 {
+                return Json(json!({"data": {"repository": {"object": null}}})).into_response();
+            }
             return Json(json!({"data": {"repository": {"object": {
                 "oid": OLD, "byteSize": 5, "text": "hello", "isBinary": false,
                 "isTruncated": state.mode.load(Ordering::SeqCst) == 3
@@ -838,6 +855,11 @@ mod tests {
         assert_eq!(
             fixture.adapter.read_bytes(&commit, &path, 5).await,
             Err(GitError::InvalidResponse)
+        );
+        fixture.state.mode.store(9, Ordering::SeqCst);
+        assert_eq!(
+            fixture.adapter.read_bytes(&commit, &path, 5).await,
+            Err(GitError::FileMissing)
         );
     }
 

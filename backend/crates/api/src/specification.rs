@@ -98,6 +98,10 @@ pub struct DocumentResponse {
     pub render_error: Option<String>,
 }
 
+#[derive(utoipa::ToSchema)]
+#[schema(value_type = String, format = Binary)]
+pub struct PngDisplay(pub Vec<u8>);
+
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct SearchHit {
     pub match_id: String,
@@ -212,6 +216,10 @@ pub fn routes() -> Router<AppState> {
             get(document),
         )
         .route("/api/v1/repositories/{repository}/find", get(find))
+        .route(
+            "/api/v1/repositories/{repository}/assets/{asset}",
+            get(asset),
+        )
 }
 
 fn failure(error: BookError) -> Response {
@@ -225,6 +233,9 @@ fn failure(error: BookError) -> Response {
         BookError::BookTooLarge => {
             Some(serde_json::json!({"max_book_bytes": 20 * 1024 * 1024, "max_documents": 1000}))
         }
+        BookError::InvalidAsset("FILE_TOO_LARGE") => {
+            Some(serde_json::json!({"max_asset_bytes": 5 * 1024 * 1024}))
+        }
         BookError::Provider(GitError::RateLimited { .. }) => {
             Some(serde_json::json!({"retry_after_seconds": retry_after}))
         }
@@ -232,7 +243,7 @@ fn failure(error: BookError) -> Response {
         _ => None,
     };
     let (status, code, message, retryable) = match error {
-        BookError::NotFound => (
+        BookError::NotFound | BookError::Provider(GitError::FileMissing) => (
             StatusCode::NOT_FOUND,
             "NOT_FOUND",
             "המשאב המבוקש לא נמצא.",
@@ -254,6 +265,16 @@ fn failure(error: BookError) -> Response {
             StatusCode::UNPROCESSABLE_ENTITY,
             "VALIDATION_FAILED",
             "קטלוג האפיון אינו תקין. נדרש תיקון סדר המסמכים והמזהים.",
+            false,
+        ),
+        BookError::InvalidAsset(code) => (
+            if code == "FILE_TOO_LARGE" {
+                StatusCode::PAYLOAD_TOO_LARGE
+            } else {
+                StatusCode::UNPROCESSABLE_ENTITY
+            },
+            code,
+            "לא ניתן להציג את התמונה. נדרש תיקון לקובץ המקור או להפניה אליו.",
             false,
         ),
         BookError::BookTooLarge => (
@@ -501,6 +522,56 @@ fn render_document(book: &BookSnapshot, document: &str) -> Result<Response, Book
         render_error,
     })
     .into_response())
+}
+
+#[utoipa::path(get, path = "/api/v1/repositories/{repository}/assets/{asset}", security(("sessionCookie" = [])),
+    params(("repository" = Uuid, Path), ("asset" = String, Path, description = "Content SHA-256 and source extension"), Version),
+    responses((status = 200, body = PngDisplay, content_type = "image/png", description = "Metadata-free PNG display derivative"),
+        (status = 400, body = ErrorBody), (status = 401, body = ErrorBody), (status = 404, body = ErrorBody),
+        (status = 413, body = ErrorBody), (status = 422, body = ErrorBody), (status = 502, body = ErrorBody), (status = 503, body = ErrorBody)))]
+pub(crate) async fn asset(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<(Uuid, String)>, axum::extract::rejection::PathRejection>,
+    query: Result<Query<Version>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let actor = match auth::authenticate(&state, &headers).await {
+        Ok(actor) => actor,
+        Err(error) => return error.into_response(),
+    };
+    let (Ok(Path((repository, filename))), Ok(Query(query))) = (path, query) else {
+        return invalid_query();
+    };
+    if let Err(error) = state.books.authorize(actor.user_id, repository).await {
+        return failure(error);
+    }
+    let commit = match CommitSha::parse(query.commit) {
+        Ok(commit) => commit,
+        Err(_) => return invalid_query(),
+    };
+    match state
+        .books
+        .asset(
+            actor.user_id,
+            repository,
+            commit,
+            format!("assets/{filename}"),
+        )
+        .await
+    {
+        Ok(image) => (
+            [
+                ("content-type", "image/png"),
+                (
+                    "content-disposition",
+                    "inline; filename=\"specspace-display.png\"",
+                ),
+            ],
+            image.png,
+        )
+            .into_response(),
+        Err(error) => failure(error),
+    }
 }
 
 #[utoipa::path(get, path = "/api/v1/repositories/{repository}/find", security(("sessionCookie" = [])), params(("repository" = Uuid, Path), FindQuery), responses((status = 200, body = SearchResponse), (status = 400, body = ErrorBody), (status = 401, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 413, body = ErrorBody), (status = 422, body = ErrorBody), (status = 502, body = ErrorBody), (status = 503, body = ErrorBody)))]

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { DocumentRenderer } from './document-renderer';
-import { externalLink, renderTree, RenderEvent, SearchHit } from './render-model';
+import { assetSource, externalLink, renderTree, RenderEvent, SearchHit } from './render-model';
 
 const event = (kind: RenderEvent['kind'], values: Partial<RenderEvent> = {}): RenderEvent =>
   ({ kind, source_start_byte: 0, source_end_byte: 1, ...values });
@@ -62,6 +62,33 @@ describe('Canonical document renderer', () => {
     expect(element.querySelector('p')?.textContent).toBe('🙂 מְחיקה עכשיו');
     expect([...element.querySelectorAll('mark')].map(mark => mark.textContent).join('')).toBe('מְחיקה עכ');
     expect(element.querySelectorAll('mark.active')).toHaveLength(3);
+  });
+
+  it('loads only the authorized commit-pinned image proxy and exposes retry on failure', async () => {
+    const fixture = TestBed.createComponent(DocumentRenderer);
+    const context = { repository: '00000000-0000-0000-0000-000000000001', commit: 'a'.repeat(40) };
+    const destination = `assets/${'b'.repeat(64)}.png`;
+    fixture.componentRef.setInput('assetContext', context);
+    fixture.componentRef.setInput('events', [event('image', { destination, text: 'תרשים הרשאות' })]);
+    await fixture.whenStable();
+    const element: HTMLElement = fixture.nativeElement;
+    const image = element.querySelector('img')!;
+    expect(image.getAttribute('src')).toBe(`/api/v1/repositories/${context.repository}/assets/${'b'.repeat(64)}.png?commit=${context.commit}`);
+    expect(image.alt).toBe('תרשים הרשאות');
+    expect(image.getAttribute('loading')).toBe('lazy');
+    image.dispatchEvent(new Event('error'));
+    await fixture.whenStable();
+    expect(element.querySelector('img')).toBeNull();
+    expect(element.textContent).toContain('לא ניתן לטעון את התמונה');
+    element.querySelector('button')!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('img')).not.toBeNull();
+    fixture.componentRef.setInput('assetContext', { ...context, commit: 'c'.repeat(40) });
+    await fixture.whenStable();
+    expect(element.querySelector('img')?.getAttribute('src')).toContain(`commit=${'c'.repeat(40)}`);
+    expect(assetSource(context, 'assets/../secret.png')).toBeNull();
+    expect(assetSource(context, 'https://tracker.example/pixel')).toBeNull();
+    expect(assetSource({ ...context, commit: 'main' }, destination)).toBeNull();
   });
 
   it('fails closed on malformed event nesting and excessive depth', async () => {

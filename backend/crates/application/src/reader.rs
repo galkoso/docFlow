@@ -3,6 +3,8 @@
 use crate::book::{BookError, BookService, BookSnapshot, ReadAuthorization};
 use async_trait::async_trait;
 use specspace_document_engine::find::MatchPage;
+use specspace_document_engine::media::{self, DisplayImage};
+use specspace_domain::RepositoryPath;
 use specspace_git_adapter::{CommitSha, GitProvider};
 use std::{collections::VecDeque, sync::Arc};
 use tokio::sync::{Mutex, Semaphore};
@@ -24,6 +26,7 @@ pub struct BookReader {
     cache: Mutex<VecDeque<CachedBook>>,
     loads: Semaphore,
     computations: Arc<Semaphore>,
+    assets: Arc<Semaphore>,
 }
 
 impl BookReader {
@@ -37,6 +40,7 @@ impl BookReader {
             cache: Mutex::new(VecDeque::new()),
             loads: Semaphore::new(2),
             computations: Arc::new(Semaphore::new(2)),
+            assets: Arc::new(Semaphore::new(2)),
         }
     }
 
@@ -149,5 +153,49 @@ impl BookReader {
         .map_err(|_| BookError::ProcessingUnavailable)??;
         self.authorize(actor, repository).await?;
         Ok(page)
+    }
+
+    pub async fn asset(
+        &self,
+        actor: Uuid,
+        repository: Uuid,
+        commit: CommitSha,
+        path: String,
+    ) -> Result<DisplayImage, BookError> {
+        self.authorize(actor, repository).await?;
+        if !media::valid_path(&path) {
+            return Err(BookError::InvalidQuery("INVALID_ASSET_PATH"));
+        }
+        // Proves the selected SHA belongs to authorized main history and rejects
+        // unsupported tree entries, exactly as document/search reads do.
+        self.at(actor, repository, commit.clone()).await?;
+        let permit = self
+            .assets
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| BookError::ProcessingUnavailable)?;
+        self.authorize(actor, repository).await?;
+        let provider = self.source.provider(repository).await?;
+        let repository_path = RepositoryPath::parse(&path)
+            .map_err(|_| BookError::InvalidQuery("INVALID_ASSET_PATH"))?;
+        let bytes = provider
+            .read_bytes(&commit, &repository_path, media::MAX_ASSET_BYTES)
+            .await
+            .map_err(|error| match error {
+                specspace_git_adapter::GitError::FileMissing => BookError::NotFound,
+                specspace_git_adapter::GitError::ResponseTooLarge => {
+                    BookError::InvalidAsset("FILE_TOO_LARGE")
+                }
+                error => BookError::Provider(error),
+            })?;
+        let image = tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            media::display(&path, &bytes).map_err(BookError::InvalidAsset)
+        })
+        .await
+        .map_err(|_| BookError::ProcessingUnavailable)??;
+        self.authorize(actor, repository).await?;
+        Ok(image)
     }
 }

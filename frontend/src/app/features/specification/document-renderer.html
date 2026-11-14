@@ -13,7 +13,12 @@
       @case ('break') { @if (event.hard_break) {<br>} @else {{{ '\n' }}} }
       @case ('rule') { <hr> }
       @case ('task_marker') { <input type="checkbox" disabled [checked]="event.checked" aria-label="מצב משימה"> }
-      @case ('image') { <span class="unsupported" role="img" [attr.aria-label]="event.text || 'תמונה'">תמונה: {{ event.text || 'ללא תיאור' }} — התצוגה עדיין אינה זמינה</span> }
+      @case ('image') {
+        @if (imageSource(event.destination); as source) {
+          @if (failedImages().has(source)) {<span class="unsupported" role="status">לא ניתן לטעון את התמונה: {{ event.text || 'ללא תיאור' }} <button (click)="retryImage(source)">ניסיון נוסף</button></span>}
+          @else {<img [src]="source" [alt]="event.text || 'תמונה ללא תיאור'" [title]="event.title || ''" loading="lazy" decoding="async" referrerpolicy="no-referrer" (error)="imageFailed(source)">}
+        } @else {<span class="unsupported" role="img" [attr.aria-label]="event.text || 'תמונה'">תמונה: {{ event.text || 'ללא תיאור' }} — ההפניה אינה זמינה</span>}
+      }
       @case ('unsupported') { <span class="unsupported">תוכן לא נתמך (מקור {{ event.source_start_byte }}–{{ event.source_end_byte }})</span> }
       @case ('open') {
         @switch (event.tag) {

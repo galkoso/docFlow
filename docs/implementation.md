@@ -282,3 +282,19 @@ Checkboxes represent verified work only.
   Reference: https://docs.rs/image/0.25.10/image/struct.Limits.html . The HTTP proxy
   and UI integration remain the next checkpoint; upload/original retention policy
   is still part of the later proposal/media workflow.
+- Authorized image delivery: a session-protected, commit-required asset endpoint
+  proves main-history provenance, validates canonical asset paths after repository
+  authorization, bounds fetch/decode concurrency to two and rechecks current access
+  after creating display pixels. Responses are PNG-only, no-store and nosniff;
+  original bytes/provider URLs are never exposed. Missing blobs return 404, invalid
+  content 422 and oversized assets 413 with limits. PostgreSQL HTTP coverage proves
+  cross-organization denial before provider reads, unauthenticated denial, history
+  isolation, old-SHA reads after main advances, corrupt/oversized/missing assets and
+  revocation during processing. The Angular renderer generates only same-origin,
+  SHA-pinned asset URLs, lazy-loads them and offers a retry notice on errors.
+  The old synthetic PNG had an invalid IDAT CRC: the strict decoder rejected it.
+  Its CRC and SHA-256 filename/references were repaired, with a fixture decode
+  regression check. Full workspace tests, Clippy, production build and twenty-two
+  frontend tests pass; OpenAPI and generated client types include the image route.
+  Real-browser image/layout verification, upload validation/retention policy and
+  pre-merge media/link checks remain open; FILE-01–04 are not fully accepted yet.

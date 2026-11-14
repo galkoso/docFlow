@@ -164,6 +164,22 @@ mod tests {
     }
 
     #[test]
+    fn book_fixture_asset_is_hashed_and_decodes_as_a_valid_display_image() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../fixtures/repository/assets");
+        let path = std::fs::read_dir(root)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let bytes = std::fs::read(&path).unwrap();
+        let reference = format!("assets/{}", path.file_name().unwrap().to_str().unwrap());
+        let result = display(&reference, &bytes).unwrap();
+        assert_eq!((result.width, result.height), (1, 1));
+    }
+
+    #[test]
     fn bounds_original_bytes_dimensions_and_display_size() {
         let bytes = vec![0; MAX_ASSET_BYTES + 1];
         assert!(matches!(

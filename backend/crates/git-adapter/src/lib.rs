@@ -30,6 +30,7 @@ impl CommitSha {
 pub enum GitError {
     InvalidInput,
     BranchMissing,
+    FileMissing,
     BranchExists,
     HeadMismatch,
     Unauthorized,

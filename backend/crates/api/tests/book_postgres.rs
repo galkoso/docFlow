@@ -19,7 +19,7 @@ use sqlx::PgPool;
 use std::{
     collections::HashMap,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicU8, AtomicUsize, Ordering},
     },
 };
@@ -28,22 +28,50 @@ use uuid::Uuid;
 
 const OLD: &str = "1111111111111111111111111111111111111111";
 const NEW: &str = "2222222222222222222222222222222222222222";
+const ASSET: &str = "5e3d382db4dd83d59aa5742793ad6b7903409e865c83bcbc54835049f043bc15.png";
 
 struct Provider {
     files: HashMap<String, String>,
     version: AtomicU8,
     reads: AtomicUsize,
+    asset_reads: AtomicUsize,
+    asset_corrupt: AtomicU8,
+    revoke_after_asset: Mutex<Option<(PgPool, Uuid)>>,
 }
 
 #[async_trait]
 impl GitProvider for Provider {
     async fn read_bytes(
         &self,
-        _: &CommitSha,
-        _: &RepositoryPath,
-        _: usize,
+        commit: &CommitSha,
+        path: &RepositoryPath,
+        max: usize,
     ) -> Result<Vec<u8>, GitError> {
-        Err(GitError::ProviderRejected)
+        self.asset_reads.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(commit.as_str(), OLD);
+        assert_eq!(max, 5 * 1024 * 1024);
+        if path.as_str() != format!("assets/{ASSET}") {
+            return Err(GitError::FileMissing);
+        }
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../../fixtures/repository/assets")
+                .join(ASSET),
+        )
+        .unwrap();
+        let revoke = self.revoke_after_asset.lock().unwrap().take();
+        if let Some((pool, user)) = revoke {
+            sqlx::query("UPDATE users SET status = 'DISABLED' WHERE id = $1")
+                .bind(user)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        match self.asset_corrupt.load(Ordering::SeqCst) {
+            1 => Ok(b"corrupt image".to_vec()),
+            2 => Err(GitError::ResponseTooLarge),
+            _ => Ok(bytes),
+        }
     }
     async fn main_head(&self) -> Result<CommitSha, GitError> {
         CommitSha::parse(if self.version.load(Ordering::SeqCst) == 0 {
@@ -175,6 +203,9 @@ fn fixture(pool: &PgPool) -> (Router, Arc<Provider>) {
         files,
         version: AtomicU8::new(0),
         reads: AtomicUsize::new(0),
+        asset_reads: AtomicUsize::new(0),
+        asset_corrupt: AtomicU8::new(0),
+        revoke_after_asset: Mutex::new(None),
     });
     let mut state = AppState::new(pool.clone());
     state.books = Arc::new(BookReader::new(
@@ -184,9 +215,8 @@ fn fixture(pool: &PgPool) -> (Router, Arc<Provider>) {
     (router(state), provider)
 }
 
-async fn get(app: &Router, token: &str, uri: &str) -> (StatusCode, serde_json::Value) {
-    let response = app
-        .clone()
+async fn response(app: &Router, token: &str, uri: &str) -> axum::response::Response {
+    app.clone()
         .oneshot(
             Request::builder()
                 .uri(uri)
@@ -195,7 +225,11 @@ async fn get(app: &Router, token: &str, uri: &str) -> (StatusCode, serde_json::V
                 .unwrap(),
         )
         .await
-        .unwrap();
+        .unwrap()
+}
+
+async fn get(app: &Router, token: &str, uri: &str) -> (StatusCode, serde_json::Value) {
+    let response = response(app, token, uri).await;
     let status = response.status();
     let value =
         serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
@@ -370,4 +404,94 @@ async fn missing_app_configuration_returns_a_setup_error_without_fixture_fallbac
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(body["error"]["code"], "REPOSITORY_NOT_CONFIGURED");
     assert_eq!(body["error"]["retryable"], false);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn image_proxy_is_private_pinned_validated_and_rechecks_access_after_processing(
+    pool: PgPool,
+) {
+    let (actor, repository, foreign, token) = setup(&pool).await;
+    let (app, provider) = fixture(&pool);
+    let uri = format!("/api/v1/repositories/{repository}/assets/{ASSET}?commit={OLD}");
+    // Invalid asset names must not expose an inaccessible repository's existence.
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!("/api/v1/repositories/{foreign}/assets/bad.svg?commit={OLD}")
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(provider.asset_reads.load(Ordering::SeqCst), 0);
+    assert_eq!(get(&app, "", &uri).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        get(&app, &token, &format!("{uri}bad")).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!("/api/v1/repositories/{repository}/assets/bad.svg?commit={OLD}")
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!(
+                "/api/v1/repositories/{repository}/assets/{ASSET}?commit={}",
+                "3".repeat(40)
+            )
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(provider.asset_reads.load(Ordering::SeqCst), 0);
+    provider.version.store(1, Ordering::SeqCst);
+    let image = response(&app, &token, &uri).await;
+    assert_eq!(image.status(), StatusCode::OK);
+    assert_eq!(image.headers()["content-type"], "image/png");
+    assert_eq!(image.headers()["cache-control"], "no-store");
+    assert_eq!(image.headers()["x-content-type-options"], "nosniff");
+    assert_eq!(
+        image.headers()["content-disposition"],
+        "inline; filename=\"specspace-display.png\""
+    );
+    let bytes = image.into_body().collect().await.unwrap().to_bytes();
+    assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!(
+                "/api/v1/repositories/{repository}/assets/{}.png?commit={OLD}",
+                "0".repeat(64)
+            )
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    provider.asset_corrupt.store(1, Ordering::SeqCst);
+    let (status, error) = get(&app, &token, &uri).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(error["error"]["code"], "ASSET_HASH_MISMATCH");
+    provider.asset_corrupt.store(2, Ordering::SeqCst);
+    let (status, error) = get(&app, &token, &uri).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(
+        error["error"]["details"]["max_asset_bytes"],
+        5 * 1024 * 1024
+    );
+    provider.asset_corrupt.store(0, Ordering::SeqCst);
+    *provider.revoke_after_asset.lock().unwrap() = Some((pool, actor));
+    assert_eq!(get(&app, &token, &uri).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(get(&app, &token, &uri).await.0, StatusCode::UNAUTHORIZED);
 }

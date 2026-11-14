@@ -226,6 +226,27 @@ impl PgSearchIndex {
         }
     }
 
+    /// Retry only derived indexing work, with a bounded delay and attempt count.
+    /// Returns true when the job remains queued; false means terminal failure.
+    pub async fn fail(
+        &self,
+        lease: &IndexLease,
+        code: &'static str,
+        retry_after: Option<u32>,
+    ) -> Result<bool, IndexError> {
+        if retry_after.is_some_and(|seconds| seconds == 0 || seconds > 86400) {
+            return Err(IndexError::InvalidQuery("INVALID_RETRY_DELAY"));
+        }
+        let mut tx = self.pool.begin().await?;
+        let state: Option<String> = sqlx::query_scalar("UPDATE jobs SET state=CASE WHEN $4::double precision IS NOT NULL AND attempts<max_attempts THEN 'QUEUED' ELSE 'FAILED' END,result=jsonb_build_object('error_code',$3::text),available_at=clock_timestamp()+make_interval(secs=>coalesce($4,0)),lease_owner=NULL,leased_until=NULL WHERE id=$1 AND lease_owner=$2 AND state='RUNNING' AND leased_until>clock_timestamp() RETURNING state")
+            .bind(lease.id).bind(lease.worker).bind(code).bind(retry_after.map(f64::from)).fetch_optional(&mut *tx).await?;
+        let state = state.ok_or(IndexError::LeaseLost)?;
+        sqlx::query("UPDATE search_index_snapshots SET state=$3,error_code=$2 WHERE job_id=$1 AND state='PENDING'")
+            .bind(lease.id).bind(code).bind(if state == "QUEUED" { "PENDING" } else { "FAILED" }).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(state == "QUEUED")
+    }
+
     async fn reject_claim(
         &self,
         job: Uuid,

@@ -407,3 +407,15 @@ Checkboxes represent verified work only.
   indexed_store_six_reader_20mib_benchmark -- --ignored --nocapture` and DATABASE_URL.
   Full workspace tests and Clippy pass. These are store-only feasibility results;
   worker/runtime wiring, HTTP timing and browser acceptance remain open.
+- Durable indexing worker: a scoped Git source checks repository/organization
+  identity, reuses only the approved reader cache and otherwise loads a pinned
+  main-history book through the existing provider boundary. Reader seeding still
+  requires fresh browser ACL checks on every later read. Workers claim index-only
+  leases, heartbeat every 15s, bound job duration, classify transient/permanent
+  errors and honor provider retry delays. Failure/requeue updates are lease-fenced
+  and atomic with snapshot state; retries stop at the job's attempt limit.
+  Shutdown cancels in-flight read/build work and leaves its lease recoverable.
+  Four PostgreSQL scenarios prove delayed retry, terminal source errors, scoped
+  cache reuse and shutdown/restart with exactly one publication. All eleven
+  non-performance index scenarios and workspace Clippy pass. API startup, indexed
+  reader routing and client readiness polling remain the next integration layer.

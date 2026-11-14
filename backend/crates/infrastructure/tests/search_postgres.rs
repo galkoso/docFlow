@@ -569,3 +569,242 @@ async fn indexed_store_six_reader_20mib_benchmark(pool: PgPool) {
         "store-only feasibility target exceeded: {p95:.3}s; HTTP/browser gates remain separate"
     );
 }
+
+struct WorkerSource {
+    organization: Uuid,
+    repository: Uuid,
+    book: std::sync::Arc<specspace_application::book::BookSnapshot>,
+    mode: std::sync::atomic::AtomicU8,
+    entered: tokio::sync::Notify,
+}
+#[async_trait::async_trait]
+impl specspace_infrastructure::index_worker::IndexSource for WorkerSource {
+    async fn load(
+        &self,
+        organization: Uuid,
+        repository: Uuid,
+        commit: specspace_git_adapter::CommitSha,
+    ) -> Result<
+        std::sync::Arc<specspace_application::book::BookSnapshot>,
+        specspace_application::book::BookError,
+    > {
+        use specspace_application::book::BookError;
+        if organization != self.organization
+            || repository != self.repository
+            || commit != self.book.commit
+        {
+            return Err(BookError::NotFound);
+        }
+        self.entered.notify_one();
+        match self.mode.load(std::sync::atomic::Ordering::SeqCst) {
+            1 => Err(BookError::Provider(
+                specspace_git_adapter::GitError::RateLimited {
+                    retry_after_seconds: Some(17),
+                },
+            )),
+            2 => Err(BookError::NotFound),
+            3 => std::future::pending().await,
+            _ => Ok(self.book.clone()),
+        }
+    }
+}
+fn worker_source(fixture: &Fixture, mode: u8) -> std::sync::Arc<WorkerSource> {
+    std::sync::Arc::new(WorkerSource {
+        organization: fixture.organization,
+        repository: fixture.repository,
+        book: std::sync::Arc::new(book(SHA, "מְחיקה")),
+        mode: std::sync::atomic::AtomicU8::new(mode),
+        entered: tokio::sync::Notify::new(),
+    })
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn worker_honors_provider_delay_then_publishes_the_same_pinned_job(pool: PgPool) {
+    use specspace_infrastructure::{
+        index_worker::{IndexWorker, WorkResult},
+        search_index::PgSearchIndex,
+    };
+    let fixture = create_fixture(&pool).await;
+    let store = std::sync::Arc::new(PgSearchIndex::new(pool.clone()));
+    let source = worker_source(&fixture, 1);
+    let worker = IndexWorker::new(
+        store.clone(),
+        source.clone(),
+        std::time::Duration::from_secs(30),
+    )
+    .unwrap();
+    let WorkResult::Deferred(job) = worker.run_once().await.unwrap() else {
+        panic!("expected deferred work");
+    };
+    let delayed:bool=sqlx::query_scalar("SELECT state='QUEUED' AND available_at>clock_timestamp()+interval '14 seconds' FROM jobs WHERE id=$1")
+        .bind(job).fetch_one(&pool).await.unwrap();
+    assert!(delayed);
+    assert_eq!(worker.run_once().await.unwrap(), WorkResult::Idle);
+    source.mode.store(0, std::sync::atomic::Ordering::SeqCst);
+    sqlx::query("UPDATE jobs SET available_at=clock_timestamp()-interval '1 second' WHERE id=$1")
+        .bind(job)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(worker.run_once().await.unwrap(), WorkResult::Completed(job));
+    assert_eq!(
+        store
+            .find(
+                fixture.user,
+                fixture.repository,
+                &source.book.commit,
+                "מחיקה",
+                0,
+                100
+            )
+            .await
+            .unwrap()
+            .total_matches,
+        1
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn worker_shutdown_abandons_its_lease_and_restart_recovers_without_duplicate_publication(
+    pool: PgPool,
+) {
+    use specspace_infrastructure::{
+        index_worker::{IndexWorker, WorkResult},
+        search_index::PgSearchIndex,
+    };
+    let fixture = create_fixture(&pool).await;
+    let store = std::sync::Arc::new(PgSearchIndex::new(pool.clone()));
+    let source = worker_source(&fixture, 3);
+    let worker = IndexWorker::new(
+        store.clone(),
+        source.clone(),
+        std::time::Duration::from_secs(30),
+    )
+    .unwrap();
+    let (stop, receiver) = tokio::sync::watch::channel(false);
+    let running = tokio::spawn(async move { worker.run(receiver).await });
+    source.entered.notified().await;
+    stop.send(true).unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(1), running)
+        .await
+        .unwrap()
+        .unwrap();
+    let (job, state): (Uuid, String) =
+        sqlx::query_as("SELECT id,state FROM jobs WHERE organization_id=$1")
+            .bind(fixture.organization)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(state, "RUNNING");
+    sqlx::query("UPDATE jobs SET leased_until=clock_timestamp()-interval '1 second' WHERE id=$1")
+        .bind(job)
+        .execute(&pool)
+        .await
+        .unwrap();
+    source.mode.store(0, std::sync::atomic::Ordering::SeqCst);
+    let replacement = IndexWorker::new(store, source, std::time::Duration::from_secs(30)).unwrap();
+    assert_eq!(
+        replacement.run_once().await.unwrap(),
+        WorkResult::Completed(job)
+    );
+    assert_eq!(replacement.run_once().await.unwrap(), WorkResult::Idle);
+    let count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM search_index_snapshots WHERE repository_id=$1 AND state='READY'",
+    )
+    .bind(fixture.repository)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(count, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn permanent_source_failures_become_explicit_terminal_index_errors(pool: PgPool) {
+    use specspace_infrastructure::{
+        index_worker::{IndexWorker, WorkResult},
+        search_index::PgSearchIndex,
+    };
+    let fixture = create_fixture(&pool).await;
+    let store = std::sync::Arc::new(PgSearchIndex::new(pool.clone()));
+    let worker = IndexWorker::new(
+        store,
+        worker_source(&fixture, 2),
+        std::time::Duration::from_secs(30),
+    )
+    .unwrap();
+    assert!(matches!(
+        worker.run_once().await.unwrap(),
+        WorkResult::Failed(_)
+    ));
+    assert_eq!(worker.run_once().await.unwrap(), WorkResult::Idle);
+    let (state, error): (String, Option<String>) = sqlx::query_as(
+        "SELECT state,error_code FROM search_index_snapshots WHERE repository_id=$1",
+    )
+    .bind(fixture.repository)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (state.as_str(), error.as_deref()),
+        ("FAILED", Some("SOURCE_NOT_AVAILABLE"))
+    );
+}
+
+struct RejectIndexProvider;
+#[async_trait::async_trait]
+impl specspace_application::reader::BookProviderFactory for RejectIndexProvider {
+    async fn provider(
+        &self,
+        _: Uuid,
+    ) -> Result<
+        std::sync::Arc<dyn specspace_git_adapter::GitProvider>,
+        specspace_application::book::BookError,
+    > {
+        panic!("scoped cached source should not contact Git");
+    }
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn trusted_index_source_checks_organization_before_cache_and_keeps_browser_acl_current(
+    pool: PgPool,
+) {
+    use specspace_infrastructure::index_worker::{GitIndexSource, IndexSource};
+    let fixture = create_fixture(&pool).await;
+    let factory = std::sync::Arc::new(RejectIndexProvider);
+    let reader = std::sync::Arc::new(specspace_application::reader::BookReader::new(
+        std::sync::Arc::new(
+            specspace_infrastructure::authorization::PgReadAuthorization::new(pool.clone()),
+        ),
+        factory.clone(),
+    ));
+    let approved = std::sync::Arc::new(book(SHA, "מחיקה"));
+    reader
+        .remember_indexed_main(fixture.repository, approved.clone())
+        .await;
+    let source = GitIndexSource::new(pool.clone(), factory, Some(reader.clone()));
+    assert!(matches!(
+        source
+            .load(Uuid::new_v4(), fixture.repository, approved.commit.clone())
+            .await,
+        Err(specspace_application::book::BookError::NotFound)
+    ));
+    let loaded = source
+        .load(
+            fixture.organization,
+            fixture.repository,
+            approved.commit.clone(),
+        )
+        .await
+        .unwrap();
+    assert!(std::sync::Arc::ptr_eq(&approved, &loaded));
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1")
+        .bind(fixture.user)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        reader
+            .at(fixture.user, fixture.repository, approved.commit.clone())
+            .await,
+        Err(specspace_application::book::BookError::NotFound)
+    ));
+}

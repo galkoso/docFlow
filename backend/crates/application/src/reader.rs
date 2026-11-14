@@ -63,6 +63,27 @@ impl BookReader {
         Some(book)
     }
 
+    /// Trusted indexing code checks repository/organization scope before using
+    /// this cache. Entries were loaded through the main-history reader only.
+    pub async fn cached_for_index(
+        &self,
+        repository: Uuid,
+        commit: &CommitSha,
+    ) -> Option<Arc<BookSnapshot>> {
+        self.cached(repository, commit).await
+    }
+
+    /// Seed reader data only after an indexing source proved main provenance.
+    /// Each subsequent browser read still performs its own current ACL checks.
+    pub async fn remember_indexed_main(&self, repository: Uuid, book: Arc<BookSnapshot>) {
+        let mut cache = self.cache.lock().await;
+        cache.retain(|entry| entry.repository != repository || entry.book.commit != book.commit);
+        cache.push_back(CachedBook { repository, book });
+        while cache.len() > 4 {
+            cache.pop_front();
+        }
+    }
+
     pub async fn main(
         &self,
         actor: Uuid,

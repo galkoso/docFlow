@@ -8,9 +8,29 @@
     <a routerLink="/history" routerLinkActive="active" ariaCurrentWhenActive="page">◷ &nbsp; היסטוריה</a>
     <a routerLink="/settings" routerLinkActive="active" ariaCurrentWhenActive="page">⚙ &nbsp; ניהול סביבת העבודה</a>
   </nav>
-  <div class="sidebar-note">סביבת פיתוח<p>אפיון משותף. החלטות מתועדות.</p></div>
+  <div class="sidebar-note">מרחב עבודה משותף<p>אפיון משותף. החלטות מתועדות.</p></div>
 </aside>
 <div class="workspace">
-  <header class="topbar"><span>מרחב העבודה / אפיון מערכת</span><span class="environment">בפיתוח</span></header>
+  <header class="topbar">
+    <span>מרחב העבודה / אפיון מערכת</span>
+    <div class="session-controls" aria-live="polite">
+      @switch (session.status()) {
+        @case ('loading') { <span>בודק התחברות…</span> }
+        @case ('authenticated') {
+          <span>{{ session.profile()?.display_name }}</span>
+          <button type="button" (click)="session.logout()" [disabled]="session.logoutStatus() === 'loading'">
+            {{ session.logoutStatus() === 'loading' ? 'מתנתק…' : 'התנתקות' }}
+          </button>
+        }
+        @case ('anonymous') { <a href="/api/v1/auth/login">התחברות ארגונית</a> }
+        @case ('unconfigured') { <a routerLink="/settings">נדרשת הגדרת התחברות</a> }
+        @case ('error') {
+          <span>שירות ההתחברות אינו זמין</span>
+          <button type="button" (click)="session.refresh()">ניסיון נוסף</button>
+        }
+      }
+      @if (session.logoutError()) { <span class="session-error" role="alert">{{ session.logoutError() }}</span> }
+    </div>
+  </header>
   <main id="main-content" tabindex="-1"><router-outlet /></main>
 </div>

@@ -11,7 +11,10 @@ nav a.active { color: #254bc3; background: #edf2ff; font-weight: 700; }
 .sidebar-note p { color: #7c8797; font-size: 12px; }
 .workspace { margin-inline-start: 248px; }
 .topbar { height: 73px; background: #fff; border-block-end: 1px solid #e4e7ec; display: flex; align-items: center; justify-content: space-between; padding-inline: 40px; color: #697586; font-size: 13px; }
-.environment { background: #faf3e5; border: 1px solid #eddfbd; color: #815a1f; padding: 4px 10px; border-radius: 20px; }
+.session-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.session-controls button, .session-controls a { border: 1px solid #d9e0ee; border-radius: 6px; background: #fff; padding: 5px 10px; color: #3159d8; text-decoration: none; cursor: pointer; }
+.session-controls button:disabled { opacity: .6; cursor: wait; }
+.session-error { color: #a82d38; }
 main { max-width: 1250px; margin: auto; padding: 45px 48px; }
 .skip-link { position: fixed; top: -80px; z-index: 10; padding: 12px; background: #fff; }
 .skip-link:focus { top: 8px; }
@@ -21,6 +24,6 @@ main { max-width: 1250px; margin: auto; padding: 45px 48px; }
  nav { display: flex; flex-wrap: wrap; margin-block-start: 16px; gap: 4px; }
  nav a { padding: 8px; font-size: 13px; }
  .workspace { margin-inline-start: 0; }
- .topbar { padding-inline: 20px; height: 55px; }
+ .topbar { padding: 12px 20px; height: auto; min-height: 55px; flex-wrap: wrap; gap: 12px; }
  main { padding: 28px 20px; }
 }

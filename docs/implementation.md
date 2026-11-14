@@ -161,6 +161,13 @@ Checkboxes represent verified work only.
   requires TypeScript 5 while Angular 22 requires 6, so `tools/api-client` has its
   own pinned dependency tree and lockfile. Frontend CI regenerates the types and
   checks for drift. No peer-dependency override or Angular downgrade is used.
+- Frontend session controls: production build and all five Angular tests pass.
+  Tests cover unconfigured login, anonymous versus failed requests, failed logout,
+  duplicate submission and cancellation of stale identity reads after logout.
+  The UI uses generated response types and Angular's cookie/CSRF HTTP support.
+  A live local proxy check returns JSON auth status (200), unauthenticated profile
+  (401) and database readiness (200), rather than a fallback HTML page. Full browser
+  sign-in and visual/accessibility verification remain pending.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

@@ -51,6 +51,9 @@ Production is the default `APP_ENV` and requires HTTPS for public/identity URLs.
 Serve frontend and `/api` at the same origin. Session cookies are HttpOnly;
 write requests require the configured Origin and an `X-XSRF-TOKEN` header matching
 the server session. OAuth tokens are never returned to the browser.
+Open the frontend using the exact `APP_PUBLIC_URL` so the login cookie and callback
+use the same origin. The Angular development server proxies `/api/**` to the local
+API at `127.0.0.1:3000`.
 
 Endpoints implemented so far: `/api/v1/auth/login`, `/api/v1/auth/callback`,
 `/api/v1/auth/logout` and `/api/v1/me`. Identity-provider setup and the full browser

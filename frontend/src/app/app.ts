@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, type OnInit } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { SessionState } from './core/auth/session-state';
 
 @Component({
   selector: 'app-root',
@@ -8,4 +9,8 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
   styleUrl: './app.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class App {}
+export class App implements OnInit {
+  protected readonly session = inject(SessionState);
+
+  ngOnInit(): void { this.session.refresh(); }
+}

@@ -6,7 +6,7 @@ all edge cases in section 22. The supplied requirements remain authoritative.
 ## Stage 0 — foundations and feasibility
 
 - [x] Preserve the original specification without changes.
-- [ ] Angular strict standalone application and Rust workspace; locked dependencies.
+- [x] Angular strict standalone application and Rust workspace; locked dependencies.
 - [ ] Local PostgreSQL and private S3-compatible storage; API/worker process roles.
 - [ ] Editor feasibility: Hebrew, tables, images, stable IDs, protected unsupported blocks.
 - [ ] GitHub App feasibility: atomic commits, branches, PRs, required-check enforcement.
@@ -111,3 +111,11 @@ Checkboxes represent verified work only.
   [Git](https://docs.github.com/en/graphql/reference/git) references.
   Live installation authentication, PR/check enforcement, tree loading and merge
   capability remain open. Contract tests do not prove the live GitHub feasibility gate.
+- GitHub App token issuer: two additional tests pass using an ephemeral RSA key,
+  cryptographic JWT verification and a local token endpoint. JWTs use RS256,
+  bounded lifetime/clock skew and repository-scoped permission requests. Expired
+  installation tokens cannot construct a provider client. No private key fixture
+  or raw token is exposed through Debug/Serialize. Secret-provider/API wiring and
+  live installation verification remain pending.
+- GitHub Actions verified both backend and frontend workflows successful for
+  commit `e5aac93` (runs 43619202550 and 43619202546), including PostgreSQL tests.

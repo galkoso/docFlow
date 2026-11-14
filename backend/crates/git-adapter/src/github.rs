@@ -82,7 +82,10 @@ impl GitHub {
         })
     }
 
-    async fn response(mut response: Response, mutation: bool) -> Result<Value, GitError> {
+    pub(crate) async fn response(
+        mut response: Response,
+        mutation: bool,
+    ) -> Result<Value, GitError> {
         let status = response.status();
         let retry_after_seconds = response
             .headers()

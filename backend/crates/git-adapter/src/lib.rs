@@ -1,4 +1,5 @@
 //! Server-owned Git provider configuration. No client-supplied provider URLs.
+pub mod app_auth;
 pub mod github;
 
 use async_trait::async_trait;

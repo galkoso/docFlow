@@ -157,6 +157,10 @@ Checkboxes represent verified work only.
   memberships; reader HTTP tests prove merge/admin capabilities remain false.
   The public auth-status endpoint reports whether login is configured. Future
   product endpoints and their request/response schemas remain to be implemented.
+- Angular API types are generated from the Rust OpenAPI artifact. The generator
+  requires TypeScript 5 while Angular 22 requires 6, so `tools/api-client` has its
+  own pinned dependency tree and lockfile. Frontend CI regenerates the types and
+  checks for drift. No peer-dependency override or Angular downgrade is used.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

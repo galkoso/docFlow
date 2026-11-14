@@ -60,3 +60,7 @@ The current API schema is [docs/openapi.json](docs/openapi.json), generated from
 Rust types and routes. Regenerate from `backend` with
 `cargo run --quiet -p specspace-api --bin export-openapi > ../docs/openapi.json`.
 Backend CI checks that this artifact matches the source contract.
+
+Angular API types are generated with `npm ci --prefix tools/api-client`, then
+`cd frontend && npm run api:generate`. The generator has an isolated TypeScript 5
+tooling package; the Angular application continues to use TypeScript 6.

@@ -1,4 +1,4 @@
-use crate::{CommitRequest, CommitSha, FileChange, GitError, GitProvider};
+use crate::{CommitRequest, CommitSha, FileChange, FileEntry, GitError, GitProvider};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use reqwest::{
@@ -193,6 +193,44 @@ impl GitHub {
         CommitSha::parse(sha)
     }
 
+    async fn full_blob_text(
+        &self,
+        blob: &CommitSha,
+        expected_size: u64,
+    ) -> Result<String, GitError> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/repos/{}/git/blobs/{}",
+                self.rest_base,
+                self.repository,
+                blob.as_str()
+            ))
+            .send()
+            .await
+            .map_err(|_| GitError::ProviderUnavailable)?;
+        let data = Self::response(response, false).await?;
+        if data["encoding"] != "base64"
+            || data["sha"] != blob.as_str()
+            || data["size"].as_u64() != Some(expected_size)
+        {
+            return Err(GitError::InvalidResponse);
+        }
+        let encoded: String = data["content"]
+            .as_str()
+            .ok_or(GitError::InvalidResponse)?
+            .chars()
+            .filter(|c| !c.is_ascii_whitespace())
+            .collect();
+        let bytes = STANDARD
+            .decode(encoded)
+            .map_err(|_| GitError::InvalidResponse)?;
+        if bytes.len() as u64 != expected_size || bytes.len() > 2 * 1024 * 1024 {
+            return Err(GitError::InvalidResponse);
+        }
+        String::from_utf8(bytes).map_err(|_| GitError::InvalidResponse)
+    }
+
     fn commit_input(&self, request: &CommitRequest<'_>) -> Result<Value, GitError> {
         if request.changes.is_empty()
             || request.changes.len() > 50
@@ -317,16 +355,27 @@ impl GitProvider for GitHub {
         path: &RepositoryPath,
     ) -> Result<String, GitError> {
         let data = self.graphql(
-            "query($owner: String!, $name: String!, $expression: String!) { repository(owner: $owner, name: $name) { object(expression: $expression) { ... on Blob { byteSize isBinary isTruncated text } } } }",
+            "query($owner: String!, $name: String!, $expression: String!) { repository(owner: $owner, name: $name) { object(expression: $expression) { ... on Blob { oid byteSize isBinary isTruncated text } } } }",
             json!({"owner": self.owner, "name": self.name, "expression": format!("{}:{}", commit.as_str(), path.as_str())}), false,
         ).await?;
         let blob = data
             .pointer("/data/repository/object")
             .ok_or(GitError::InvalidResponse)?;
         if blob["isBinary"] != false
-            || blob["isTruncated"] != false
             || blob["byteSize"].as_u64().ok_or(GitError::InvalidResponse)? > 2 * 1024 * 1024
         {
+            return Err(GitError::InvalidResponse);
+        }
+        if blob["isTruncated"] == true {
+            let oid = CommitSha::parse(blob["oid"].as_str().ok_or(GitError::InvalidResponse)?)?;
+            return self
+                .full_blob_text(
+                    &oid,
+                    blob["byteSize"].as_u64().ok_or(GitError::InvalidResponse)?,
+                )
+                .await;
+        }
+        if blob["isTruncated"] != false {
             return Err(GitError::InvalidResponse);
         }
         blob["text"]
@@ -338,6 +387,48 @@ impl GitProvider for GitHub {
             .map(str::to_owned)
             .ok_or(GitError::InvalidResponse)
     }
+
+    async fn list_files(&self, commit: &CommitSha) -> Result<Vec<FileEntry>, GitError> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/repos/{}/git/trees/{}",
+                self.rest_base,
+                self.repository,
+                commit.as_str()
+            ))
+            .query(&[("recursive", "1")])
+            .send()
+            .await
+            .map_err(|_| GitError::ProviderUnavailable)?;
+        let data = Self::response(response, false).await?;
+        if data["truncated"] != false {
+            return Err(GitError::ResponseTooLarge);
+        }
+        let entries = data["tree"]
+            .as_array()
+            .filter(|entries| entries.len() <= 20000)
+            .ok_or(GitError::InvalidResponse)?;
+        let mut files = vec![];
+        for entry in entries {
+            match entry["type"].as_str() {
+                Some("tree") => continue,
+                Some("blob") if entry["mode"] == "100644" || entry["mode"] == "100755" => {}
+                _ => return Err(GitError::InvalidResponse),
+            }
+            files.push(FileEntry {
+                path: RepositoryPath::parse(
+                    entry["path"].as_str().ok_or(GitError::InvalidResponse)?,
+                )
+                .map_err(|_| GitError::InvalidResponse)?,
+                blob_sha: CommitSha::parse(
+                    entry["sha"].as_str().ok_or(GitError::InvalidResponse)?,
+                )?,
+                size: entry["size"].as_u64().ok_or(GitError::InvalidResponse)?,
+            });
+        }
+        Ok(files)
+    }
 }
 
 #[cfg(test)]
@@ -348,7 +439,7 @@ mod tests {
         extract::State,
         http::HeaderMap,
         response::{IntoResponse, Response},
-        routing::post,
+        routing::{get, post},
     };
     use std::sync::{
         Arc, Mutex,
@@ -419,7 +510,7 @@ mod tests {
         if body["variables"].get("expression").is_some() {
             assert_eq!(body["variables"]["expression"], format!("{OLD}:docs/a.md"));
             return Json(json!({"data": {"repository": {"object": {
-                "byteSize": 5, "text": "hello", "isBinary": false,
+                "oid": OLD, "byteSize": 5, "text": "hello", "isBinary": false,
                 "isTruncated": state.mode.load(Ordering::SeqCst) == 3
             }}}}))
             .into_response();
@@ -437,6 +528,21 @@ mod tests {
         Json(json!({"object": {"sha": OLD}}))
     }
 
+    async fn blob() -> Json<Value> {
+        Json(
+            json!({"sha": OLD, "size": 5, "encoding": "base64", "content": STANDARD.encode("hello")}),
+        )
+    }
+
+    async fn tree(State(state): State<Arc<ProviderState>>) -> Json<Value> {
+        Json(
+            json!({"truncated": state.mode.load(Ordering::SeqCst) == 4, "tree": [
+                {"type": "blob", "mode": "100644", "path": "docs/a.md", "sha": OLD, "size": 5},
+                {"type": "blob", "mode": "100644", "path": "docs/orphan.md", "sha": NEW, "size": 7}
+            ]}),
+        )
+    }
+
     async fn fixture() -> Fixture {
         let state = Arc::new(ProviderState {
             head: Mutex::new(OLD.into()),
@@ -446,6 +552,8 @@ mod tests {
         let app = Router::new()
             .route("/graphql", post(provider))
             .route("/repos/synthetic/book/git/refs", post(create_ref))
+            .route(&format!("/repos/synthetic/book/git/blobs/{OLD}"), get(blob))
+            .route(&format!("/repos/synthetic/book/git/trees/{OLD}"), get(tree))
             .with_state(state.clone());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
@@ -562,7 +670,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn read_is_commit_pinned_and_rejects_truncated_content() {
+    async fn read_is_commit_pinned_and_fetches_full_blob_when_graphql_truncates() {
         let fixture = fixture().await;
         let head = CommitSha::parse(OLD).unwrap();
         let path = RepositoryPath::parse("docs/a.md").unwrap();
@@ -572,9 +680,23 @@ mod tests {
         );
         fixture.state.mode.store(3, Ordering::SeqCst);
         assert_eq!(
-            fixture.adapter.read_text(&head, &path).await.unwrap_err(),
-            GitError::InvalidResponse
+            fixture.adapter.read_text(&head, &path).await.unwrap(),
+            "hello"
         );
+    }
+
+    #[tokio::test]
+    async fn full_tree_includes_orphans_and_truncated_trees_fail_explicitly() {
+        let fixture = fixture().await;
+        let head = CommitSha::parse(OLD).unwrap();
+        let files = fixture.adapter.list_files(&head).await.unwrap();
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[1].path.as_str(), "docs/orphan.md");
+        fixture.state.mode.store(4, Ordering::SeqCst);
+        assert!(matches!(
+            fixture.adapter.list_files(&head).await,
+            Err(GitError::ResponseTooLarge)
+        ));
     }
 
     #[tokio::test]

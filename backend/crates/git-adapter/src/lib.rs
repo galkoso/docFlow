@@ -61,6 +61,12 @@ pub enum FileChange {
     },
 }
 
+pub struct FileEntry {
+    pub path: RepositoryPath,
+    pub blob_sha: CommitSha,
+    pub size: u64,
+}
+
 pub struct CommitRequest<'a> {
     pub operation_id: Uuid,
     pub branch: &'a BranchName,
@@ -87,4 +93,5 @@ pub trait GitProvider: Send + Sync {
         commit: &CommitSha,
         path: &RepositoryPath,
     ) -> Result<String, GitError>;
+    async fn list_files(&self, commit: &CommitSha) -> Result<Vec<FileEntry>, GitError>;
 }

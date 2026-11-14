@@ -119,3 +119,7 @@ Checkboxes represent verified work only.
   live installation verification remain pending.
 - GitHub Actions verified both backend and frontend workflows successful for
   commit `e5aac93` (runs 43619202550 and 43619202546), including PostgreSQL tests.
+- Snapshot transport: provider tree enumeration now includes uncatalogued files
+  and rejects truncated trees. Truncated GraphQL text falls back to a pinned Git
+  blob read with size/encoding/identity checks. Five HTTP transport tests plus the
+  two App authentication tests pass. Live provider and book-service wiring remain open.

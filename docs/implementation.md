@@ -183,6 +183,12 @@ Checkboxes represent verified work only.
   scoped clients only after GitHub repository metadata matches the configured
   numeric repository ID. Nine provider tests pass, including substituted metadata
   rejection. No token or private key is exposed through the connection interface.
+- Server source configuration: secret references accept bounded `env:NAME` or
+  absolute `file:/path` inputs, never URLs, and secret bytes are zeroized on drop.
+  Repository IDs/installations come from DB records; short-lived connection caching
+  is bounded and respects configuration changes/expiry. Three infrastructure unit
+  tests and eleven PostgreSQL tests pass. Foreign repository IDs remain hidden
+  before configuration lookup. API startup wiring is the next step.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

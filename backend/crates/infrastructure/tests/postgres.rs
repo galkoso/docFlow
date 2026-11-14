@@ -1,9 +1,12 @@
 use specspace_application::book::ReadAuthorization;
+use specspace_application::{book::BookError, reader::BookReader};
 use specspace_infrastructure::authorization::PgReadAuthorization;
+use specspace_infrastructure::github_source::PgGitHubSource;
 use specspace_infrastructure::login_flows::LoginFlowStore;
 use specspace_infrastructure::sessions::SessionStore;
 use specspace_infrastructure::{complete_job, lease_job};
 use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
 
 async fn organization(pool: &PgPool) -> Uuid {
@@ -368,4 +371,35 @@ async fn login_state_requires_its_browser_binding_and_can_be_used_only_once(pool
             .unwrap()
             .is_none()
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn repository_configuration_is_db_selected_and_foreign_ids_stay_hidden(pool: PgPool) {
+    let a = proposal_fixture(&pool).await;
+    let b = proposal_fixture(&pool).await;
+    sqlx::query("UPDATE repositories SET remote_id = '42', installation_id = '7'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let reader = BookReader::new(
+        Arc::new(PgReadAuthorization::new(pool.clone())),
+        Arc::new(PgGitHubSource::new(pool.clone(), None)),
+    );
+    assert!(matches!(
+        reader.main(a.1, b.3).await,
+        Err(BookError::NotFound)
+    ));
+    assert!(matches!(
+        reader.main(a.1, a.3).await,
+        Err(BookError::RepositoryNotConfigured)
+    ));
+    sqlx::query("UPDATE repositories SET default_branch = 'other' WHERE id = $1")
+        .bind(a.3)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        reader.main(a.1, a.3).await,
+        Err(BookError::InvalidRepositoryConfiguration)
+    ));
 }

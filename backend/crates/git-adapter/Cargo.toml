@@ -1,0 +1,21 @@
+[package]
+name = "specspace-git-adapter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+specspace-domain = { path = "../domain" }
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls", "json"] }
+async-trait = "0.1"
+base64 = "0.22"
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

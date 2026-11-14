@@ -103,3 +103,11 @@ Checkboxes represent verified work only.
 - Path canonicalization additionally rejects non-NFC filenames; a decomposed
   Unicode path is covered by the traversal test, preventing ambiguous normalization
   from silently targeting another file. Archive-level duplicate detection is pending.
+- GitHub read/write adapter: four local HTTP contract tests pass for verified ref
+  creation, one expected-head mutation for multiple files, stale-head refusal,
+  unknown-result handling without retries, immutable text reads, truncation rejection
+  and rate-limit timing. Provider API contracts were checked against GitHub's
+  [commit](https://docs.github.com/en/graphql/reference/commits) and
+  [Git](https://docs.github.com/en/graphql/reference/git) references.
+  Live installation authentication, PR/check enforcement, tree loading and merge
+  capability remain open. Contract tests do not prove the live GitHub feasibility gate.

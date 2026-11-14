@@ -1,0 +1,89 @@
+//! Server-owned Git provider configuration. No client-supplied provider URLs.
+pub mod github;
+
+use async_trait::async_trait;
+use specspace_domain::{BranchName, RepositoryPath};
+use uuid::Uuid;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CommitSha(String);
+
+impl CommitSha {
+    pub fn parse(value: impl Into<String>) -> Result<Self, GitError> {
+        let value = value.into();
+        if !(40..=128).contains(&value.len())
+            || value.len() % 2 != 0
+            || !value.bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            return Err(GitError::InvalidInput);
+        }
+        Ok(Self(value.to_ascii_lowercase()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GitError {
+    InvalidInput,
+    BranchMissing,
+    BranchExists,
+    HeadMismatch,
+    Unauthorized,
+    RateLimited {
+        retry_after_seconds: Option<u64>,
+    },
+    ProviderUnavailable,
+    ProviderRejected,
+    ResponseTooLarge,
+    InvalidResponse,
+    /// A mutation may have succeeded. Reconcile the operation before retrying.
+    ResultUnknown,
+}
+
+impl std::fmt::Display for GitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+impl std::error::Error for GitError {}
+
+pub enum FileChange {
+    Put {
+        path: RepositoryPath,
+        content: Vec<u8>,
+    },
+    Delete {
+        path: RepositoryPath,
+    },
+}
+
+pub struct CommitRequest<'a> {
+    pub operation_id: Uuid,
+    pub branch: &'a BranchName,
+    pub expected_head: &'a CommitSha,
+    pub message: &'a str,
+    pub actor_id: Uuid,
+    pub changes: &'a [FileChange],
+}
+
+/// Read/write foundation. PR, merge and checks are added as explicit capabilities
+/// when implemented; no default methods pretend those operations succeeded.
+#[async_trait]
+pub trait GitProvider: Send + Sync {
+    async fn main_head(&self) -> Result<CommitSha, GitError>;
+    async fn branch_head(&self, branch: &BranchName) -> Result<CommitSha, GitError>;
+    async fn create_branch(
+        &self,
+        branch: &BranchName,
+        source: &CommitSha,
+    ) -> Result<CommitSha, GitError>;
+    async fn commit(&self, request: CommitRequest<'_>) -> Result<CommitSha, GitError>;
+    async fn read_text(
+        &self,
+        commit: &CommitSha,
+        path: &RepositoryPath,
+    ) -> Result<String, GitError>;
+}

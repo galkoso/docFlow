@@ -63,3 +63,7 @@ Checkboxes represent verified work only.
   prevention. `cargo fmt` and `cargo clippy --workspace --all-targets -- -D warnings`
   pass. This establishes identifier rules only; Git/database uniqueness enforcement
   and resource authorization remain open.
+- Angular foundation: production build and navigation accessibility unit check pass
+  with strict TypeScript/templates. Four lazy routes, Hebrew/RTL shell and initial
+  setup states are implemented. No connected book, authentication or proposal
+  workflows are claimed by this check; browser/narrow-screen verification is pending.

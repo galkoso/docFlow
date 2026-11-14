@@ -1,0 +1,16 @@
+<a class="skip-link" href="#main-content">דילוג לתוכן</a>
+<aside class="sidebar" aria-label="ניווט ראשי">
+  <a class="brand" routerLink="/specification"><span class="brand-icon" aria-hidden="true">S</span><b dir="ltr">SpecSpace</b></a>
+  <p class="workspace-label">סביבת האפיון של הצוות</p>
+  <nav>
+    <a routerLink="/specification" routerLinkActive="active" ariaCurrentWhenActive="page">▤ &nbsp; האפיון המאושר</a>
+    <a routerLink="/changes" routerLinkActive="active" ariaCurrentWhenActive="page">⑂ &nbsp; הצעות שינוי</a>
+    <a routerLink="/history" routerLinkActive="active" ariaCurrentWhenActive="page">◷ &nbsp; היסטוריה</a>
+    <a routerLink="/settings" routerLinkActive="active" ariaCurrentWhenActive="page">⚙ &nbsp; ניהול סביבת העבודה</a>
+  </nav>
+  <div class="sidebar-note">סביבת פיתוח<p>אפיון משותף. החלטות מתועדות.</p></div>
+</aside>
+<div class="workspace">
+  <header class="topbar"><span>מרחב העבודה / אפיון מערכת</span><span class="environment">בפיתוח</span></header>
+  <main id="main-content" tabindex="-1"><router-outlet /></main>
+</div>

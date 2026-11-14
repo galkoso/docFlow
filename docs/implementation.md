@@ -179,6 +179,10 @@ Checkboxes represent verified work only.
   bounds concurrent loads/search work and does not silently substitute a cached
   version when a current-main read fails. Durable indexing and worker integration
   remain open; cached data is disposable and Git remains authoritative.
+- App connection scope: reusable App signing credentials produce installation-
+  scoped clients only after GitHub repository metadata matches the configured
+  numeric repository ID. Nine provider tests pass, including substituted metadata
+  rejection. No token or private key is exposed through the connection interface.
 - Browser verification attempt: the Browser runtime reported no available browser
   and discovery returned an empty list. Desktop/320px visual verification remains
   open; the Angular development server starts successfully on loopback port 4200.

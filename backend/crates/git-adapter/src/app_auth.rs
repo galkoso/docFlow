@@ -24,6 +24,13 @@ pub struct GitHubApp {
     api_base: String,
 }
 
+/// Reusable server credential. Installation/repository scope is chosen from DB.
+pub struct GitHubAppKey {
+    issuer: String,
+    signing_key: EncodingKey,
+    client: Client,
+}
+
 /// Deliberately does not expose the raw token through public accessors.
 pub struct InstallationToken {
     token: String,
@@ -50,21 +57,14 @@ impl InstallationToken {
     }
 }
 
-impl GitHubApp {
+impl GitHubAppKey {
     /// `private_pem` is resolved by the server's secret provider, never a client.
-    pub fn from_pem(
-        issuer: &str,
-        installation_id: u64,
-        repository_id: u64,
-        private_pem: &[u8],
-    ) -> Result<Self, GitError> {
+    pub fn from_pem(issuer: &str, private_pem: &[u8]) -> Result<Self, GitError> {
         if issuer.is_empty()
             || issuer.len() > 100
             || !issuer
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || b == b'_')
-            || installation_id == 0
-            || repository_id == 0
         {
             return Err(GitError::InvalidInput);
         }
@@ -80,12 +80,65 @@ impl GitHubApp {
             .map_err(|_| GitError::ProviderUnavailable)?;
         Ok(Self {
             issuer: issuer.into(),
-            installation_id,
-            repository_id,
             signing_key,
             client,
+        })
+    }
+
+    pub fn installation(
+        &self,
+        installation_id: u64,
+        repository_id: u64,
+    ) -> Result<GitHubApp, GitError> {
+        if installation_id == 0 || repository_id == 0 {
+            return Err(GitError::InvalidInput);
+        }
+        Ok(GitHubApp {
+            issuer: self.issuer.clone(),
+            signing_key: self.signing_key.clone(),
+            client: self.client.clone(),
+            installation_id,
+            repository_id,
             api_base: "https://api.github.com".into(),
         })
+    }
+}
+
+impl GitHubApp {
+    pub fn from_pem(
+        issuer: &str,
+        installation_id: u64,
+        repository_id: u64,
+        private_pem: &[u8],
+    ) -> Result<Self, GitError> {
+        GitHubAppKey::from_pem(issuer, private_pem)?.installation(installation_id, repository_id)
+    }
+
+    pub async fn connect_repository(&self) -> Result<(GitHub, u64), GitError> {
+        let token = self.installation_token().await?;
+        let mut authorization = HeaderValue::from_str(&format!("Bearer {}", token.token))
+            .map_err(|_| GitError::InvalidInput)?;
+        authorization.set_sensitive(true);
+        let response = self
+            .client
+            .get(format!(
+                "{}/repositories/{}",
+                self.api_base, self.repository_id
+            ))
+            .header("authorization", authorization)
+            .header("accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2026-03-10")
+            .send()
+            .await
+            .map_err(|_| GitError::ProviderUnavailable)?;
+        let metadata = GitHub::response(response, false).await?;
+        if metadata["id"].as_u64() != Some(self.repository_id) {
+            return Err(GitError::InvalidResponse);
+        }
+        let name = metadata["full_name"]
+            .as_str()
+            .ok_or(GitError::InvalidResponse)?;
+        Ok((token.github(name)?, token.expires_at()))
     }
 
     pub async fn installation_token(&self) -> Result<InstallationToken, GitError> {
@@ -133,7 +186,12 @@ impl GitHubApp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{Json, Router, extract::State, http::HeaderMap, routing::post};
+    use axum::{
+        Json, Router,
+        extract::State,
+        http::HeaderMap,
+        routing::{get, post},
+    };
     use jsonwebtoken::{DecodingKey, Validation, decode};
     use std::{
         io::Write,
@@ -195,6 +253,14 @@ mod tests {
         )
     }
 
+    async fn repository(headers: HeaderMap) -> Json<serde_json::Value> {
+        assert_eq!(
+            headers["authorization"],
+            "Bearer synthetic-installation-token"
+        );
+        Json(json!({"id": 42, "full_name": "synthetic/book"}))
+    }
+
     #[tokio::test]
     async fn signed_app_jwt_requests_one_repository_and_bounded_permissions() {
         let (private, public) = keys();
@@ -203,6 +269,7 @@ mod tests {
         app.api_base = format!("http://{}", listener.local_addr().unwrap());
         let service = Router::new()
             .route("/app/installations/7/access_tokens", post(issue))
+            .route("/repositories/42", get(repository))
             .with_state(Arc::new(public));
         let server = tokio::spawn(async move {
             axum::serve(listener, service).await.unwrap();
@@ -210,6 +277,31 @@ mod tests {
         let token = app.installation_token().await.unwrap();
         assert!(token.github("synthetic/book").is_ok());
         assert!(token.expires_at() > now().unwrap());
+        assert!(app.connect_repository().await.is_ok());
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn mismatched_repository_metadata_cannot_redirect_an_installation_to_another_repo() {
+        let (private, public) = keys();
+        let key = GitHubAppKey::from_pem("Iv1SyntheticApp", &private).unwrap();
+        let mut app = key.installation(7, 42).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        app.api_base = format!("http://{}", listener.local_addr().unwrap());
+        let service = Router::new()
+            .route("/app/installations/7/access_tokens", post(issue))
+            .route(
+                "/repositories/42",
+                get(|| async { Json(json!({"id": 99, "full_name": "other/repo"})) }),
+            )
+            .with_state(Arc::new(public));
+        let server = tokio::spawn(async move {
+            axum::serve(listener, service).await.unwrap();
+        });
+        assert!(matches!(
+            app.connect_repository().await,
+            Err(GitError::InvalidResponse)
+        ));
         server.abort();
     }
 

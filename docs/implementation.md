@@ -56,4 +56,10 @@ real data is connected (DEC-01–15); this does not block local implementation.
 
 ## Evidence
 
-No application checks have run yet. Checkboxes represent verified work only.
+Checkboxes represent verified work only.
+
+- Rust domain foundation: `cargo test --workspace` passes three behavioral tests
+  for branch validation, case-insensitive reservation keys and path traversal
+  prevention. `cargo fmt` and `cargo clippy --workspace --all-targets -- -D warnings`
+  pass. This establishes identifier rules only; Git/database uniqueness enforcement
+  and resource authorization remain open.

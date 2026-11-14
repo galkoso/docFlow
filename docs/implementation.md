@@ -67,3 +67,7 @@ Checkboxes represent verified work only.
   with strict TypeScript/templates. Four lazy routes, Hebrew/RTL shell and initial
   setup states are implemented. No connected book, authentication or proposal
   workflows are claimed by this check; browser/narrow-screen verification is pending.
+- Axum API foundation: liveness, database-unavailable readiness and structured 404
+  tests pass. API binds to loopback by default, uses a bounded SQLx pool, disables
+  response caching and shuts down on Ctrl+C. Readiness currently checks PostgreSQL
+  only; provider/storage checks remain pending with their respective adapters.

@@ -23,3 +23,9 @@ Run `npm start` from `frontend` for the development server.
 Backend: `cd backend && cargo test --workspace --locked`.
 Run `cargo fmt --all -- --check` and
 `cargo clippy --workspace --all-targets --locked -- -D warnings` before committing.
+
+The API runs with `DATABASE_URL=postgres://... cargo run -p specspace-api`
+from `backend`. It binds to `127.0.0.1:3000` by default; set
+`APP_LISTEN_ADDRESS` to change this. `/api/v1/health/live` reports process health;
+`/api/v1/health/ready` checks PostgreSQL and returns 503 when unavailable.
+These are infrastructure endpoints; product routes are still being implemented.

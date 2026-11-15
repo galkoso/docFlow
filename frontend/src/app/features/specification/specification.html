@@ -26,7 +26,7 @@
       <input #findInput id="book-find" type="search" autocomplete="off" [value]="find.query()" maxlength="400"
         (input)="updateQuery(findInput.value)" (keydown)="findKey($event)" aria-describedby="find-count">
       <span id="find-count" aria-live="polite" role="status">
-        @if (find.loading()) {מחפשים…} @else if (find.total() !== null) {{{ find.total() ? find.position() + 1 : 0 }} מתוך {{ find.total() }}}
+        @if (find.indexing()) {מכינים את החיפוש לגרסה זו…} @else if (find.loading()) {מחפשים…} @else if (find.total() !== null) {{{ find.total() ? find.position() + 1 : 0 }} מתוך {{ find.total() }}}
       </span>
       <button (click)="find.move(-1)" [disabled]="!find.total()" aria-label="תוצאה קודמת">↑</button>
       <button (click)="find.move(1)" [disabled]="!find.total()" aria-label="תוצאה הבאה">↓</button>

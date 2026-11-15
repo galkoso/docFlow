@@ -25,12 +25,84 @@ describe('Snapshot-bound find controller', () => {
     http = TestBed.inject(HttpTestingController);
     find.scope('repository', sha);
   });
-  afterEach(() => { find.clear(); http.verify(); vi.useRealTimers(); });
+  afterEach(() => { find.clear(); http.verify(); vi.restoreAllMocks(); vi.useRealTimers(); });
   function request(start = 0, q = query) {
     return http.expectOne(req => req.url === '/api/v1/repositories/repository/find'
       && req.params.get('q') === q && req.params.get('commit') === sha && req.params.get('start_at') === String(start));
   }
   function initial() { find.search(query); vi.advanceTimersByTime(200); request().flush(page(0)); }
+
+  function pending(commit = sha) {
+    request().flush({ error: { code: 'SEARCH_SNAPSHOT_NOT_READY', retryable: true,
+      details: { snapshot_sha: commit }, message_he: 'החיפוש נמצא בהכנה' } }, { status: 409, statusText: 'Conflict' });
+  }
+
+  it('polls a pending pinned index until ready without reporting zero matches', () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    find.search(query);
+    vi.advanceTimersByTime(200);
+    pending();
+    expect(find.total()).toBeNull();
+    expect(find.indexing()).toBe(true);
+    expect(find.error()).toBeNull();
+    vi.advanceTimersByTime(1999);
+    http.expectNone(req => req.url.endsWith('/find'));
+    vi.advanceTimersByTime(1);
+    request().flush(page(0));
+    expect(find.indexing()).toBe(false);
+    expect(find.total()).toBe(501);
+    vi.advanceTimersByTime(10000);
+    http.expectNone(req => req.url.endsWith('/find'));
+  });
+
+  it('slows hidden-tab polling and cancels it on query and version changes', () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    find.search(query);
+    vi.advanceTimersByTime(200);
+    pending();
+    vi.advanceTimersByTime(9999);
+    http.expectNone(req => req.url.endsWith('/find'));
+    vi.advanceTimersByTime(1);
+    pending();
+    find.search('other');
+    vi.advanceTimersByTime(200);
+    request(0, 'other').flush(page(0, 0, 'other'));
+    vi.advanceTimersByTime(10000);
+    http.expectNone(req => req.url.endsWith('/find'));
+    find.search(query);
+    vi.advanceTimersByTime(200);
+    pending();
+    find.scope();
+    vi.advanceTimersByTime(10000);
+    http.expectNone(req => req.url.endsWith('/find'));
+    expect(find.indexing()).toBe(false);
+  });
+
+  it('stops on terminal or mismatched progress and bounds automatic checks', () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    find.search(query);
+    vi.advanceTimersByTime(200);
+    pending('b'.repeat(40));
+    vi.advanceTimersByTime(10000);
+    http.expectNone(req => req.url.endsWith('/find'));
+    find.retry();
+    request().flush({ error: { code: 'SEARCH_SNAPSHOT_FAILED', retryable: false, message_he: 'ההכנה נכשלה' } },
+      { status: 409, statusText: 'Conflict' });
+    vi.advanceTimersByTime(10000);
+    http.expectNone(req => req.url.endsWith('/find'));
+    expect(find.error()).toContain('נכשלה');
+    find.retry();
+    for (let attempt = 0; attempt < 90; ++attempt) { pending(); vi.advanceTimersByTime(2000); }
+    pending();
+    expect(find.loading()).toBe(false);
+    expect(find.error()).toContain('זמן רב');
+    expect(find.total()).toBeNull();
+    vi.advanceTimersByTime(10000);
+    http.expectNone(req => req.url.endsWith('/find'));
+    find.retry();
+    request().flush(page(0));
+    expect(find.total()).toBe(501);
+  });
 
   it('debounces changes, cancels superseded queries and clears hits when the snapshot changes', () => {
     find.search('old');

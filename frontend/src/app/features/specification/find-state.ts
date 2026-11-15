@@ -14,10 +14,12 @@ export class FindState {
   private request?: Subscription;
   private timer?: ReturnType<typeof setTimeout>;
   private generation = 0;
+  private pendingChecks = 0;
   readonly query = signal('');
   readonly total = signal<number | null>(null);
   readonly position = signal(0);
   readonly loading = signal(false);
+  readonly indexing = signal(false);
   readonly error = signal<string | null>(null);
   readonly announcement = signal('');
   readonly pages = signal(new Map<number, SearchPage>());
@@ -47,7 +49,7 @@ export class FindState {
     this.restart();
   }
 
-  retry(): void { this.fetch(Math.floor(this.position() / 100) * 100); }
+  retry(): void { this.pendingChecks = 0; this.fetch(Math.floor(this.position() / 100) * 100); }
 
   move(delta: number): void {
     const total = this.total();
@@ -66,7 +68,9 @@ export class FindState {
     else {
       ++this.generation;
       this.request?.unsubscribe();
+      clearTimeout(this.timer);
       this.loading.set(false);
+      this.indexing.set(false);
       this.error.set(null);
       this.pages.update(pages => {
         const next = new Map(pages);
@@ -88,6 +92,8 @@ export class FindState {
     this.error.set(null);
     this.announcement.set('');
     this.loading.set(false);
+    this.indexing.set(false);
+    this.pendingChecks = 0;
     if (!this.query() || !this.repository || !this.commit) return;
     if (Array.from(this.query()).length > 200) { this.error.set('אפשר לחפש עד 200 תווים.'); return; }
     this.loading.set(true);
@@ -99,6 +105,7 @@ export class FindState {
     const commit = this.commit;
     const query = this.query();
     if (!repository || !commit || !query || Array.from(query).length > 200) return;
+    clearTimeout(this.timer);
     this.request?.unsubscribe();
     const generation = ++this.generation;
     this.loading.set(true);
@@ -106,6 +113,8 @@ export class FindState {
     this.request = this.api.find(repository, commit, query, start).subscribe({
       next: page => {
         if (generation !== this.generation) return;
+        this.indexing.set(false);
+        this.pendingChecks = 0;
         if (page.snapshot_sha !== commit || page.query !== query || page.start_at !== start
           || (this.total() != null && page.total_matches !== this.total())) {
           this.loading.set(false);
@@ -126,6 +135,26 @@ export class FindState {
       },
       error: error => {
         if (generation !== this.generation) return;
+        const progress = error instanceof HttpErrorResponse ? error.error?.error : null;
+        if (error instanceof HttpErrorResponse && error.status === 409 && progress?.code === 'SEARCH_SNAPSHOT_NOT_READY'
+          && progress.retryable === true && progress.details?.snapshot_sha === commit) {
+          this.pages.set(new Map());
+          this.total.set(null);
+          this.indexing.set(true);
+          if (++this.pendingChecks <= 90) {
+            // One foreground request every 2s, or every 10s in a hidden tab.
+            // Every scope/query change cancels both the timer and its request.
+            this.timer = setTimeout(() => {
+              if (generation === this.generation) this.fetch(start);
+            }, globalThis.document?.visibilityState === 'hidden' ? 10000 : 2000);
+            return;
+          }
+          this.indexing.set(false);
+          this.loading.set(false);
+          this.error.set('הכנת החיפוש נמשכת זמן רב. אפשר לבדוק שוב בעוד רגע.');
+          return;
+        }
+        this.indexing.set(false);
         this.loading.set(false);
         this.error.set(bookError(error));
         if (error instanceof HttpErrorResponse && [401, 403, 404].includes(error.status)) {

@@ -450,3 +450,14 @@ Checkboxes represent verified work only.
   search after process/cache loss without a Git round-trip, foreign scope denial,
   and failed new snapshots alongside a working older version. API tests and
   workspace Clippy pass. Client polling is the next stage.
+
+- Reader index readiness: find now recognizes retryable pending-index responses
+  only for the selected SHA, shows preparation status and keeps the match count
+  unknown. It polls every 2s in a visible tab / 10s while hidden, with one request
+  at a time and at most 90 automatic retries. Query/version/access changes and
+  disposal cancel work; terminal failures stop polling. A bounded-wait message
+  offers explicit retry after that limit. Canonical visible highlights continue
+  to work independently during preparation. Three new client scenarios cover
+  pending-to-ready, background timing, cancellation, terminal/mismatched state
+  and the retry bound. Angular production build and all 32 tests pass. Browser
+  visual acceptance and end-to-end HTTP performance remain open.

@@ -347,6 +347,13 @@ async fn recovery_expiry_policy_and_cleanup_never_reuse_versions(pool: PgPool) {
             .buffers
             .is_empty()
     );
+    assert_eq!(
+        request(&app, &f.actor, f.proposal, None, false, Some("DOC-MEDIA"))
+            .await
+            .1["buffers"],
+        json!([]),
+        "an expired buffer must not reappear when a longer policy reads it before cleanup"
+    );
     assert_eq!(shortened.purge_expired().await.unwrap(), 1);
     let (_, saved) = request(
         &app,
@@ -611,4 +618,48 @@ async fn recovery_discard_is_private_versioned_and_retry_safe_after_recreation(p
             .1["buffers"][0]["content_utf8"],
         "new unsaved source"
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn recovery_startup_policy_applies_to_unread_buffers_and_cannot_be_undone_by_longer_retention(
+    pool: PgPool,
+) {
+    let f = fixture(&pool).await;
+    let app = app(&pool, Some(30));
+    assert_eq!(
+        request(
+            &app,
+            &f.actor,
+            f.proposal,
+            Some(&input("DOC-MEDIA", 0, "unread recovery")),
+            true,
+            None
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    sqlx::query("UPDATE draft_buffers SET updated_at=now()-interval '20 days',expires_at=now()+interval '10 days'").execute(&pool).await.unwrap();
+    let shorter = PgDrafts::new(pool.clone(), Some(DraftRetention::new(7).unwrap()));
+    assert_eq!(shorter.enforce_retention().await.unwrap(), 1);
+    let longer = PgDrafts::new(pool.clone(), Some(DraftRetention::new(60).unwrap()));
+    assert_eq!(longer.enforce_retention().await.unwrap(), 0);
+    assert!(
+        longer
+            .read(f.actor.id, f.proposal, Some("DOC-MEDIA"))
+            .await
+            .unwrap()
+            .buffers
+            .is_empty()
+    );
+    let unset = PgDrafts::new(pool.clone(), None);
+    assert!(
+        unset
+            .read(f.actor.id, f.proposal, Some("DOC-MEDIA"))
+            .await
+            .unwrap()
+            .buffers
+            .is_empty()
+    );
+    assert_eq!(unset.purge_expired().await.unwrap(), 1);
 }

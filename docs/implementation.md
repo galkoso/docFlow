@@ -695,3 +695,13 @@ Checkboxes represent verified work only.
   frontend tests pass against the generated contract.
   The rich editor, recovery prompts/autosave UI and verified Git commits remain
   subsequent work; this backend does not satisfy the complete editing criterion.
+
+- Durable expiry correction: a regression reproduced an expired buffer becoming
+  visible under a longer policy before cleanup. Reads/saves now persist shorter
+  expiry, and startup applies the configured cap to unread buffers before serving
+  traffic. Increasing or removing retention cannot extend those recorded expiry
+  times. Cleanup also applies the cap before its deletion batch. The regression
+  and a new startup/unread-buffer scenario pass alongside all eight recovery API
+  scenarios; workspace Clippy passes. A configured recovery policy now requires
+  PostgreSQL availability at startup, documented in README. No content, buffer
+  versions or migration checksums are rewritten by expiry maintenance.

@@ -70,6 +70,32 @@ impl PgDrafts {
         Ok(tx)
     }
 
+    async fn clamp_user_expiry(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        actor: Uuid,
+        proposal: Uuid,
+    ) -> Result<(), DraftError> {
+        if let Some(days) = self.days() {
+            sqlx::query("UPDATE draft_buffers SET expires_at=updated_at+make_interval(days=>$3) WHERE proposal_id=$1 AND user_id=$2 AND expires_at>updated_at+make_interval(days=>$3)")
+                .bind(proposal).bind(actor).bind(days).execute(&mut **tx).await.map_err(unavailable)?;
+        }
+        Ok(())
+    }
+
+    /// Persist shortening before serving requests. Raising/removing the policy
+    /// later cannot revive content that already expired under an earlier policy.
+    pub async fn enforce_retention(&self) -> Result<u64, DraftError> {
+        let Some(days) = self.days() else {
+            return Ok(0);
+        };
+        let mut tx = self.transaction().await?;
+        let result = sqlx::query("UPDATE draft_buffers SET expires_at=updated_at+make_interval(days=>$1) WHERE expires_at>updated_at+make_interval(days=>$1)")
+            .bind(days).execute(&mut *tx).await.map_err(unavailable)?;
+        tx.commit().await.map_err(unavailable)?;
+        Ok(result.rows_affected())
+    }
+
     async fn scope(
         tx: &mut Transaction<'_, Postgres>,
         actor: Uuid,
@@ -144,6 +170,7 @@ impl PgDrafts {
     ) -> Result<DraftSnapshot, DraftError> {
         let mut tx = self.transaction().await?;
         let scope = Self::scope(&mut tx, actor, proposal, false).await?;
+        self.clamp_user_expiry(&mut tx, actor, proposal).await?;
         let (context, _) = self.context(&mut tx, &scope, actor, proposal).await?;
         let buffers = self.buffers(&mut tx, actor, &context, document).await?;
         if buffers.len() > MAX_RECOVERY_DOCUMENTS as usize {
@@ -167,6 +194,7 @@ impl PgDrafts {
             return Err(DraftError::Forbidden);
         }
         let days = self.days().ok_or(DraftError::PolicyNotConfigured)?;
+        self.clamp_user_expiry(&mut tx, actor, proposal).await?;
         let existing: Option<Existing> = sqlx::query_as("SELECT version,least(expires_at,updated_at+make_interval(days=>$4))>now() AS live,last_save_id,last_request_hash FROM draft_buffers WHERE proposal_id=$1 AND user_id=$2 AND document_id=$3 FOR UPDATE")
             .bind(proposal).bind(actor).bind(&request.document_id).bind(days).fetch_optional(&mut *tx).await.map_err(unavailable)?;
         let replayed = existing
@@ -248,6 +276,7 @@ impl PgDrafts {
     /// Bounded batches; a shorter configured policy also takes effect for older
     /// buffers. Global sequence versions prevent stale tabs surviving deletion.
     pub async fn purge_expired(&self) -> Result<u64, DraftError> {
+        self.enforce_retention().await?;
         sqlx::query("WITH expired AS (SELECT ctid FROM draft_buffers WHERE least(expires_at,updated_at+make_interval(days=>$1))<=now() ORDER BY expires_at LIMIT 500 FOR UPDATE SKIP LOCKED) DELETE FROM draft_buffers d USING expired e WHERE d.ctid=e.ctid")
             .bind(self.days()).execute(&self.pool).await.map(|result| result.rows_affected()).map_err(unavailable)
     }

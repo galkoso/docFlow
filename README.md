@@ -92,6 +92,9 @@ production policy. An unset value disables recovery writes and is reported in
 the recovery context. The API exposes the configured policy and each expiry.
 Expired content is hidden immediately; a cleanup task removes up to 500 expired
 buffers per minute. Shortening the policy also expires older buffers.
+Policy shortening is persisted before the API serves requests, so increasing or
+removing the policy later cannot revive expired buffers. Applying a configured
+recovery policy requires PostgreSQL to be available at startup.
 
 `GET /api/v1/proposals/:id/draft` lists the current user's buffer metadata;
 `?document_id=DOC-ID` retrieves one buffer's exact source. `PUT` requires a

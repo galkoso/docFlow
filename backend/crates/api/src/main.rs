@@ -41,6 +41,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let retention = specspace_application::draft::DraftRetention::new(days.parse()?)
             .map_err(|_| "DRAFT_RETENTION_DAYS must be between 1 and 365")?;
         state.configure_draft_retention(retention);
+        state
+            .drafts
+            .enforce_retention()
+            .await
+            .map_err(|_| "Unable to apply the configured draft retention policy")?;
     }
     if let Ok(provider) = std::env::var("GIT_PROVIDER")
         && !provider.eq_ignore_ascii_case("github")

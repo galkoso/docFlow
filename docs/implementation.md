@@ -757,3 +757,19 @@ Checkboxes represent verified work only.
   matches and workspace Clippy passes. Page/toolbar, session recovery/autosave,
   source repair and Git commits remain required; this core is not a complete
   user-facing editor yet. Browser rendering/IME/RTL acceptance remains open.
+
+- Rich editor component: standalone controls now drive ProseMirror formatting,
+  H1–H4/code blocks, lists/tasks/quotes, simple table insertion/row/column actions,
+  links, image descriptions and Undo/Redo. Heading level changes retain each
+  selected block's ID, including nested headings. Source atoms use inert details/
+  text views. HTML paste conversion is announced; unsupported complex-table paste
+  falls back to text and protected-source paste is blocked explicitly. Permission
+  changes preserve the local document while transaction guards reject readonly
+  mutations, including keyboard history. Link/image fields can be flushed by the
+  future page save boundary and remain available if permissions change. Four new
+  component scenarios exercise actual editor DOM/commands, nested identity,
+  undo/redo, permission changes, invalid links, inert protected source and simple
+  table shape changes. Geometry is mocked in jsdom; these are not browser layout,
+  RTL/IME or accessibility acceptance. Production build and all 61 frontend tests
+  pass. This reusable component is not yet connected to a proposal route;
+  page/session/recovery integration, source repair and Git save remain required.

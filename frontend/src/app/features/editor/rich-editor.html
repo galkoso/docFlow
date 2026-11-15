@@ -1,0 +1,44 @@
+<div class="rich-toolbar" aria-label="כלי עריכה" (mousedown)="$event.target === $event.currentTarget ? $event.preventDefault() : null">
+  <label>סגנון <select #style [value]="selection().block" [disabled]="!editable() || selection().table" (change)="block(style.value)">
+    <option value="paragraph">פסקה</option><option value="h1">כותרת 1</option><option value="h2">כותרת 2</option>
+    <option value="h3">כותרת 3</option><option value="h4">כותרת 4</option><option value="code_block">בלוק קוד</option>
+  </select></label>
+  <button type="button" [disabled]="!editable()" [attr.aria-pressed]="selection().bold" (mousedown)="$event.preventDefault()" (click)="mark('strong')">מודגש</button>
+  <button type="button" [disabled]="!editable()" [attr.aria-pressed]="selection().italic" (mousedown)="$event.preventDefault()" (click)="mark('em')">נטוי</button>
+  <button type="button" [disabled]="!editable()" [attr.aria-pressed]="selection().strike" (mousedown)="$event.preventDefault()" (click)="mark('strike')">קו חוצה</button>
+  <button type="button" [disabled]="!editable()" [attr.aria-pressed]="selection().inlineCode" (mousedown)="$event.preventDefault()" (click)="mark('code')">קוד בשורה</button>
+  <button type="button" [disabled]="!editable()" [attr.aria-pressed]="selection().quote" (mousedown)="$event.preventDefault()" (click)="quote()">ציטוט</button>
+  <button type="button" [disabled]="!editable()" [attr.aria-pressed]="selection().list === 'bullet_list'" (mousedown)="$event.preventDefault()" (click)="list('bullet_list')">רשימה</button>
+  <button type="button" [disabled]="!editable()" [attr.aria-pressed]="selection().list === 'ordered_list'" (mousedown)="$event.preventDefault()" (click)="list('ordered_list')">מספור</button>
+  <button type="button" [disabled]="!editable()" (mousedown)="$event.preventDefault()" (click)="task()">סימון משימה</button>
+  <button type="button" [disabled]="!editable()" (mousedown)="$event.preventDefault()" (click)="openLink()">קישור</button>
+  <button type="button" [disabled]="!editable() || !selection().image" (mousedown)="$event.preventDefault()" (click)="openImage()">תיאור תמונה</button>
+  <button type="button" [disabled]="!editable() || selection().table" (mousedown)="$event.preventDefault()" (click)="table()">הוספת טבלה</button>
+  <button type="button" [disabled]="!editable()" (mousedown)="$event.preventDefault()" (click)="undo()">ביטול עריכה</button>
+  <button type="button" [disabled]="!editable()" (mousedown)="$event.preventDefault()" (click)="redo()">ביצוע חוזר</button>
+</div>
+@if (selection().table) {
+  <div class="rich-table-tools" aria-label="כלי טבלה"><span>Enter עובר לתא הבא.</span>
+    <button type="button" [disabled]="!editable()" (mousedown)="$event.preventDefault()" (click)="tableAction('row')">הוספת שורה</button>
+    <button type="button" [disabled]="!editable()" (mousedown)="$event.preventDefault()" (click)="tableAction('column')">הוספת עמודה</button>
+    <button type="button" [disabled]="!editable() || selection().header" (mousedown)="$event.preventDefault()" (click)="tableAction('deleteRow')">מחיקת שורה</button>
+    <button type="button" [disabled]="!editable()" (mousedown)="$event.preventDefault()" (click)="tableAction('deleteColumn')">מחיקת עמודה</button>
+    <button type="button" [disabled]="!editable()" (mousedown)="$event.preventDefault()" (click)="tableAction('deleteTable')">מחיקת טבלה</button>
+  </div>
+}
+@if (linkOpen()) {
+  <form class="rich-link" (submit)="$event.preventDefault(); applyLink()">
+    <label>כתובת קישור <input #linkInput type="text" dir="ltr" [readOnly]="!editable()" [value]="linkUrl()" (input)="linkUrl.set(linkInput.value)" aria-describedby="rich-link-error"></label>
+    <button type="submit" [disabled]="!editable()">החלת קישור</button><button type="button" [disabled]="!editable()" (click)="removeLink()">הסרת קישור</button><button type="button" (click)="closeLink()">סגירה</button>
+    <p id="rich-link-error" role="alert">{{ linkError() }}</p>
+  </form>
+}
+@if (imageOpen()) {
+  <form class="rich-link" (submit)="$event.preventDefault(); applyImage()">
+    <label>תיאור תמונה <input #alt [readOnly]="!editable()" [value]="imageAlt()" (input)="imageAlt.set(alt.value)" required></label>
+    <button type="submit" [disabled]="!editable() || !imageAlt().trim()">עדכון התיאור</button><button type="button" (click)="imageOpen.set(false)">סגירה</button>
+  </form>
+}
+@if (notice()) {<p class="rich-notice" role="status">{{ notice() }}</p>}
+@if (error()) {<p class="rich-error" role="alert">{{ error() }}</p>}
+<div #mount class="rich-mount"></div>

@@ -318,7 +318,12 @@ impl GitProvider for GitHub {
             .pointer("/object/sha")
             .and_then(Value::as_str)
             .ok_or(GitError::ResultUnknown)?;
-        let actual = self.branch_head(branch).await?;
+        // The ref was accepted. A failed verification read cannot prove that
+        // creation failed and must never authorize a blind mutation retry.
+        let actual = self
+            .branch_head(branch)
+            .await
+            .map_err(GitError::uncertain_readback)?;
         if returned != source.as_str() || actual != *source {
             return Err(GitError::ResultUnknown);
         }
@@ -351,7 +356,7 @@ impl GitProvider for GitHub {
         let actual = self
             .branch_head(request.branch)
             .await
-            .map_err(|_| GitError::ResultUnknown)?;
+            .map_err(GitError::uncertain_readback)?;
         if actual != committed {
             return Err(GitError::ResultUnknown);
         }
@@ -554,7 +559,7 @@ mod tests {
     };
     use std::sync::{
         Arc, Mutex,
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicU8, AtomicUsize, Ordering},
     };
     use uuid::Uuid;
 
@@ -565,6 +570,7 @@ mod tests {
         head: Mutex<String>,
         mutations: Mutex<Vec<Value>>,
         mode: AtomicU8,
+        created_refs: AtomicUsize,
     }
 
     struct Fixture {
@@ -638,6 +644,7 @@ mod tests {
     ) -> Json<Value> {
         assert_eq!(body["ref"], "refs/heads/change/1-feature");
         assert_eq!(body["sha"], OLD);
+        state.created_refs.fetch_add(1, Ordering::SeqCst);
         *state.head.lock().unwrap() = OLD.into();
         Json(json!({"object": {"sha": OLD}}))
     }
@@ -685,6 +692,7 @@ mod tests {
             head: Mutex::new(OLD.into()),
             mutations: Mutex::new(vec![]),
             mode: AtomicU8::new(0),
+            created_refs: AtomicUsize::new(0),
         });
         let app = Router::new()
             .route("/graphql", post(provider))
@@ -893,6 +901,35 @@ mod tests {
         ));
         fixture.state.mode.store(6, Ordering::SeqCst);
         assert!(!fixture.adapter.is_ancestor(&old, &new).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn accepted_branch_with_failed_readback_requires_delayed_reconciliation() {
+        let fixture = fixture().await;
+        fixture.state.mode.store(2, Ordering::SeqCst);
+        assert_eq!(
+            fixture
+                .adapter
+                .create_branch(
+                    &BranchName::parse("change/1-feature").unwrap(),
+                    &CommitSha::parse(OLD).unwrap()
+                )
+                .await,
+            Err(GitError::ResultUnknownWithRetryAfter {
+                retry_after_seconds: 17
+            })
+        );
+        assert_eq!(fixture.state.created_refs.load(Ordering::SeqCst), 1);
+        fixture.state.mode.store(0, Ordering::SeqCst);
+        assert_eq!(
+            fixture
+                .adapter
+                .branch_head(&BranchName::parse("change/1-feature").unwrap())
+                .await
+                .unwrap()
+                .as_str(),
+            OLD
+        );
     }
 
     #[tokio::test]

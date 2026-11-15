@@ -505,3 +505,11 @@ Checkboxes represent verified work only.
   infrastructure tests, API compatibility tests and workspace Clippy pass; the
   migration is applied locally. Provisioning execution, API endpoints and UI
   remain the next layer.
+
+- Provider mutation readback: an accepted branch creation followed by a failed
+  ref read now reports an uncertain result rather than a safe-to-retry failure.
+  Uncertain readbacks retain any provider Retry-After delay, including Commit
+  verification, so reconciliation cannot retry earlier than the provider allows.
+  A provider HTTP test proves one accepted create, a delayed uncertain result
+  after rate-limited verification, and later observation of the existing ref.
+  All eleven provider tests and workspace Clippy pass.

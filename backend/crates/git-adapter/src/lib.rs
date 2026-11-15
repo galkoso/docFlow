@@ -43,6 +43,26 @@ pub enum GitError {
     InvalidResponse,
     /// A mutation may have succeeded. Reconcile the operation before retrying.
     ResultUnknown,
+    /// The write may have succeeded; wait before observing/reconciling it.
+    ResultUnknownWithRetryAfter {
+        retry_after_seconds: u64,
+    },
+}
+
+impl GitError {
+    pub(crate) fn uncertain_readback(self) -> Self {
+        match self {
+            Self::RateLimited {
+                retry_after_seconds: Some(seconds),
+            }
+            | Self::ResultUnknownWithRetryAfter {
+                retry_after_seconds: seconds,
+            } => Self::ResultUnknownWithRetryAfter {
+                retry_after_seconds: seconds,
+            },
+            _ => Self::ResultUnknown,
+        }
+    }
 }
 
 impl std::fmt::Display for GitError {

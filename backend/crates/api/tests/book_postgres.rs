@@ -35,6 +35,7 @@ struct Provider {
     asset_reads: AtomicUsize,
     asset_corrupt: AtomicU8,
     revoke_after_asset: Mutex<Option<(PgPool, Uuid)>>,
+    revoke_editor_after_text: Mutex<Option<(PgPool, Uuid)>>,
 }
 
 #[async_trait]
@@ -93,6 +94,14 @@ impl GitProvider for Provider {
         path: &RepositoryPath,
     ) -> Result<String, GitError> {
         self.reads.fetch_add(1, Ordering::SeqCst);
+        let revoke = self.revoke_editor_after_text.lock().unwrap().take();
+        if let Some((pool, actor)) = revoke {
+            sqlx::query("UPDATE memberships SET role='READER' WHERE user_id=$1")
+                .bind(actor)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
         let source = self
             .files
             .get(path.as_str())
@@ -211,8 +220,11 @@ fn fixture_with_files(
         asset_reads: AtomicUsize::new(0),
         asset_corrupt: AtomicU8::new(0),
         revoke_after_asset: Mutex::new(None),
+        revoke_editor_after_text: Mutex::new(None),
     });
     let mut state = AppState::new(pool.clone());
+    state.cookies =
+        specspace_api::auth::CookiePolicy::new("https://specspace.example", false).unwrap();
     state.configure_book_source(Arc::new(Source(provider.clone())));
     let worker = state
         .index_worker(std::time::Duration::from_secs(30))
@@ -283,6 +295,419 @@ fn proposal_uri(uri: String, repository: Uuid, proposal: Uuid) -> String {
         &format!("repositories/{repository}"),
         &format!("proposals/{proposal}"),
     )
+}
+
+async fn editor_model(
+    app: &Router,
+    token: &str,
+    proposal: Uuid,
+    document: &str,
+    commit: &str,
+) -> (StatusCode, serde_json::Value) {
+    get(
+        app,
+        token,
+        &format!("/api/v1/proposals/{proposal}/documents/{document}/editor?commit={commit}"),
+    )
+    .await
+}
+fn keep_edit(model: &serde_json::Value) -> serde_json::Value {
+    serde_json::json!({"expected_sha256":model["sha256"],"blocks":model["blocks"].as_array().unwrap().iter().map(|block|serde_json::json!({"action":"keep","key":block["key"]})).collect::<Vec<_>>(),"deleted_keys":[],"deleted_section_ids":[]})
+}
+async fn editor_preview(
+    pool: &PgPool,
+    app: &Router,
+    actor: Uuid,
+    proposal: Uuid,
+    document: &str,
+    body: &serde_json::Value,
+    csrf: bool,
+) -> (StatusCode, serde_json::Value) {
+    let credentials = SessionStore::new(pool.clone())
+        .mint(actor, 3600)
+        .await
+        .unwrap();
+    let mut request = Request::builder()
+        .method("POST")
+        .uri(format!(
+            "/api/v1/proposals/{proposal}/documents/{document}/editor/preview"
+        ))
+        .header(
+            "Cookie",
+            format!(
+                "__Host-specspace-session={}",
+                credentials.session_cookie_value()
+            ),
+        )
+        .header("Content-Type", "application/json");
+    if csrf {
+        request = request
+            .header("Origin", "https://specspace.example")
+            .header("X-XSRF-TOKEN", credentials.csrf_cookie_value());
+    }
+    let response = app
+        .clone()
+        .oneshot(
+            request
+                .body(Body::from(serde_json::to_vec(body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    (
+        status,
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap(),
+    )
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn editor_model_and_preview_keep_exact_source_without_claiming_a_git_save(pool: PgPool) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    let id = proposal(&pool, actor, repository, Some(OLD)).await;
+    let (app, provider, _) = fixture(&pool);
+    let (status, readonly) = editor_model(&app, &token, id, "DOC-OVERVIEW", OLD).await;
+    assert_eq!(status, StatusCode::OK, "{readonly}");
+    assert_eq!(
+        readonly["can_edit"], false,
+        "Reader role remains readonly even if it owns a fixture proposal"
+    );
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, model) = editor_model(&app, &token, id, "DOC-OVERVIEW", OLD).await;
+    assert_eq!(model["can_edit"], true);
+    assert_eq!(model["snapshot_sha"], OLD);
+    assert_eq!(model["recorded_head_sha"], OLD);
+    assert_eq!(model["branch"], format!("change/{id}"));
+    assert_eq!(model["target_branch"], "main");
+    let original = &provider.files["docs/overview.md"];
+    let base = &model["model"];
+    let keep = keep_edit(base);
+    let no_op = serde_json::json!({"commit":OLD,"expected_proposal_version":1,"edit":keep});
+    let (status, unchanged) =
+        editor_preview(&pool, &app, actor, id, "DOC-OVERVIEW", &no_op, true).await;
+    assert_eq!(status, StatusCode::OK, "{unchanged}");
+    assert_eq!(unchanged["changed"], false);
+    assert_eq!(unchanged["markdown"], *original);
+    assert_eq!(unchanged["sha256"], base["sha256"]);
+    assert!(
+        unchanged.get("snapshot_sha").is_none(),
+        "uncommitted preview must not claim a new Git snapshot"
+    );
+    let blocks = base["blocks"].as_array().unwrap();
+    let index = blocks
+        .iter()
+        .position(|block| block["kind"] == "heading")
+        .unwrap();
+    let replacement = "## כותרת חדשה **מודגשת**\n";
+    let mut edit = keep_edit(base);
+    edit["blocks"][index] =
+        serde_json::json!({"action":"replace","key":blocks[index]["key"],"markdown":replacement});
+    let (status, preview) = editor_preview(
+        &pool,
+        &app,
+        actor,
+        id,
+        "DOC-OVERVIEW",
+        &serde_json::json!({"commit":OLD,"expected_proposal_version":1,"edit":edit}),
+        true,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{preview}");
+    let mut expected = original.clone();
+    expected.replace_range(
+        blocks[index]["source_start_byte"].as_u64().unwrap() as usize
+            ..blocks[index]["source_end_byte"].as_u64().unwrap() as usize,
+        replacement,
+    );
+    assert_eq!(preview["markdown"], expected);
+    assert_eq!(preview["changed"], true);
+    assert_eq!(preview["base_snapshot_sha"], OLD);
+    assert_eq!(preview["removed_section_ids"], serde_json::json!([]));
+    assert!(
+        preview["render_events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| event["text"] == "כותרת חדשה ")
+    );
+    let saved:(String,i64,i64)=sqlx::query_as("SELECT p.head_sha,p.version,(SELECT count(*) FROM git_operations) FROM proposals p WHERE id=$1").bind(id).fetch_one(&pool).await.unwrap();
+    assert_eq!(saved, (OLD.into(), 1, 0));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn editor_preview_checks_scope_csrf_roles_versions_and_historical_readonly_state(
+    pool: PgPool,
+) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    let id = proposal(&pool, actor, repository, Some(NEW)).await;
+    let (app, provider, _) = fixture(&pool);
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, historical) = editor_model(&app, &token, id, "DOC-PERMISSIONS", OLD).await;
+    assert_eq!(historical["snapshot_sha"], OLD);
+    assert_eq!(historical["recorded_head_sha"], NEW);
+    assert_eq!(historical["can_edit"], false);
+    let (_, current) = editor_model(&app, &token, id, "DOC-PERMISSIONS", NEW).await;
+    let body = serde_json::json!({"commit":NEW,"expected_proposal_version":1,"edit":keep_edit(&current["model"])});
+    let reads = provider.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        editor_preview(&pool, &app, actor, id, "DOC-PERMISSIONS", &body, false)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    let mut stale = body.clone();
+    stale["expected_proposal_version"] = serde_json::json!(2);
+    assert_eq!(
+        editor_preview(&pool, &app, actor, id, "DOC-PERMISSIONS", &stale, true)
+            .await
+            .1["error"]["code"],
+        "EDITOR_VERSION_CHANGED"
+    );
+    stale["expected_proposal_version"] = serde_json::json!(1);
+    stale["commit"] = serde_json::json!(OLD);
+    assert_eq!(
+        editor_preview(&pool, &app, actor, id, "DOC-PERMISSIONS", &stale, true)
+            .await
+            .1["error"]["code"],
+        "EDITOR_HEAD_CHANGED"
+    );
+    assert_eq!(
+        editor_preview(
+            &pool,
+            &app,
+            actor,
+            Uuid::new_v4(),
+            "DOC-PERMISSIONS",
+            &body,
+            true
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    sqlx::query("UPDATE memberships SET role='READER' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        editor_preview(&pool, &app, actor, id, "DOC-PERMISSIONS", &body, true)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        provider.reads.load(Ordering::SeqCst),
+        reads,
+        "denied or stale previews must not consult provider content"
+    );
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE proposals SET state='CLOSED' WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        editor_model(&app, &token, id, "DOC-PERMISSIONS", NEW)
+            .await
+            .1["can_edit"],
+        false
+    );
+    assert_eq!(
+        editor_preview(&pool, &app, actor, id, "DOC-PERMISSIONS", &body, true)
+            .await
+            .1["error"]["code"],
+        "PROPOSAL_NOT_EDITABLE"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn editor_preview_protects_unsupported_source_and_rechecks_permission_after_provider_await(
+    pool: PgPool,
+) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let id = proposal(&pool, actor, repository, Some(OLD)).await;
+    let (app, provider, _) = fixture(&pool);
+    let model =
+        specspace_document_engine::editing::parse(&provider.files["docs/overview.md"]).unwrap();
+    let body =
+        serde_json::json!({"commit":OLD,"expected_proposal_version":1,"edit":model.unchanged()});
+    *provider.revoke_editor_after_text.lock().unwrap() = Some((pool.clone(), actor));
+    let (status, denied) =
+        editor_preview(&pool, &app, actor, id, "DOC-OVERVIEW", &body, true).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{denied}");
+    assert!(denied.get("markdown").is_none());
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let mut files = provider.files.clone();
+    files
+        .get_mut("docs/overview.md")
+        .unwrap()
+        .push_str("\n<script>private()</script>\n");
+    let (app, _, _) = fixture_with_files(&pool, files);
+    let (status, model) = editor_model(&app, &token, id, "DOC-OVERVIEW", OLD).await;
+    assert_eq!(status, StatusCode::OK);
+    let base = &model["model"];
+    let blocks = base["blocks"].as_array().unwrap();
+    let index = blocks
+        .iter()
+        .position(|block| !block["protected_reason"].is_null())
+        .unwrap();
+    let mut edit = keep_edit(base);
+    edit["blocks"][index] = serde_json::json!({"action":"replace","key":blocks[index]["key"],"markdown":"lost script source\n"});
+    let (status, error) = editor_preview(
+        &pool,
+        &app,
+        actor,
+        id,
+        "DOC-OVERVIEW",
+        &serde_json::json!({"commit":OLD,"expected_proposal_version":1,"edit":edit}),
+        true,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(error["error"]["code"], "PROTECTED_EDITOR_BLOCK");
+    let (_, preview) = editor_preview(
+        &pool,
+        &app,
+        actor,
+        id,
+        "DOC-OVERVIEW",
+        &serde_json::json!({"commit":OLD,"expected_proposal_version":1,"edit":keep_edit(base)}),
+        true,
+    )
+    .await;
+    assert!(
+        preview["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|finding| finding["code"] == "UNSUPPORTED_HTML")
+    );
+    assert!(
+        preview["render_events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| event["kind"] == "unsupported")
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn editor_preview_requires_current_edit_assignment_and_rejects_foreign_documents(
+    pool: PgPool,
+) {
+    let (owner, repository, _, token) = setup(&pool).await;
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(owner)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let id = proposal(&pool, owner, repository, Some(OLD)).await;
+    let (peer, foreign_repo, _, peer_token) = setup(&pool).await;
+    let foreign = proposal(&pool, peer, foreign_repo, Some(OLD)).await;
+    sqlx::query("INSERT INTO memberships(organization_id,user_id,role) SELECT organization_id,$2,'CONTRIBUTOR' FROM repositories WHERE id=$1")
+        .bind(repository).bind(peer).execute(&pool).await.unwrap();
+    let (app, provider, _) = fixture(&pool);
+    let (_, model) = editor_model(&app, &token, id, "DOC-OVERVIEW", OLD).await;
+    let body = serde_json::json!({"commit":OLD,"expected_proposal_version":1,"edit":keep_edit(&model["model"])});
+    assert_eq!(
+        editor_model(&app, &peer_token, id, "DOC-OVERVIEW", OLD)
+            .await
+            .1["can_edit"],
+        false
+    );
+    assert_eq!(
+        editor_preview(&pool, &app, peer, id, "DOC-OVERVIEW", &body, true)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    sqlx::query("INSERT INTO proposal_collaborators(organization_id,proposal_id,user_id,access) SELECT organization_id,id,$2,'EDIT' FROM proposals WHERE id=$1")
+        .bind(id).bind(peer).execute(&pool).await.unwrap();
+    assert_eq!(
+        editor_preview(&pool, &app, peer, id, "DOC-OVERVIEW", &body, true)
+            .await
+            .0,
+        StatusCode::OK
+    );
+    sqlx::query(
+        "UPDATE proposal_collaborators SET access='READ' WHERE proposal_id=$1 AND user_id=$2",
+    )
+    .bind(id)
+    .bind(peer)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        editor_preview(&pool, &app, peer, id, "DOC-OVERVIEW", &body, true)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    let reads = provider.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        editor_model(&app, &token, foreign, "DOC-OVERVIEW", OLD)
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        editor_preview(&pool, &app, owner, foreign, "DOC-OVERVIEW", &body, true)
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
+    let mut wrong_document = body.clone();
+    wrong_document["edit"]["expected_sha256"] = serde_json::json!("a".repeat(64));
+    let (status, error) = editor_preview(
+        &pool,
+        &app,
+        owner,
+        id,
+        "DOC-OVERVIEW",
+        &wrong_document,
+        true,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(error["error"]["code"], "EDITOR_BASE_MISMATCH");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn editor_rejects_catalog_and_front_matter_identity_mismatch_before_editing(pool: PgPool) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    let id = proposal(&pool, actor, repository, Some(OLD)).await;
+    let (_, provider, _) = fixture(&pool);
+    let mut files = provider.files.clone();
+    let original = files.get_mut("docs/overview.md").unwrap();
+    *original = original.replacen("document_id: DOC-OVERVIEW", "document_id: DOC-OTHER", 1);
+    let (app, _, _) = fixture_with_files(&pool, files);
+    let (status, error) = editor_model(&app, &token, id, "DOC-OVERVIEW", OLD).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(error["error"]["code"], "EDITOR_DOCUMENT_ID_MISMATCH");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

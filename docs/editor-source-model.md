@@ -48,3 +48,20 @@ state/version, provider head, catalog and incoming references, normalize changed
 content according to policy, and journal the atomic Git operation. Explicit
 authorized source mode is a separate path for fixing protected syntax. Browser
 rich-text integration and its round-trip acceptance remain in progress.
+
+## Proposal-scoped HTTP boundary
+
+`GET /api/v1/proposals/:id/documents/:document/editor?commit=:sha` returns the
+pinned model alongside the proposal number, branch, target, recorded head,
+metadata version and current `can_edit` capability. Historical and closed views
+remain readable with editing disabled. An invalid source document returns an
+explicit source-model failure; the authorized source-repair path is still pending.
+
+`POST .../editor/preview` accepts `commit`, `expected_proposal_version` and an
+`edit` object using the protocol above. It requires current edit assignment,
+Origin and session CSRF validation. It rejects stale proposal/head/document
+versions and rechecks access after provider/CPU waits. The response distinguishes
+`base_snapshot_sha` from the uncommitted Markdown SHA-256; it includes inert
+render events, document findings and declared removed IDs. Preview does not
+write a recovery buffer, operation journal, Git Commit or review approval.
+Repository-wide validation and Git publication remain separate requirements.

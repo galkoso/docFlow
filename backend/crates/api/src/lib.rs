@@ -2,6 +2,7 @@ pub mod auth;
 pub mod contract;
 pub mod creation_context;
 pub mod drafts;
+pub mod editor;
 pub mod proposal_content;
 pub mod proposal_reads;
 pub mod proposals;
@@ -163,6 +164,7 @@ pub fn router(state: AppState) -> Router {
         .merge(proposals::routes())
         .merge(proposal_content::routes())
         .merge(drafts::routes())
+        .merge(editor::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))
         .fallback(not_found)

@@ -1140,6 +1140,263 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/documents/{document}/editor": {
+      "get": {
+        "tags": [
+          "crate::editor"
+        ],
+        "operationId": "proposalEditorModel",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/documents/{document}/editor/preview": {
+      "post": {
+        "tags": [
+          "crate::editor"
+        ],
+        "operationId": "previewProposalEditor",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditorPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditorPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/documents/{document}/highlights": {
       "get": {
         "tags": [
@@ -2911,6 +3168,364 @@
           },
           "context": {
             "$ref": "#/components/schemas/DraftContext"
+          }
+        }
+      },
+      "EditorBlock": {
+        "type": "object",
+        "required": [
+          "key",
+          "kind",
+          "prefix",
+          "markdown",
+          "source_start_byte",
+          "source_end_byte"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EditorKind"
+          },
+          "markdown": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string",
+            "description": "Immutable source before this block, including its stable heading marker."
+          },
+          "protected_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "section_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source_start_byte": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "EditorBlockEdit": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "key",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "keep"
+                ]
+              },
+              "key": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "key",
+              "markdown",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "replace"
+                ]
+              },
+              "key": {
+                "type": "string"
+              },
+              "markdown": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "markdown",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "insert"
+                ]
+              },
+              "markdown": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "EditorDocument": {
+        "type": "object",
+        "required": [
+          "document_id",
+          "sha256",
+          "preamble",
+          "blocks",
+          "suffix",
+          "section_ids"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EditorBlock"
+            }
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "preamble": {
+            "type": "string",
+            "description": "Exact YAML source, including unknown fields and original layout."
+          },
+          "section_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Includes headings nested inside lists/quotes, retaining duplicates so the\nassembler can reject them across the complete document."
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "suffix": {
+            "type": "string"
+          }
+        }
+      },
+      "EditorEdit": {
+        "type": "object",
+        "required": [
+          "expected_sha256",
+          "blocks",
+          "deleted_keys"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EditorBlockEdit"
+            },
+            "description": "Complete new order. Missing old blocks require an explicit deletion below."
+          },
+          "deleted_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deleted_section_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Includes IDs removed inside a changed list/quote, not just top-level\nheading deletions. The caller must confirm incoming-reference validation."
+          },
+          "expected_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EditorFinding": {
+        "type": "object",
+        "required": [
+          "code",
+          "source_start_byte",
+          "source_end_byte"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "source_end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source_start_byte": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "EditorKind": {
+        "type": "string",
+        "enum": [
+          "heading",
+          "paragraph",
+          "list",
+          "quote",
+          "code",
+          "table",
+          "protected"
+        ]
+      },
+      "EditorPreview": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "proposal_version",
+          "document_id",
+          "base_snapshot_sha",
+          "base_document_sha256",
+          "markdown",
+          "sha256",
+          "changed",
+          "removed_section_ids",
+          "findings",
+          "render_events"
+        ],
+        "properties": {
+          "base_document_sha256": {
+            "type": "string"
+          },
+          "base_snapshot_sha": {
+            "type": "string"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EditorFinding"
+            }
+          },
+          "markdown": {
+            "type": "string"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "removed_section_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "render_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "render_events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderEvent"
+            }
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      },
+      "EditorPreviewRequest": {
+        "type": "object",
+        "required": [
+          "commit",
+          "expected_proposal_version",
+          "edit"
+        ],
+        "properties": {
+          "commit": {
+            "type": "string"
+          },
+          "edit": {
+            "$ref": "#/components/schemas/EditorEdit"
+          },
+          "expected_proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EditorResponse": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "repository_id",
+          "number",
+          "title",
+          "branch",
+          "target_branch",
+          "proposal_version",
+          "recorded_head_sha",
+          "snapshot_sha",
+          "can_edit",
+          "model"
+        ],
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "can_edit": {
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/EditorDocument"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recorded_head_sha": {
+            "type": "string"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshot_sha": {
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
           }
         }
       },

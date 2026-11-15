@@ -232,6 +232,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/documents/{document}/editor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalEditorModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}/documents/{document}/editor/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewProposalEditor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/documents/{document}/highlights": {
         parameters: {
             query?: never;
@@ -501,6 +533,101 @@ export interface components {
         DraftSnapshot: {
             buffers: components["schemas"]["DraftBuffer"][];
             context: components["schemas"]["DraftContext"];
+        };
+        EditorBlock: {
+            key: string;
+            kind: components["schemas"]["EditorKind"];
+            markdown: string;
+            /** @description Immutable source before this block, including its stable heading marker. */
+            prefix: string;
+            protected_reason?: string | null;
+            section_id?: string | null;
+            source_end_byte: number;
+            source_start_byte: number;
+        };
+        EditorBlockEdit: {
+            /** @enum {string} */
+            action: "keep";
+            key: string;
+        } | {
+            /** @enum {string} */
+            action: "replace";
+            key: string;
+            markdown: string;
+        } | {
+            /** @enum {string} */
+            action: "insert";
+            markdown: string;
+        };
+        EditorDocument: {
+            blocks: components["schemas"]["EditorBlock"][];
+            document_id: string;
+            /** @description Exact YAML source, including unknown fields and original layout. */
+            preamble: string;
+            /**
+             * @description Includes headings nested inside lists/quotes, retaining duplicates so the
+             *     assembler can reject them across the complete document.
+             */
+            section_ids: string[];
+            sha256: string;
+            suffix: string;
+        };
+        EditorEdit: {
+            /** @description Complete new order. Missing old blocks require an explicit deletion below. */
+            blocks: components["schemas"]["EditorBlockEdit"][];
+            deleted_keys: string[];
+            /**
+             * @description Includes IDs removed inside a changed list/quote, not just top-level
+             *     heading deletions. The caller must confirm incoming-reference validation.
+             */
+            deleted_section_ids?: string[];
+            expected_sha256: string;
+        };
+        EditorFinding: {
+            code: string;
+            source_end_byte: number;
+            source_start_byte: number;
+        };
+        /** @enum {string} */
+        EditorKind: "heading" | "paragraph" | "list" | "quote" | "code" | "table" | "protected";
+        EditorPreview: {
+            base_document_sha256: string;
+            base_snapshot_sha: string;
+            changed: boolean;
+            document_id: string;
+            findings: components["schemas"]["EditorFinding"][];
+            markdown: string;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: int64 */
+            proposal_version: number;
+            removed_section_ids: string[];
+            render_error?: string | null;
+            render_events: components["schemas"]["RenderEvent"][];
+            sha256: string;
+        };
+        EditorPreviewRequest: {
+            commit: string;
+            edit: components["schemas"]["EditorEdit"];
+            /** Format: int64 */
+            expected_proposal_version: number;
+        };
+        EditorResponse: {
+            branch: string;
+            can_edit: boolean;
+            model: components["schemas"]["EditorDocument"];
+            /** Format: int64 */
+            number: number;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: int64 */
+            proposal_version: number;
+            recorded_head_sha: string;
+            /** Format: uuid */
+            repository_id: string;
+            snapshot_sha: string;
+            target_branch: string;
+            title: string;
         };
         ErrorBody: {
             error: components["schemas"]["ApiError"];
@@ -1539,6 +1666,192 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalEditorModel: {
+        parameters: {
+            query: {
+                commit: string;
+            };
+            header?: never;
+            path: {
+                proposal: string;
+                document: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditorResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    previewProposalEditor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal: string;
+                document: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditorPreviewRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditorPreview"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

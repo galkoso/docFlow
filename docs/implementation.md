@@ -721,3 +721,20 @@ Checkboxes represent verified work only.
   validation and atomic Git persistence remain required. The protocol and its
   limits are recorded in editor-source-model.md.
   All 34 document-engine tests and workspace Clippy pass.
+
+- Editor model/preview API: proposal/document-scoped GET returns exact source
+  blocks plus current identity/version/capabilities; pinned historical or closed
+  models are readonly. CSRF-protected POST validates current edit assignment and
+  head/proposal/document versions, assembles explicit changes and returns raw
+  draft source, SHA-256, inert rendering, findings and removed IDs. It rechecks
+  access after provider/CPU waits and never invents a Git snapshot for preview.
+  Five HTTP/PostgreSQL scenarios cover unchanged/changed source, protected HTML,
+  assignment grant/revocation, Reader/closed/historical behavior, cross-org scope,
+  stale hashes/versions, CSRF and permission loss during provider awaits. They
+  also reject catalog/front-matter document identity mismatch before editing.
+  assert proposal head/version and operation journal remain unchanged by preview.
+  Browser rich editing, source repair for malformed documents, recovery autosave
+  integration and atomic Git saves remain required subsequent work.
+  Full backend regression checks passed before the identity guard; all five
+  editor scenarios and Clippy pass afterward. OpenAPI/client types are updated;
+  Angular production build and all 51 frontend tests pass.

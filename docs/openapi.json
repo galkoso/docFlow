@@ -1279,6 +1279,297 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/draft": {
+      "get": {
+        "tags": [
+          "crate::drafts"
+        ],
+        "operationId": "readProposalDraft",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "query",
+            "description": "Omit to list buffer metadata without contents. Supplying an ID retrieves\nonly the current user's recovery content for that document.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "crate::drafts"
+        ],
+        "operationId": "saveProposalDraft",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftSaved"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "crate::drafts"
+        ],
+        "operationId": "discardProposalDraft",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expected_draft_version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/find": {
       "get": {
         "tags": [
@@ -2505,6 +2796,124 @@
           }
         }
       },
+      "DraftBuffer": {
+        "type": "object",
+        "required": [
+          "document_id",
+          "base_head_sha",
+          "version",
+          "updated_at",
+          "expires_at",
+          "base_is_current"
+        ],
+        "properties": {
+          "base_head_sha": {
+            "type": "string"
+          },
+          "base_is_current": {
+            "type": "boolean"
+          },
+          "content_utf8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DraftContext": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "proposal_version",
+          "proposal_state",
+          "can_edit",
+          "can_store_recovery"
+        ],
+        "properties": {
+          "can_edit": {
+            "type": "boolean"
+          },
+          "can_store_recovery": {
+            "type": "boolean"
+          },
+          "current_head_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_state": {
+            "type": "string"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "retention_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "DraftSaved": {
+        "type": "object",
+        "required": [
+          "context",
+          "buffer",
+          "replayed"
+        ],
+        "properties": {
+          "buffer": {
+            "$ref": "#/components/schemas/DraftBuffer"
+          },
+          "context": {
+            "$ref": "#/components/schemas/DraftContext"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DraftSnapshot": {
+        "type": "object",
+        "required": [
+          "context",
+          "buffers"
+        ],
+        "properties": {
+          "buffers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftBuffer"
+            }
+          },
+          "context": {
+            "$ref": "#/components/schemas/DraftContext"
+          }
+        }
+      },
       "ErrorBody": {
         "type": "object",
         "required": [
@@ -3331,6 +3740,37 @@
             "format": "uuid"
           }
         }
+      },
+      "SaveDraft": {
+        "type": "object",
+        "required": [
+          "save_id",
+          "document_id",
+          "base_head_sha",
+          "expected_draft_version",
+          "content_utf8"
+        ],
+        "properties": {
+          "base_head_sha": {
+            "type": "string"
+          },
+          "content_utf8": {
+            "type": "string"
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "expected_draft_version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zero creates a buffer; existing live buffers require their returned version."
+          },
+          "save_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
       },
       "SearchHit": {
         "type": "object",

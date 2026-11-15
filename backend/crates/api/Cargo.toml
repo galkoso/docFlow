@@ -46,5 +46,9 @@ required-features = ["postgres-tests"]
 name = "proposals_postgres"
 required-features = ["postgres-tests"]
 
+[[test]]
+name = "drafts_postgres"
+required-features = ["postgres-tests"]
+
 [lints]
 workspace = true

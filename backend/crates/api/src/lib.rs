@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod contract;
 pub mod creation_context;
+pub mod drafts;
 pub mod proposal_content;
 pub mod proposal_reads;
 pub mod proposals;
@@ -15,10 +16,12 @@ use axum::{
     routing::get,
 };
 use serde::Serialize;
+use specspace_application::draft::DraftRetention;
 use specspace_application::proposal_reader::ProposalReader;
 use specspace_application::reader::{BookProviderFactory, BookReader};
 use specspace_git_adapter::app_auth::GitHubAppKey;
 use specspace_infrastructure::authorization::PgProposalReadAuthorization;
+use specspace_infrastructure::drafts::PgDrafts;
 use specspace_infrastructure::oidc::Oidc;
 use specspace_infrastructure::{authorization::PgReadAuthorization, github_source::PgGitHubSource};
 use specspace_infrastructure::{
@@ -38,6 +41,7 @@ pub struct AppState {
     pub cookies: auth::CookiePolicy,
     pub books: Arc<BookReader>,
     pub proposal_books: Arc<ProposalReader>,
+    pub drafts: Arc<PgDrafts>,
     pub search_index: Arc<PgSearchIndex>,
     index_source: Arc<dyn IndexSource>,
     book_source: Arc<dyn BookProviderFactory>,
@@ -68,6 +72,7 @@ impl AppState {
             source.clone(),
         ));
         Self {
+            drafts: Arc::new(PgDrafts::new(database.clone(), None)),
             database,
             oidc: None,
             cookies: auth::CookiePolicy::unconfigured(),
@@ -86,6 +91,10 @@ impl AppState {
             self.database.clone(),
             Some(Arc::new(key)),
         )));
+    }
+
+    pub fn configure_draft_retention(&mut self, retention: DraftRetention) {
+        self.drafts = Arc::new(PgDrafts::new(self.database.clone(), Some(retention)));
     }
 
     /// Reader and background indexer must use the same configured source/cache.
@@ -153,6 +162,7 @@ pub fn router(state: AppState) -> Router {
         .merge(specification::routes())
         .merge(proposals::routes())
         .merge(proposal_content::routes())
+        .merge(drafts::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))
         .fallback(not_found)

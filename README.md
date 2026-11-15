@@ -83,3 +83,24 @@ Authenticated reads are available under `/api/v1/repositories`: repository list,
 document/search requests use it. Explicit versions must belong to main history.
 The in-memory snapshot cache is bounded, disposable, and always checks current
 access. Durable search indexing, the worker and the reader UI remain in progress.
+
+## Recovery storage
+
+Set `DRAFT_RETENTION_DAYS` explicitly (1–365 days) to enable server recovery
+writes. The sample environment proposes 30 days; the organization must select its
+production policy. An unset value disables recovery writes and is reported in
+the recovery context. The API exposes the configured policy and each expiry.
+Expired content is hidden immediately; a cleanup task removes up to 500 expired
+buffers per minute. Shortening the policy also expires older buffers.
+
+`GET /api/v1/proposals/:id/draft` lists the current user's buffer metadata;
+`?document_id=DOC-ID` retrieves one buffer's exact source. `PUT` requires a
+`save_id`, `document_id`, `base_head_sha`, `expected_draft_version` and
+`content_utf8`. Retrying the same accepted save preserves its version. Conflicting
+tabs receive 409. Recovery accepts unfinished source, retains its reported base
+for comparison and works without Git. It creates no Commit or review approval.
+Each user has up to 1,000 buffers / 20MiB per proposal, with 2MiB per document.
+An authenticated, CSRF-protected `DELETE` with document ID and expected draft
+version discards only that user's selected buffer. Recreated buffers receive new
+versions, protecting them from delayed requests. The editor UI and Git saves
+remain separate implementation stages.

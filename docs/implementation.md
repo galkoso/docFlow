@@ -670,3 +670,28 @@ Checkboxes represent verified work only.
   workflows. In-app Browser availability was checked again and remains empty;
   rendered visual/accessibility acceptance is still open. Editing, draft recovery,
   atomic commits and subsequent review/import/merge stages remain required.
+
+- User-private recovery backend: GET lists only the current user's metadata or
+  retrieves one document's exact unfinished source; PUT uses an immutable save ID
+  and expected buffer version, preserving accepted retries and rejecting other
+  tabs' stale saves. Recovery remains independent of Git and records its claimed
+  base alongside the current proposal head/version for comparison. Closed/merged
+  proposals retain recovery storage for current authorized editors; revocation
+  stops writes, while current members can read/discard their own existing buffers.
+  Even administrators cannot read another user's buffers through these routes.
+  Versioned DELETE protects recreated buffers from delayed discard requests.
+  Migration 006 adds a global non-repeating version sequence, save fingerprints,
+  timestamps and storage constraints. A configurable DRAFT_RETENTION_DAYS policy
+  is returned in context; absent policy disables writes. Expired/shortened-policy
+  content is hidden immediately and a bounded background task purges it. Per-user
+  proposal quotas are 20MiB / 1,000 documents, each at most 2MiB. DB lock/statement
+  waits are bounded; audit contains references/results without document content.
+  Two application validation tests and seven HTTP/PostgreSQL scenarios cover
+  byte preservation, privacy, concurrent saves, replay/mismatch, stale/final heads,
+  current ACL, retention/cleanup, discard recreation, both quotas and CSRF. Full
+  backend regression tests passed before the discard addition; the final API
+  suite and workspace Clippy pass afterward. OpenAPI and client types are updated.
+  Migration 006 is applied locally; Angular production build and all 51 existing
+  frontend tests pass against the generated contract.
+  The rich editor, recovery prompts/autosave UI and verified Git commits remain
+  subsequent work; this backend does not satisfy the complete editing criterion.

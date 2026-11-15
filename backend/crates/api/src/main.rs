@@ -37,6 +37,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect_lazy(&database_url)?;
     let listener = tokio::net::TcpListener::bind(address).await?;
     let mut state = AppState::new(database);
+    if let Ok(days) = std::env::var("DRAFT_RETENTION_DAYS") {
+        let retention = specspace_application::draft::DraftRetention::new(days.parse()?)
+            .map_err(|_| "DRAFT_RETENTION_DAYS must be between 1 and 365")?;
+        state.configure_draft_retention(retention);
+    }
     if let Ok(provider) = std::env::var("GIT_PROVIDER")
         && !provider.eq_ignore_ascii_case("github")
     {
@@ -101,6 +106,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::spawn(async move { worker.run(stopped).await })
         })
         .collect();
+    let draft_stopped = stopped.clone();
+    let drafts = state.drafts.clone();
+    handles.push(tokio::spawn(async move {
+        drafts.run_cleanup(draft_stopped).await
+    }));
     handles.push(tokio::spawn(
         async move { proposal_worker.run(stopped).await },
     ));

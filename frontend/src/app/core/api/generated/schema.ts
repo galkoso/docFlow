@@ -248,6 +248,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readProposalDraft"];
+        put: operations["saveProposalDraft"];
+        post?: never;
+        delete: operations["discardProposalDraft"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/find": {
         parameters: {
             query?: never;
@@ -454,6 +470,37 @@ export interface components {
             path: string;
             sections: components["schemas"]["SectionSummary"][];
             title: string;
+        };
+        DraftBuffer: {
+            base_head_sha: string;
+            base_is_current: boolean;
+            content_utf8?: string | null;
+            document_id: string;
+            expires_at: string;
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        DraftContext: {
+            can_edit: boolean;
+            can_store_recovery: boolean;
+            current_head_sha?: string | null;
+            /** Format: uuid */
+            proposal_id: string;
+            proposal_state: string;
+            /** Format: int64 */
+            proposal_version: number;
+            /** Format: int32 */
+            retention_days?: number | null;
+        };
+        DraftSaved: {
+            buffer: components["schemas"]["DraftBuffer"];
+            context: components["schemas"]["DraftContext"];
+            replayed: boolean;
+        };
+        DraftSnapshot: {
+            buffers: components["schemas"]["DraftBuffer"][];
+            context: components["schemas"]["DraftContext"];
         };
         ErrorBody: {
             error: components["schemas"]["ApiError"];
@@ -662,6 +709,18 @@ export interface components {
             default_branch: string;
             /** Format: uuid */
             repository_id: string;
+        };
+        SaveDraft: {
+            base_head_sha: string;
+            content_utf8: string;
+            document_id: string;
+            /**
+             * Format: int64
+             * @description Zero creates a buffer; existing live buffers require their returned version.
+             */
+            expected_draft_version: number;
+            /** Format: uuid */
+            save_id: string;
         };
         SearchHit: {
             block_id: string;
@@ -1610,6 +1669,224 @@ export interface operations {
                 };
             };
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    readProposalDraft: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Omit to list buffer metadata without contents. Supplying an ID retrieves
+                 *     only the current user's recovery content for that document.
+                 */
+                document_id?: string;
+            };
+            header?: never;
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftSnapshot"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    saveProposalDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveDraft"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftSaved"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    discardProposalDraft: {
+        parameters: {
+            query: {
+                document_id: string;
+                expected_draft_version: number;
+            };
+            header?: never;
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

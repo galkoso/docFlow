@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum InitialMode {
     Manual,
     Ai,
@@ -22,6 +23,7 @@ impl InitialMode {
 }
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum UiImpact {
     Yes,
     No,
@@ -38,6 +40,7 @@ impl UiImpact {
 }
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum LinkKind {
     Figma,
     Ticket,
@@ -45,6 +48,7 @@ pub enum LinkKind {
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ProposalLink {
     pub kind: LinkKind,
     pub url: String,
@@ -52,6 +56,7 @@ pub struct ProposalLink {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateProposal {
     pub repository_id: Uuid,
     pub title: String,

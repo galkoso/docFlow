@@ -244,7 +244,7 @@ pub fn routes() -> Router<AppState> {
         )
 }
 
-fn failure(error: BookError) -> Response {
+pub(crate) fn failure(error: BookError) -> Response {
     let retry_after = match &error {
         BookError::Provider(GitError::RateLimited {
             retry_after_seconds,

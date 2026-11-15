@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod contract;
+pub mod proposals;
 pub mod specification;
 
 use axum::{
@@ -133,6 +134,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(auth::routes())
         .merge(specification::routes())
+        .merge(proposals::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))
         .fallback(not_found)

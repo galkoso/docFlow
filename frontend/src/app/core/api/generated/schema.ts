@@ -104,6 +104,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/{job}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["job_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -114,6 +130,22 @@ export interface paths {
         get: operations["me"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -232,6 +264,39 @@ export interface components {
         AuthAvailability: {
             login_available: boolean;
         };
+        CreateProposal: {
+            branch: string;
+            description: string;
+            expected_source_sha: string;
+            initial_mode: components["schemas"]["InitialMode"];
+            links?: components["schemas"]["ProposalLink"][];
+            /** Format: uuid */
+            owner_id?: string | null;
+            /** Format: uuid */
+            repository_id: string;
+            source_branch: string;
+            /** Format: uuid */
+            team_id: string;
+            title: string;
+            ui_impact: components["schemas"]["UiImpact"];
+            ui_impact_reason?: string | null;
+        };
+        CreationAccepted: {
+            /** Format: uuid */
+            job_id: string;
+            /** Format: int64 */
+            number: number;
+            /** Format: uuid */
+            operation_id: string;
+            /** Format: uuid */
+            proposal_id: string;
+        };
+        CreationResult: {
+            branch: string;
+            head_sha: string;
+            /** Format: uuid */
+            proposal_id: string;
+        };
         DocumentBlock: {
             block_id: string;
             /** Format: int32 */
@@ -280,6 +345,23 @@ export interface components {
             query: string;
             snapshot_sha: string;
         };
+        /** @enum {string} */
+        InitialMode: "manual" | "ai";
+        JobStatus: {
+            /** Format: int32 */
+            attempts: number;
+            creation?: components["schemas"]["CreationResult"] | null;
+            error_code?: string | null;
+            /** Format: uuid */
+            job_id: string;
+            kind: string;
+            phase: string;
+            /** Format: uuid */
+            proposal_id?: string | null;
+            state: string;
+        };
+        /** @enum {string} */
+        LinkKind: "figma" | "ticket" | "development_pr";
         /**
          * @description Visible text intervals within one document. Matching uses each entire block,
          *     so a viewport/formatting boundary never changes literal-search semantics.
@@ -312,6 +394,10 @@ export interface components {
             merge: boolean;
             read_specification: boolean;
             review: boolean;
+        };
+        ProposalLink: {
+            kind: components["schemas"]["LinkKind"];
+            url: string;
         };
         ReadFinding: {
             code: string;
@@ -387,6 +473,8 @@ export interface components {
             updated_at: string;
             version_selected: boolean;
         };
+        /** @enum {string} */
+        UiImpact: "yes" | "no" | "undecided";
     };
     responses: never;
     parameters: never;
@@ -585,6 +673,59 @@ export interface operations {
             };
         };
     };
+    job_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStatus"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     me: {
         parameters: {
             query?: never;
@@ -603,6 +744,108 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header: {
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProposal"];
+            };
+        };
+        responses: {
+            /** @description Reserved proposal and provisioning job; Git creation is not yet complete */
+            202: {
+                headers: {
+                    /** @description Authorized job status URL */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreationAccepted"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

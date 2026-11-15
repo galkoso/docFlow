@@ -534,3 +534,22 @@ Checkboxes represent verified work only.
   API startup now runs one provisioning worker alongside two index workers;
   its 30–3600s timeout defaults to 120s and uses the same graceful shutdown.
   HTTP creation/list/job endpoints and the proposal UI remain the next stage.
+
+- Proposal creation and job HTTP API: POST /api/v1/proposals now authenticates
+  the current session, verifies same-origin CSRF, validates a single idempotency
+  key and bounded typed JSON, checks create permission before provider access,
+  returns an existing ticket before consulting mutable Git refs, and verifies
+  the displayed main SHA and absent destination before atomic reservation.
+  SOURCE_MOVED is an explicit 409 with expected/actual SHAs; changing the request
+  under an existing key conflicts. A 202 returns the proposal/operation/job IDs
+  and Location, without implying that Git creation has finished. GET /jobs/:id
+  resolves organization/repository access through linked proposal or index
+  records, exposes real phases and verified creation results, and never returns
+  internal payloads or provider configuration. Unknown operations remain visibly
+  in reconciliation, including while queued for delayed observation. Six new
+  HTTP/PostgreSQL scenarios cover concurrent replay, source movement, validation,
+  CSRF/roles/foreign scope/revocation, accepted-to-ready and uncertain recovery,
+  plus index-job phase and scope. Full backend tests and Clippy pass. Shared
+  creation models have optional OpenAPI support; the exported contract and
+  generated TypeScript types are updated, and Angular builds successfully.
+  Proposal browsing/detail/context endpoints and the creation UI follow next.

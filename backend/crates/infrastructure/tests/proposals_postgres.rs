@@ -119,6 +119,13 @@ async fn concurrent_replays_reserve_one_identity_operation_job_and_audit(pool: P
             "change/1-synthetic".into()
         )
     );
+    let source: (Option<String>, Option<String>) =
+        sqlx::query_as("SELECT base_sha,target_sha FROM proposals WHERE id=$1")
+            .bind(ticket.proposal_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(source, (Some("1".repeat(40)), Some("1".repeat(40))));
     let operation: (String, String, String) =
         sqlx::query_as("SELECT state,expected_sha,request_hash FROM git_operations WHERE id=$1")
             .bind(ticket.operation_id)

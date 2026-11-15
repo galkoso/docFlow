@@ -671,8 +671,22 @@ async fn proposal_detail_keeps_recorded_versions_while_reporting_provider_change
     let reads = provider.reads.load(Ordering::SeqCst);
     let (_, pending) = get(&app, &actor, &uri).await;
     assert_eq!(pending["synchronization"]["state"], "provisioning");
+    assert_eq!(pending["base_sha"], OLD);
+    assert_eq!(pending["target_sha"], OLD);
+    assert!(pending["head_sha"].is_null());
     assert_eq!(pending["capabilities"]["can_edit"], false);
     assert_eq!(pending["creation_job_id"], ticket["job_id"]);
+    assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
+    // Pending rows written before source persistence still expose their journaled source.
+    sqlx::query("UPDATE proposals SET base_sha=NULL,target_sha=NULL WHERE id=$1")
+        .bind(Uuid::parse_str(id).unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, legacy_pending) = get(&app, &actor, &uri).await;
+    assert_eq!(legacy_pending["base_sha"], OLD);
+    assert_eq!(legacy_pending["target_sha"], OLD);
+    assert!(legacy_pending["head_sha"].is_null());
     assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
     assert!(matches!(
         worker.run_once().await.unwrap(),

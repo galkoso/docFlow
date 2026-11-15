@@ -204,10 +204,10 @@ impl PgProposals {
             None
         };
         let proposal_id = Uuid::new_v4();
-        let number: i64 = sqlx::query_scalar("INSERT INTO proposals(id,organization_id,repository_id,title,branch,owner_id,author_id,team_id,description,ui_impact,ui_impact_reason,initial_mode,links,number,creation_context_id) OVERRIDING SYSTEM VALUE VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,coalesce($14::bigint,nextval('proposals_number_seq')),$15) RETURNING number")
+        let number: i64 = sqlx::query_scalar("INSERT INTO proposals(id,organization_id,repository_id,title,branch,owner_id,author_id,team_id,description,ui_impact,ui_impact_reason,initial_mode,links,number,creation_context_id,base_sha,target_sha) OVERRIDING SYSTEM VALUE VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,coalesce($14::bigint,nextval('proposals_number_seq')),$15,$16,$16) RETURNING number")
             .bind(proposal_id).bind(organization).bind(request.repository_id).bind(&request.title).bind(intent.branch().as_str())
             .bind(owner).bind(actor).bind(request.team_id).bind(&request.description).bind(request.ui_impact.as_str()).bind(&request.ui_impact_reason)
-            .bind(request.initial_mode.as_str()).bind(serde_json::to_value(&request.links).map_err(|_| ProposalError::Unavailable)?).bind(reserved_number).bind(request.creation_context_id)
+            .bind(request.initial_mode.as_str()).bind(serde_json::to_value(&request.links).map_err(|_| ProposalError::Unavailable)?).bind(reserved_number).bind(request.creation_context_id).bind(intent.source().as_str())
             .fetch_one(&mut *tx).await.map_err(reservation_error)?;
         let operation_id = Uuid::new_v4();
         sqlx::query("INSERT INTO git_operations(id,organization_id,proposal_id,actor_id,kind,idempotency_key,request_hash,expected_sha) VALUES($1,$2,$3,$4,'CREATE',$5,$6,$7)")

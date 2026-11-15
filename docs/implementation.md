@@ -627,3 +627,11 @@ Checkboxes represent verified work only.
   workspace Clippy pass. Browser visual/accessibility acceptance remains open.
   Proposal content reading/editing, review and the AI bundle workflow are still
   required subsequent stages of the full specification.
+
+- Provisioning source metadata: new reservations persist the selected base and
+  target SHA immediately, while head remains absent until Git is verified.
+  Pending records from earlier versions read their immutable source from the
+  CREATE journal. Integration assertions cover persisted values, legacy pending
+  records, no provider reads during provisioning and the eventual verified head.
+  All 17 infrastructure and 10 API proposal scenarios pass; workspace Clippy
+  passes. This preserves source-version visibility without claiming completion.

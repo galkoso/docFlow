@@ -1,0 +1,42 @@
+<a routerLink="/changes">לרשימת ההצעות</a>
+@if (!session.profile()) {<section class="empty-state"><h1>פרטי ההצעה זמינים לאחר התחברות</h1>
+  @if (session.status() === 'loading') {<p role="status">בודקים התחברות…</p>}
+  @else if (session.status() === 'unconfigured') {<a class="button" routerLink="/settings">הגדרת התחברות</a>}
+  @else if (session.status() === 'error') {<button (click)="session.refresh()">בדיקת התחברות מחדש</button>}
+  @else {<a class="button" href="/api/v1/auth/login">התחברות ארגונית</a>}
+</section>}
+@else if (state.loading()) {<p role="status">טוענים את פרטי ההצעה ובודקים את מצב הענף…</p>}
+@else if (state.error(); as error) {<div class="notice" role="alert">{{ error }} <button (click)="refresh()">ניסיון נוסף</button></div>}
+@else if (state.detail(); as proposal) {
+  <header><p class="eyebrow">הצעה #{{ proposal.number }}</p><h1>{{ proposal.title }}</h1><p>{{ stateLabel(proposal.state) }} · {{ proposal.owner_name }} · {{ proposal.team_name }}</p></header>
+  <div class="branch-bar"><span>ענף: <bdi>{{ proposal.branch }}</bdi></span><span>יעד: <bdi>{{ proposal.target_branch }}</bdi></span><span>עדכון: {{ proposal.updated_at | date:'dd/MM/yyyy HH:mm' }}</span><button (click)="refresh()">בדיקת מצב</button></div>
+  @if (proposal.state === 'CLOSED' || proposal.state === 'MERGED') {<p class="notice" role="status">ההצעה {{ proposal.state === 'MERGED' ? 'מוזגה' : 'סגורה' }} ומוצגת לקריאה בלבד.</p>}
+  @switch (proposal.synchronization.state) {
+    @case ('provisioning') {
+      <div class="notice" role="status">
+        @if (state.job()?.state === 'FAILED' || state.job()?.state === 'CANCELLED') {<p>{{ preparationError(state.job()?.error_code ?? proposal.creation_error_code) }}</p>}
+        @else if (state.job()?.phase === 'RECONCILIATION_REQUIRED') {<p>בודקים את תוצאת יצירת הענף לפני המשך העבודה.</p>}
+        @else {<p>הענף נמצא בהכנה. פרטי הגרסה יופיעו לאחר השלמת הבדיקה.</p>}
+        @if (state.jobError(); as error) {<p role="alert">{{ error }} <button (click)="refresh()">בדיקה נוספת</button></p>}
+      </div>
+    }
+    @case ('head_moved') {<p class="notice" role="alert">הענף השתנה ב־Git. מוצגת גרסת ההצעה הרשומה; יש לבדוק את השינוי לפני שמירה או סקירה.</p>}
+    @case ('provider_missing') {<p class="notice" role="alert">הענף אינו זמין בספק Git. פרטי ההצעה נשמרו; יש לפנות למנהל המאגר.</p>}
+    @case ('provider_unavailable') {<p class="notice" role="alert">ספק Git אינו זמין כרגע. פרטי ההצעה הרשומים מוצגים כאן, אך מצב הענף לא אומת.</p>}
+    @case ('not_configured') {<p class="notice" role="alert">חיבור המאגר אינו מוגדר כראוי. נדרשת בדיקה בהגדרות סביבת העבודה.</p>}
+  }
+  @if (proposal.synchronization.base_outdated) {<p class="notice" role="status">האפיון המאושר התקדם מאז גרסת היעד הרשומה להצעה.</p>}
+  @if (proposal.synchronization.main_error_code) {<p class="notice" role="status">לא ניתן לבדוק כרגע את הגרסה העדכנית של <bdi>main</bdi>.</p>}
+  <section class="proposal-description" aria-label="תיאור השינוי"><h2>תיאור השינוי</h2><p>{{ proposal.description }}</p>
+    <p>השפעת UI: {{ proposal.ui_impact === 'yes' ? 'כן' : proposal.ui_impact === 'no' ? 'לא' : 'טרם הוכרעה' }}</p>
+    @if (proposal.ui_impact_reason) {<p>{{ proposal.ui_impact_reason }}</p>}
+    @if (proposal.changed_documents === 0 && proposal.changed_sections === 0) {<p>אין שינויים בתוכן ביחס למקור ההצעה.</p>}
+  </section>
+  <section class="versions" aria-label="גרסאות ההצעה"><h2>גרסאות</h2>
+    <dl><dt>מקור</dt><dd><code>{{ proposal.base_sha ?? 'טרם נקבע' }}</code></dd><dt>ראש הענף הרשום</dt><dd><code>{{ proposal.head_sha ?? 'טרם אומת' }}</code></dd>
+      @if (proposal.synchronization.actual_head_sha && proposal.synchronization.actual_head_sha !== proposal.head_sha) {<dt>ראש הענף ב־Git</dt><dd><code>{{ proposal.synchronization.actual_head_sha }}</code></dd>}
+    </dl>
+    @if (proposal.base_sha) {<a routerLink="/specification" [queryParams]="{ repo: proposal.repository_id, commit: proposal.base_sha }">צפייה באפיון בגרסת המקור</a>}
+  </section>
+  @if (proposal.links.length) {<section><h2>קישורים קשורים</h2><ul>@for (link of proposal.links; track $index) {<li>{{ link.kind === 'figma' ? 'Figma' : link.kind === 'ticket' ? 'טיקט' : 'PR פיתוח' }}: <a class="external-link" [href]="link.url" target="_blank" rel="noopener noreferrer"><bdi>{{ link.url }}</bdi></a></li>}</ul></section>}
+}

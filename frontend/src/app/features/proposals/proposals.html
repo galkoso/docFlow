@@ -1,0 +1,54 @@
+<header class="page-heading"><div><h1>הצעות שינוי</h1><p class="page-description">מגבשים שינוי בענף משלו, סוקרים יחד וממזגים לאחר אישור.</p></div></header>
+@if (session.profile()) {
+  <form class="filters" aria-label="סינון הצעות" (submit)="$event.preventDefault()">
+    <label class="search-field">חיפוש בשם או בענף<input #query type="search" maxlength="400" autocomplete="off" [value]="searchDraft()" (input)="search(query.value)"></label>
+    <label>מצב<select #status [value]="params().get('state') ?? ''" (change)="filter('state', status.value)"><option value="">כל המצבים</option>
+      @for (item of states; track item[0]) {<option [value]="item[0]">{{ item[1] }}</option>}
+    </select></label>
+    <label>מאגר<select #repository [disabled]="!state.choices()" [value]="params().get('repository_id') ?? ''" (change)="filter('repository_id', repository.value)">
+      <option value="">כל המאגרים</option>@for (item of state.choices()?.repositories ?? []; track item.repository_id) {<option [value]="item.repository_id">מאגר {{ item.repository_id.slice(0, 8) }}</option>}
+    </select></label>
+    <label>צוות<select #team [disabled]="!state.choices()" [value]="params().get('team_id') ?? ''" (change)="filter('team_id', team.value)">
+      <option value="">כל הצוותים</option>@for (item of teams(); track item.team_id) {<option [value]="item.team_id">{{ item.name }}</option>}
+    </select></label>
+    <label>בעלים<select #owner [disabled]="!state.choices()" [value]="params().get('owner_id') ?? ''" (change)="filter('owner_id', owner.value)">
+      <option value="">כל הבעלים</option>@for (item of owners(); track item.owner_id) {<option [value]="item.owner_id">{{ item.display_name }}</option>}
+    </select></label>
+    <button type="button" (click)="reset()">ניקוי סינון</button><button type="button" (click)="refresh()" [disabled]="state.loading()">רענון</button>
+  </form>
+  @if (state.choicesError(); as error) {<p role="alert">{{ error }} <button (click)="state.loadChoices()">טעינת אפשרויות מחדש</button></p>}
+  @if (state.loading()) {<p role="status">טוענים את ההצעות…</p>}
+  @else if (state.error(); as error) {<div class="notice" role="alert">{{ error }} <button (click)="refresh()">ניסיון נוסף</button> <button (click)="reset()">לתחילת הרשימה</button></div>}
+  @else if (state.rows().length) {
+    <p class="result-note" role="status">מוצגות {{ state.rows().length }} הצעות בעמוד זה</p>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="רשימת הצעות, ניתנת לגלילה לרוחב">
+      <table><thead><tr><th scope="col">הצעה</th><th scope="col">ענף ויעד</th><th scope="col">בעלים וצוות</th><th scope="col">מצב</th><th scope="col">שינויים</th><th scope="col">עדכון אחרון</th></tr></thead>
+        <tbody>@for (row of state.rows(); track row.proposal_id) {
+          <tr><th scope="row"><small>#{{ row.number }}</small><a [routerLink]="['/changes', row.proposal_id]">{{ row.title }}</a></th>
+            <td><bdi>{{ row.branch }}</bdi><small>יעד: <bdi>{{ row.target_branch }}</bdi></small></td>
+            <td>{{ row.owner_name }}<small>{{ row.team_name }}</small></td>
+            <td><span class="status">{{ stateLabel(row.state) }}</span>@if (row.creation_error_code) {<small>{{ preparationError(row.creation_error_code) }}</small>}</td>
+            <td>@if (row.changed_documents != null && row.changed_sections != null) {{{ row.changed_documents }} מסמכים · {{ row.changed_sections }} סעיפים} @else {<span aria-label="כמות השינויים עדיין אינה זמינה">—</span>}</td>
+            <td>{{ row.updated_at | date:'dd/MM/yyyy HH:mm' }}</td>
+          </tr>
+        }</tbody>
+      </table>
+    </div>
+    <nav class="pagination" aria-label="דפדוף בהצעות">
+      @if (params().get('cursor')) {<button (click)="first()" [disabled]="searchDraft() !== (filters().q ?? '')">לתחילת הרשימה</button>}
+      @if (state.nextCursor()) {<button (click)="next()" [disabled]="searchDraft() !== (filters().q ?? '')">להצעות הבאות</button>}
+    </nav>
+  } @else {
+    <section class="empty-state"><h2>{{ hasFilters() || params().get('cursor') ? 'לא נמצאו הצעות בסינון זה' : 'אין עדיין הצעות במאגרים המורשים לך' }}</h2>
+      <p>{{ hasFilters() ? 'אפשר לשנות את הסינון או לחפש שם אחר.' : 'הצעות חדשות יופיעו כאן עם הענף, הבעלים ומצב ההכנה שלהן.' }}</p>
+      @if (hasFilters() || params().get('cursor')) {<button (click)="reset()">הצגת כל ההצעות</button>}
+    </section>
+  }
+} @else {
+  <section class="empty-state"><h2>ההצעות זמינות לאחר התחברות</h2><p>יש להתחבר לחשבון הארגוני כדי לראות את ההצעות המורשות לך.</p>
+    @if (session.status() === 'loading') {<p role="status">בודקים התחברות…</p>}
+    @else if (session.status() === 'unconfigured') {<a class="button" routerLink="/settings">הגדרת התחברות</a>}
+    @else if (session.status() === 'error') {<button (click)="session.refresh()">בדיקת התחברות מחדש</button>}
+    @else {<a class="button" href="/api/v1/auth/login">התחברות ארגונית</a>}
+  </section>
+}

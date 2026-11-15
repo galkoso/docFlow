@@ -1,0 +1,12 @@
+header { margin-top: 1.5rem; }
+h1 { overflow-wrap: anywhere; }
+.eyebrow { color: #697586; margin-bottom: .25rem; }
+.branch-bar { display: flex; flex-wrap: wrap; gap: .6rem 1.5rem; align-items: center; padding-block: 1rem; border-block: 1px solid #dce2eb; font-size: .9rem; }
+.branch-bar bdi { overflow-wrap: anywhere; }
+button { border: 1px solid #cdd7df; background: white; border-radius: 5px; padding: .4rem .7rem; color: #23324b; cursor: pointer; }
+section { margin-block: 2rem; } h2 { font-size: 1.15rem; }
+.proposal-description p { white-space: pre-wrap; overflow-wrap: anywhere; }
+dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .75rem 1rem; }
+dd { margin: 0; overflow-wrap: anywhere; } dt { color: #697586; }
+.external-link { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+@media (max-width: 500px) { dl { grid-template-columns: 1fr; gap: .25rem; } dd { margin-bottom: .75rem; } }

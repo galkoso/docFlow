@@ -569,3 +569,22 @@ Checkboxes represent verified work only.
   changes, closed branches, revocation and eligible choices. All nine proposal
   API scenarios, the remaining API tests and workspace Clippy pass. OpenAPI and
   generated client types are updated; proposal list/detail UI follows separately.
+
+- Connected proposal list and metadata workspace: the RTL list replaces the
+  static placeholder with authorized server data, URL-restored literal search,
+  state/repository/team/owner selectors, bounded cursor navigation, exact zero
+  counts where known, explicit unknown counts and separate loading/error/empty
+  states. Detail URLs restore identity, recorded branch/target/versions, metadata,
+  links, source-version navigation and live synchronization notices. Pending
+  provisioning polls scoped jobs every 2s / 10s in hidden tabs, stops on terminal
+  outcomes or 90 retries, and reloads verified metadata after success. Private
+  state and pending requests/timers are disposed on identity, route and access
+  changes. A pending server detail keeps its original coherent metadata snapshot
+  when no provider call is needed, avoiding a mixed provisioning/ready response.
+  Six state tests and a URL/identity component test cover cancellation, failures,
+  private-data clearing, polling success/termination/bounds and mismatched IDs.
+  Angular build and all 39 client tests pass; nine proposal API tests and Clippy
+  pass after the consistency guard. The in-app Browser still lists no browsers,
+  so rendered visual/accessibility acceptance remains open. The creation form,
+  proposal content reader/editor and editing/review operations are not complete
+  in this commit and remain part of the full implementation.

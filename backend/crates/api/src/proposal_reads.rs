@@ -322,13 +322,16 @@ pub(crate) async fn detail(
         Ok(row) => row,
         Err(error) => return failure(error),
     };
+    let provisioning = row.summary.state == "PROVISIONING";
     let mut synchronization = observe(&state, &row.summary).await;
     // Provider calls may wait or race with revocation, ownership or state changes.
     // Reload current scope and capabilities before returning private metadata.
-    row = match detail_row(&state, actor.user_id, proposal).await {
-        Ok(row) => row,
-        Err(error) => return failure(error),
-    };
+    if !provisioning {
+        row = match detail_row(&state, actor.user_id, proposal).await {
+            Ok(row) => row,
+            Err(error) => return failure(error),
+        };
+    }
     synchronization.base_outdated = synchronization
         .current_main_sha
         .as_ref()

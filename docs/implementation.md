@@ -481,3 +481,13 @@ Checkboxes represent verified work only.
   Reproduction commands and scope are recorded in docs/reader-performance.md.
   In-app Browser still reports no available browsers; visual/accessibility
   acceptance and browser-visible navigation/first-content timing remain open.
+
+- Proposal creation intent: typed, deny-unknown-field input validates Hebrew
+  plain-text metadata, the immutable change/ branch, main-only source SHA,
+  initial navigation mode, UI-impact reason and bounded typed HTTPS links.
+  Idempotency keys are validated separately; a deterministic SHA-256 request
+  fingerprint includes all intent and resolves an omitted owner to the actor.
+  Two new application tests verify invalid-field reports, key limits, default
+  owner equivalence and intent changes. Application/infrastructure tests and
+  workspace Clippy pass. This is the creation model; API and Git provisioning
+  are not exposed by this commit.

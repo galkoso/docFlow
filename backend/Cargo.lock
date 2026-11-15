@@ -2573,6 +2573,7 @@ dependencies = [
  "specspace-domain",
  "specspace-git-adapter",
  "tokio",
+ "url",
  "uuid",
 ]
 

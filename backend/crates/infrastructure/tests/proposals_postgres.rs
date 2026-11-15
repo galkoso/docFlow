@@ -61,6 +61,7 @@ fn request(f: &Fixture, branch: &str) -> CreateProposal {
         ui_impact: UiImpact::No,
         ui_impact_reason: Some("שינוי לוגיקה בלבד".into()),
         links: vec![],
+        creation_context_id: None,
     }
 }
 fn intent(f: &Fixture, branch: &str) -> ValidatedProposal {
@@ -1005,4 +1006,203 @@ async fn provisioning_never_retargets_a_reserved_job_after_repository_reconfigur
         .await
         .unwrap();
     assert_eq!(state, "PROVISIONING");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn preview_numbers_share_the_proposal_sequence_and_are_consumed_once(pool: PgPool) {
+    use specspace_infrastructure::creation_context::PgCreationContexts;
+    let f = fixture(&pool, "CONTRIBUTOR").await;
+    let contexts = PgCreationContexts::new(pool.clone());
+    let store = PgProposals::new(pool.clone());
+    let source = specspace_git_adapter::CommitSha::parse("1".repeat(40)).unwrap();
+    let key = IdempotencyKey::parse("preview").unwrap();
+    let (a, b) = tokio::join!(
+        contexts.allocate(f.actor, f.repository, &source, &key),
+        contexts.allocate(f.actor, f.repository, &source, &key)
+    );
+    let preview = a.unwrap();
+    let repeated = b.unwrap();
+    assert_eq!(preview.context_id, repeated.context_id);
+    assert_eq!(preview.number, repeated.number);
+    let second = contexts
+        .allocate(
+            f.actor,
+            f.repository,
+            &source,
+            &IdempotencyKey::parse("second-preview").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(second.number > preview.number);
+    let legacy = store
+        .reserve(
+            f.actor,
+            &intent(&f, "change/legacy"),
+            &IdempotencyKey::parse("legacy").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(legacy.number > second.number);
+    let mut body = request(&f, &format!("change/{}-new-proposal", preview.number));
+    body.creation_context_id = Some(preview.context_id);
+    let input = ValidatedProposal::validate(body.clone(), f.actor).unwrap();
+    let create_key = IdempotencyKey::parse("consume").unwrap();
+    let ticket = store.reserve(f.actor, &input, &create_key).await.unwrap();
+    assert_eq!(ticket.number, preview.number);
+    sqlx::query(
+        "UPDATE proposal_creation_contexts SET expires_at=clock_timestamp()-interval '1 second'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        store.reserve(f.actor, &input, &create_key).await.unwrap(),
+        ticket,
+        "replay survives context expiry and consumption"
+    );
+    body.branch = "change/duplicate-context".into();
+    assert_eq!(
+        store
+            .reserve(
+                f.actor,
+                &ValidatedProposal::validate(body, f.actor).unwrap(),
+                &IdempotencyKey::parse("second-consumer").unwrap()
+            )
+            .await,
+        Err(ProposalError::ContextUsed)
+    );
+    assert!(matches!(
+        contexts
+            .existing(
+                f.actor,
+                f.repository,
+                &IdempotencyKey::parse("second-preview").unwrap()
+            )
+            .await,
+        Err(ProposalError::ContextExpired)
+    ));
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM jobs")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn preview_binding_rejects_different_actors_sources_configuration_and_expiry(pool: PgPool) {
+    use specspace_infrastructure::creation_context::PgCreationContexts;
+    let f = fixture(&pool, "CONTRIBUTOR").await;
+    let foreign = fixture(&pool, "ADMIN").await;
+    let contexts = PgCreationContexts::new(pool.clone());
+    let store = PgProposals::new(pool.clone());
+    let source = specspace_git_adapter::CommitSha::parse("1".repeat(40)).unwrap();
+    let preview = contexts
+        .allocate(
+            f.actor,
+            f.repository,
+            &source,
+            &IdempotencyKey::parse("binding").unwrap(),
+        )
+        .await
+        .unwrap();
+    let mut body = request(&foreign, "change/foreign-preview");
+    body.creation_context_id = Some(preview.context_id);
+    assert_eq!(
+        store
+            .check_context(
+                foreign.actor,
+                &ValidatedProposal::validate(body, foreign.actor).unwrap()
+            )
+            .await,
+        Err(ProposalError::NotFound)
+    );
+    let mut body = request(&f, "change/moved-preview");
+    body.creation_context_id = Some(preview.context_id);
+    body.expected_source_sha = "2".repeat(40);
+    assert_eq!(
+        store
+            .check_context(
+                f.actor,
+                &ValidatedProposal::validate(body, f.actor).unwrap()
+            )
+            .await,
+        Err(ProposalError::ContextMismatch)
+    );
+    let mut body = request(&f, "change/expired-preview");
+    body.creation_context_id = Some(preview.context_id);
+    let input = ValidatedProposal::validate(body, f.actor).unwrap();
+    sqlx::query("UPDATE repositories SET remote_id='changed' WHERE id=$1")
+        .bind(f.repository)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        store.check_context(f.actor, &input).await,
+        Err(ProposalError::ContextMismatch)
+    );
+    sqlx::query(
+        "UPDATE proposal_creation_contexts SET expires_at=clock_timestamp()-interval '1 second'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        store
+            .reserve(
+                f.actor,
+                &input,
+                &IdempotencyKey::parse("expired-create").unwrap()
+            )
+            .await,
+        Err(ProposalError::ContextExpired)
+    );
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM proposals")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn different_creation_keys_cannot_consume_one_context_concurrently(pool: PgPool) {
+    use specspace_infrastructure::creation_context::PgCreationContexts;
+    let f = fixture(&pool, "CONTRIBUTOR").await;
+    let source = specspace_git_adapter::CommitSha::parse("1".repeat(40)).unwrap();
+    let preview = PgCreationContexts::new(pool.clone())
+        .allocate(
+            f.actor,
+            f.repository,
+            &source,
+            &IdempotencyKey::parse("one-number").unwrap(),
+        )
+        .await
+        .unwrap();
+    let mut a = request(&f, "change/first-consumer");
+    a.creation_context_id = Some(preview.context_id);
+    let mut b = a.clone();
+    b.branch = "change/second-consumer".into();
+    let (a, b) = (
+        ValidatedProposal::validate(a, f.actor).unwrap(),
+        ValidatedProposal::validate(b, f.actor).unwrap(),
+    );
+    let store = PgProposals::new(pool.clone());
+    let (ka, kb) = (
+        IdempotencyKey::parse("consumer-a").unwrap(),
+        IdempotencyKey::parse("consumer-b").unwrap(),
+    );
+    let (a, b) = tokio::join!(
+        store.reserve(f.actor, &a, &ka),
+        store.reserve(f.actor, &b, &kb)
+    );
+    let ticket = match (a, b) {
+        (Ok(ticket), Err(ProposalError::ContextUsed))
+        | (Err(ProposalError::ContextUsed), Ok(ticket)) => ticket,
+        other => panic!("invalid context race: {other:?}"),
+    };
+    assert_eq!(ticket.number, preview.number);
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM proposals")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
 }

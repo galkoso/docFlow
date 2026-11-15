@@ -1,5 +1,6 @@
 //! PostgreSQL persistence primitives; provider calls never hold a DB transaction.
 pub mod authorization;
+pub mod creation_context;
 pub mod github_source;
 pub mod index_worker;
 pub mod login_flows;

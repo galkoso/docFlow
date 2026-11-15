@@ -611,6 +611,138 @@
         ]
       }
     },
+    "/api/v1/proposals/context": {
+      "post": {
+        "tags": [
+          "crate::creation_context"
+        ],
+        "operationId": "prepare",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepareCreation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedCreation"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/options": {
       "get": {
         "tags": [
@@ -1490,6 +1622,13 @@
           "branch": {
             "type": "string"
           },
+          "creation_context_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
           "description": {
             "type": "string"
           },
@@ -1932,6 +2071,53 @@
       "PngDisplay": {
         "type": "string",
         "format": "binary"
+      },
+      "PrepareCreation": {
+        "type": "object",
+        "required": [
+          "repository_id"
+        ],
+        "properties": {
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PreparedCreation": {
+        "type": "object",
+        "required": [
+          "context_id",
+          "repository_id",
+          "number",
+          "source_branch",
+          "source_sha",
+          "expires_at"
+        ],
+        "properties": {
+          "context_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_branch": {
+            "type": "string"
+          },
+          "source_sha": {
+            "type": "string"
+          }
+        }
       },
       "Profile": {
         "type": "object",

@@ -8,7 +8,7 @@ use utoipa::{
     info(title = "SpecSpace API", version = "0.1.0"),
     paths(crate::live, crate::ready, crate::auth::login, crate::auth::availability, crate::auth::callback, crate::auth::logout, crate::auth::me,
         crate::specification::repositories, crate::specification::specification, crate::specification::document, crate::specification::find, crate::specification::asset,
-        crate::specification::highlights, crate::proposals::create, crate::proposals::job_status, crate::proposal_reads::list, crate::proposal_reads::detail, crate::proposal_reads::options),
+        crate::specification::highlights, crate::proposals::create, crate::proposals::job_status, crate::proposal_reads::list, crate::proposal_reads::detail, crate::proposal_reads::options, crate::creation_context::prepare),
     components(schemas(crate::Health, crate::ErrorBody, crate::ApiError, crate::auth::Profile, crate::auth::Membership, crate::auth::ProfileCapabilities,
         crate::auth::AuthAvailability, specspace_document_engine::find::MatchWindow)),
     modifiers(&SessionSecurity)

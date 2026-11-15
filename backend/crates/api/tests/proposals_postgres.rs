@@ -805,3 +805,96 @@ async fn proposal_choices_include_only_current_scoped_teams_and_eligible_owners(
     );
     assert_eq!(provider.reads.load(Ordering::SeqCst), 0);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn creation_context_previews_exact_number_source_and_survives_idempotent_replay(
+    pool: PgPool,
+) {
+    let actor = user(&pool, "CONTRIBUTOR").await;
+    let (app, provider, worker) = app(&pool, &actor);
+    let prepare = serde_json::json!({"repository_id":actor.repository});
+    let (status, context) = json(
+        response(
+            &app,
+            &actor,
+            "POST",
+            "/api/v1/proposals/context",
+            Some(&prepare),
+            Some("prepare"),
+            (Some(ORIGIN), Some(&actor.csrf)),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(context["source_sha"], OLD);
+    assert!(context["number"].as_i64().unwrap() > 0);
+    assert!(context["remote_id"].is_null());
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM proposals")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+    assert_eq!(provider.writes.load(Ordering::SeqCst), 0);
+    provider.main.store(1, Ordering::SeqCst);
+    let reads = provider.reads.load(Ordering::SeqCst);
+    let (_, repeated) = json(
+        response(
+            &app,
+            &actor,
+            "POST",
+            "/api/v1/proposals/context",
+            Some(&prepare),
+            Some("prepare"),
+            (Some(ORIGIN), Some(&actor.csrf)),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(context, repeated);
+    assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
+    let mut body = input(&actor);
+    body["creation_context_id"] = context["context_id"].clone();
+    body["branch"] = format!(
+        "change/{}-new-proposal",
+        context["number"].as_i64().unwrap()
+    )
+    .into();
+    assert_eq!(
+        create(&app, &actor, &body, "create").await.1["error"]["code"],
+        "SOURCE_MOVED"
+    );
+    let (_, fresh) = json(
+        response(
+            &app,
+            &actor,
+            "POST",
+            "/api/v1/proposals/context",
+            Some(&prepare),
+            Some("fresh-source"),
+            (Some(ORIGIN), Some(&actor.csrf)),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(fresh["source_sha"], NEW);
+    assert_ne!(fresh["number"], context["number"]);
+    body["creation_context_id"] = fresh["context_id"].clone();
+    body["expected_source_sha"] = NEW.into();
+    body["branch"] = format!("change/{}-new-proposal", fresh["number"].as_i64().unwrap()).into();
+    let (status, ticket) = create(&app, &actor, &body, "create").await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    assert_eq!(ticket["number"], fresh["number"]);
+    assert!(matches!(
+        worker.run_once().await.unwrap(),
+        ProvisionWork::Completed(_)
+    ));
+    sqlx::query(
+        "UPDATE proposal_creation_contexts SET expires_at=clock_timestamp()-interval '1 second'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    provider.online.store(false, Ordering::SeqCst);
+    assert_eq!(create(&app, &actor, &body, "create").await.1, ticket);
+}

@@ -26,6 +26,10 @@ pub fn routes() -> Router<AppState> {
         )
         .route("/api/v1/jobs/{job}", get(job_status))
         .route(
+            "/api/v1/proposals/context",
+            post(crate::creation_context::prepare).layer(DefaultBodyLimit::max(4096)),
+        )
+        .route(
             "/api/v1/proposals/options",
             get(crate::proposal_reads::options),
         )
@@ -93,21 +97,9 @@ pub(crate) async fn create(
             );
         }
     };
-    let mut keys = headers.get_all("Idempotency-Key").iter();
-    let key = match (keys.next().and_then(|key| key.to_str().ok()), keys.next()) {
-        (Some(key), None) => match IdempotencyKey::parse(key) {
-            Ok(key) => key,
-            Err(error) => return failure(error),
-        },
-        _ => {
-            return problem(
-                StatusCode::BAD_REQUEST,
-                "IDEMPOTENCY_KEY_REQUIRED",
-                "נדרש מזהה פעולה תקין ליצירת ההצעה.",
-                false,
-                None,
-            );
-        }
+    let key = match operation_key(&headers) {
+        Ok(key) => key,
+        Err(error) => return error.into_response(),
     };
     let intent = match ValidatedProposal::validate(request, actor.user_id) {
         Ok(intent) => intent,
@@ -118,6 +110,9 @@ pub(crate) async fn create(
         Ok(Some(ticket)) => return accepted(ticket),
         Ok(None) => {}
         Err(error) => return failure(error),
+    }
+    if let Err(error) = store.check_context(actor.user_id, &intent).await {
+        return failure(error);
     }
     let provider = match state
         .book_source
@@ -156,6 +151,32 @@ pub(crate) async fn create(
     match store.reserve(actor.user_id, &intent, &key).await {
         Ok(ticket) => accepted(ticket),
         Err(error) => failure(error),
+    }
+}
+
+pub(crate) enum KeyError {
+    Required,
+    Invalid(ProposalError),
+}
+impl IntoResponse for KeyError {
+    fn into_response(self) -> Response {
+        match self {
+            Self::Required => problem(
+                StatusCode::BAD_REQUEST,
+                "IDEMPOTENCY_KEY_REQUIRED",
+                "נדרש מזהה פעולה תקין.",
+                false,
+                None,
+            ),
+            Self::Invalid(error) => failure(error),
+        }
+    }
+}
+pub(crate) fn operation_key(headers: &HeaderMap) -> Result<IdempotencyKey, KeyError> {
+    let mut keys = headers.get_all("Idempotency-Key").iter();
+    match (keys.next().and_then(|key| key.to_str().ok()), keys.next()) {
+        (Some(key), None) => IdempotencyKey::parse(key).map_err(KeyError::Invalid),
+        _ => Err(KeyError::Required),
     }
 }
 
@@ -345,6 +366,24 @@ pub(crate) fn failure(error: ProposalError) -> Response {
             StatusCode::CONFLICT,
             "IDEMPOTENCY_MISMATCH",
             "מזהה הפעולה כבר שימש לפרטים אחרים. יש לחזור להצעה הקיימת או להתחיל פעולה חדשה.",
+            false,
+        ),
+        ProposalError::ContextExpired => (
+            StatusCode::CONFLICT,
+            "CREATE_CONTEXT_EXPIRED",
+            "תוקף הכנת הטופס פג. יש לבדוק שוב את גרסת המקור לפני יצירה.",
+            false,
+        ),
+        ProposalError::ContextUsed => (
+            StatusCode::CONFLICT,
+            "CREATE_CONTEXT_USED",
+            "מספר ההצעה כבר שימש ליצירה. יש לחזור להצעה הקיימת או להכין טופס חדש.",
+            false,
+        ),
+        ProposalError::ContextMismatch => (
+            StatusCode::CONFLICT,
+            "CREATE_CONTEXT_MISMATCH",
+            "פרטי המקור או חיבור המאגר השתנו. יש להכין מחדש את הטופס.",
             false,
         ),
         _ => (

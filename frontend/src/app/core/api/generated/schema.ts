@@ -152,6 +152,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["prepare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/options": {
         parameters: {
             query?: never;
@@ -298,6 +314,8 @@ export interface components {
         };
         CreateProposal: {
             branch: string;
+            /** Format: uuid */
+            creation_context_id?: string | null;
             description: string;
             expected_source_sha: string;
             initial_mode: components["schemas"]["InitialMode"];
@@ -419,6 +437,21 @@ export interface components {
         };
         /** Format: binary */
         PngDisplay: string;
+        PrepareCreation: {
+            /** Format: uuid */
+            repository_id: string;
+        };
+        PreparedCreation: {
+            /** Format: uuid */
+            context_id: string;
+            expires_at: string;
+            /** Format: int64 */
+            number: number;
+            /** Format: uuid */
+            repository_id: string;
+            source_branch: string;
+            source_sha: string;
+        };
         Profile: {
             capabilities: components["schemas"]["ProfileCapabilities"];
             display_name: string;
@@ -1009,6 +1042,97 @@ export interface operations {
                 };
             };
             413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    prepare: {
+        parameters: {
+            query?: never;
+            header: {
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareCreation"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreparedCreation"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

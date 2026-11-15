@@ -588,3 +588,20 @@ Checkboxes represent verified work only.
   so rendered visual/accessibility acceptance remains open. The creation form,
   proposal content reader/editor and editing/review operations are not complete
   in this commit and remain part of the full implementation.
+
+- Exact creation previews: authenticated/CSRF-protected POST /proposals/context
+  idempotently reserves a number from the proposal sequence and records the
+  server-read main SHA for 30 minutes. Preparation creates no proposal, Git ref
+  or job. Optional creation_context_id binds final creation to the same actor,
+  repository, source and provider identity; one transaction consumes its exact
+  number. Concurrent consumers cannot reuse it, while ordinary creation still
+  shares the sequence safely. A composite FK binds context/number/author/scope.
+  Expired, consumed or changed contexts fail explicitly; replay of an already
+  accepted creation still returns its original ticket after expiry. Legacy
+  requests omit the new field from canonical serialization, with a byte-level
+  compatibility test preserving existing idempotency fingerprints. Three new
+  PostgreSQL scenarios and one HTTP scenario cover allocation/consumption races,
+  scope/source/configuration/expiry and source-move/replay behavior. Application,
+  infrastructure and API tests pass; Clippy passes and migration 005 is applied
+  locally. OpenAPI/client types are updated. The form UI follows in a separate
+  commit.

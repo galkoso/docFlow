@@ -71,6 +71,9 @@ pub struct CreateProposal {
     pub ui_impact_reason: Option<String>,
     #[serde(default)]
     pub links: Vec<ProposalLink>,
+    // Omit absent contexts from serialization to preserve existing request hashes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub creation_context_id: Option<Uuid>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -85,6 +88,9 @@ pub enum ProposalError {
     Forbidden,
     BranchTaken,
     IdempotencyMismatch,
+    ContextExpired,
+    ContextUsed,
+    ContextMismatch,
     Unavailable,
 }
 
@@ -223,6 +229,7 @@ mod tests {
             ui_impact: UiImpact::Undecided,
             ui_impact_reason: None,
             links: vec![],
+            creation_context_id: None,
         }
     }
     #[test]
@@ -277,6 +284,33 @@ mod tests {
         assert_ne!(
             baseline.fingerprint(),
             ValidatedProposal::validate(changed, actor)
+                .unwrap()
+                .fingerprint()
+        );
+    }
+
+    #[test]
+    fn context_extension_preserves_legacy_request_hash_bytes() {
+        let actor = Uuid::new_v4();
+        let input = request();
+        let legacy = format!(
+            r#"{{"repository_id":"{}","title":"הצעה חדשה","branch":"change/25-new-proposal","source_branch":"main","expected_source_sha":"{}","description":"תיאור מלא של השינוי המוצע","team_id":"{}","owner_id":"{}","initial_mode":"manual","ui_impact":"undecided","ui_impact_reason":null,"links":[]}}"#,
+            input.repository_id,
+            "1".repeat(40),
+            input.team_id,
+            actor
+        );
+        let validated = ValidatedProposal::validate(input.clone(), actor).unwrap();
+        assert_eq!(serde_json::to_string(validated.request()).unwrap(), legacy);
+        assert_eq!(
+            validated.fingerprint(),
+            format!("{:x}", Sha256::digest(legacy.as_bytes()))
+        );
+        let mut with_context = input;
+        with_context.creation_context_id = Some(Uuid::new_v4());
+        assert_ne!(
+            validated.fingerprint(),
+            ValidatedProposal::validate(with_context, actor)
                 .unwrap()
                 .fingerprint()
         );

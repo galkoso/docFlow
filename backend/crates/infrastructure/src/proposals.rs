@@ -99,6 +99,39 @@ impl PgProposals {
         existing.map(|existing| existing.ticket(intent)).transpose()
     }
 
+    pub async fn check_context(
+        &self,
+        actor: Uuid,
+        intent: &ValidatedProposal,
+    ) -> Result<(), ProposalError> {
+        let Some(id) = intent.request().creation_context_id else {
+            return Ok(());
+        };
+        self.authorize_create(actor, intent.request().repository_id)
+            .await?;
+        let mut tx = self.pool.begin().await.map_err(unavailable)?;
+        let scope = sqlx::query_as::<_, Scope>(ACCESS)
+            .bind(intent.request().repository_id)
+            .bind(actor)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(unavailable)?
+            .ok_or(ProposalError::NotFound)?;
+        scope.require_create()?;
+        crate::creation_context::lock_number(
+            &mut tx,
+            id,
+            actor,
+            intent.request().repository_id,
+            intent.source(),
+            &scope.remote_id,
+            &scope.installation_id,
+        )
+        .await?;
+        tx.commit().await.map_err(unavailable)?;
+        Ok(())
+    }
+
     /// The caller proves the displayed source SHA is still current before this
     /// reservation. The worker must check it again before creating the Git ref.
     pub async fn reserve(
@@ -154,11 +187,27 @@ impl PgProposals {
         if eligible.is_none() {
             return Err(invalid("owner_id", "OWNER_NOT_AVAILABLE"));
         }
+        let reserved_number = if let Some(id) = request.creation_context_id {
+            Some(
+                crate::creation_context::lock_number(
+                    &mut tx,
+                    id,
+                    actor,
+                    request.repository_id,
+                    intent.source(),
+                    &scope.remote_id,
+                    &scope.installation_id,
+                )
+                .await?,
+            )
+        } else {
+            None
+        };
         let proposal_id = Uuid::new_v4();
-        let number: i64 = sqlx::query_scalar("INSERT INTO proposals(id,organization_id,repository_id,title,branch,owner_id,author_id,team_id,description,ui_impact,ui_impact_reason,initial_mode,links) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING number")
+        let number: i64 = sqlx::query_scalar("INSERT INTO proposals(id,organization_id,repository_id,title,branch,owner_id,author_id,team_id,description,ui_impact,ui_impact_reason,initial_mode,links,number,creation_context_id) OVERRIDING SYSTEM VALUE VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,coalesce($14::bigint,nextval('proposals_number_seq')),$15) RETURNING number")
             .bind(proposal_id).bind(organization).bind(request.repository_id).bind(&request.title).bind(intent.branch().as_str())
             .bind(owner).bind(actor).bind(request.team_id).bind(&request.description).bind(request.ui_impact.as_str()).bind(&request.ui_impact_reason)
-            .bind(request.initial_mode.as_str()).bind(serde_json::to_value(&request.links).map_err(|_| ProposalError::Unavailable)?)
+            .bind(request.initial_mode.as_str()).bind(serde_json::to_value(&request.links).map_err(|_| ProposalError::Unavailable)?).bind(reserved_number).bind(request.creation_context_id)
             .fetch_one(&mut *tx).await.map_err(reservation_error)?;
         let operation_id = Uuid::new_v4();
         sqlx::query("INSERT INTO git_operations(id,organization_id,proposal_id,actor_id,kind,idempotency_key,request_hash,expected_sha) VALUES($1,$2,$3,$4,'CREATE',$5,$6,$7)")
@@ -196,6 +245,11 @@ fn reservation_error(error: sqlx::Error) -> ProposalError {
             && error.constraint() == Some("proposals_repository_id_branch_key_key")
     }) {
         ProposalError::BranchTaken
+    } else if error.as_database_error().is_some_and(|error| {
+        error.is_unique_violation()
+            && error.constraint() == Some("proposals_creation_context_id_key")
+    }) {
+        ProposalError::ContextUsed
     } else {
         ProposalError::Unavailable
     }

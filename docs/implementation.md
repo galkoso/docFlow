@@ -738,3 +738,22 @@ Checkboxes represent verified work only.
   Full backend regression checks passed before the identity guard; all five
   editor scenarios and Clippy pass afterward. OpenAPI/client types are updated;
   Angular production build and all 51 frontend tests pass.
+
+- Browser rich-document core: pinned ProseMirror/Markdown dependencies and typed
+  editor/recovery API methods support the source model. The schema handles
+  CommonMark, simple GFM tables/alignment/escaped pipes, strike, task states and
+  nested stable heading markers; known schema DOM and private image URLs remain
+  inert. Unrepresentable/non-round-trippable source is protected. Retained nodes
+  preserve original bytes; changed nodes emit explicit edits/deletions. Identity
+  normalization preserves originals when copied before their source, gives new
+  headings fresh IDs and clears duplicate source keys on split. Protected source
+  cannot disappear in rich transactions. Undo/redo restores original Markdown.
+  A deterministic Rust fixture exporter and backend CI drift check connect
+  browser tests to actual server models/canonical edits. Six new client scenarios
+  cover seven fixture documents, no-op/changed/undo/redo source, identity, protected
+  deletion, GFM details and inert DOM/private images. Tests caught and fixed an
+  attribute mutation in semantic comparison; the comparison now builds fresh
+  objects. Production build and all 57 client tests pass; fixture regeneration
+  matches and workspace Clippy passes. Page/toolbar, session recovery/autosave,
+  source repair and Git commits remain required; this core is not a complete
+  user-facing editor yet. Browser rendering/IME/RTL acceptance remains open.

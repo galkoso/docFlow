@@ -65,3 +65,25 @@ versions and rechecks access after provider/CPU waits. The response distinguishe
 render events, document findings and declared removed IDs. Preview does not
 write a recovery buffer, operation journal, Git Commit or review approval.
 Repository-wide validation and Git publication remain separate requirements.
+
+## Browser representation
+
+The browser core uses a ProseMirror schema with CommonMark text/marks, simple GFM
+tables, strike-through and task items. Stable section markers become heading
+attributes. Images use the pinned private proposal proxy; schema DOM contains
+only known elements/attributes. Unsupported or non-round-trippable blocks become
+protected atoms. A parsing/serialization probe compares semantic trees without
+mutating ProseMirror attributes. Protected source cannot be removed by rich
+transactions. Copy/split normalization keeps existing identities and assigns
+fresh IDs to copied/new headings, including copies inserted before originals.
+
+Unchanged nodes yield `keep` operations and exact original bytes. Changed nodes
+serialize individually; omitted original nodes generate explicit block/section
+deletions. Undo/redo returns to original source when the document tree returns to
+its baseline. Buffer instances belong to one document/version and remain local;
+page/session recovery integration and Git saving are subsequent work.
+
+`cargo run -p specspace-document-engine --example editor_contract` generates
+`fixtures/editor-contract.json`. Backend CI checks drift. Browser tests consume
+the actual Rust models and compare their no-op and canonical heading changes
+with Rust-validated output, alongside GFM, identity and inert-DOM checks.

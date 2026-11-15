@@ -1,0 +1,598 @@
+[
+  {
+    "model": {
+      "blocks": [
+        {
+          "key": "6f71cf7138f027f499812f41438e486203acbdee19a67d4d0406739e24f507cb",
+          "kind": "heading",
+          "markdown": "## המערכת לדוגמה\n",
+          "prefix": "\n<!-- ss:section:SEC-OVERVIEW -->\n",
+          "protected_reason": null,
+          "section_id": "SEC-OVERVIEW",
+          "source_end_byte": 168,
+          "source_start_byte": 139
+        },
+        {
+          "key": "40b960712cc5ce491d1f3c49506435a87e3919a8fc8ba52a6be7a196bb9598cb",
+          "kind": "paragraph",
+          "markdown": "זהו ספר בדיקה סינתטי בלבד. הטקסט אינו מתאר מערכת מבצעית.\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 271,
+          "source_start_byte": 169
+        },
+        {
+          "key": "875348914438f952c29149d6afe64861f74a8f7437f5d5ae701ae3f0d2f099fd",
+          "kind": "paragraph",
+          "markdown": "משתמשים יכולים לעבור בין פרקים ולחפש את הטקסט המוצג.\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 368,
+          "source_start_byte": 272
+        }
+      ],
+      "document_id": "DOC-OVERVIEW",
+      "preamble": "---\ndocument_id: DOC-OVERVIEW\ntitle: סקירת המערכת\nowner_team: synthetic\nschema_version: 1\n---\n",
+      "section_ids": [
+        "SEC-OVERVIEW"
+      ],
+      "sha256": "08245df66cb8645edbcdcf9ec822f44997ae2fa4a7d308f91cf265e03d79756a",
+      "suffix": ""
+    },
+    "name": "overview",
+    "rename": {
+      "edit": {
+        "blocks": [
+          {
+            "action": "replace",
+            "key": "6f71cf7138f027f499812f41438e486203acbdee19a67d4d0406739e24f507cb",
+            "markdown": "## כותרת בדיקה\n\n"
+          },
+          {
+            "action": "keep",
+            "key": "40b960712cc5ce491d1f3c49506435a87e3919a8fc8ba52a6be7a196bb9598cb"
+          },
+          {
+            "action": "keep",
+            "key": "875348914438f952c29149d6afe64861f74a8f7437f5d5ae701ae3f0d2f099fd"
+          }
+        ],
+        "deleted_keys": [],
+        "deleted_section_ids": [],
+        "expected_sha256": "08245df66cb8645edbcdcf9ec822f44997ae2fa4a7d308f91cf265e03d79756a"
+      },
+      "key": "6f71cf7138f027f499812f41438e486203acbdee19a67d4d0406739e24f507cb",
+      "source": "---\ndocument_id: DOC-OVERVIEW\ntitle: סקירת המערכת\nowner_team: synthetic\nschema_version: 1\n---\n\n<!-- ss:section:SEC-OVERVIEW -->\n## כותרת בדיקה\n\n\nזהו ספר בדיקה סינתטי בלבד. הטקסט אינו מתאר מערכת מבצעית.\n\nמשתמשים יכולים לעבור בין פרקים ולחפש את הטקסט המוצג.\n",
+      "text": "כותרת בדיקה"
+    }
+  },
+  {
+    "model": {
+      "blocks": [
+        {
+          "key": "a308ab8390cf60aa4e96d9360c8c4609558ec900399c12412c2c4c2e99babd87",
+          "kind": "heading",
+          "markdown": "## פעולות מורשות\n",
+          "prefix": "\n<!-- ss:section:SEC-PERMISSIONS -->\n",
+          "protected_reason": null,
+          "section_id": "SEC-PERMISSIONS",
+          "source_end_byte": 163,
+          "source_start_byte": 134
+        },
+        {
+          "key": "68e3297db6c9c769b984ce8b130dc01ac2484984abc717863603b2a71a05417c",
+          "kind": "paragraph",
+          "markdown": "מחיקה מותרת רק למשתמש שהוקצתה לו הרשאה מפורשת.\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 249,
+          "source_start_byte": 164
+        },
+        {
+          "key": "280e0ee4e7cebac95774d0fabab88e328c35ba202acff81573329374269f6d75",
+          "kind": "table",
+          "markdown": "| תפקיד | יכולת |\n|---|---|\n| קורא | צפייה בלבד |\n| עורך | שינוי בענף מורשה |\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 369,
+          "source_start_byte": 250
+        }
+      ],
+      "document_id": "DOC-PERMISSIONS",
+      "preamble": "---\ndocument_id: DOC-PERMISSIONS\ntitle: הרשאות\nowner_team: synthetic\nschema_version: 1\n---\n",
+      "section_ids": [
+        "SEC-PERMISSIONS"
+      ],
+      "sha256": "1148d99980881f643bf9e42ab5e6210ca7a044f9c71ce36e9a391694d4536aff",
+      "suffix": ""
+    },
+    "name": "permissions",
+    "rename": {
+      "edit": {
+        "blocks": [
+          {
+            "action": "replace",
+            "key": "a308ab8390cf60aa4e96d9360c8c4609558ec900399c12412c2c4c2e99babd87",
+            "markdown": "## כותרת בדיקה\n\n"
+          },
+          {
+            "action": "keep",
+            "key": "68e3297db6c9c769b984ce8b130dc01ac2484984abc717863603b2a71a05417c"
+          },
+          {
+            "action": "keep",
+            "key": "280e0ee4e7cebac95774d0fabab88e328c35ba202acff81573329374269f6d75"
+          }
+        ],
+        "deleted_keys": [],
+        "deleted_section_ids": [],
+        "expected_sha256": "1148d99980881f643bf9e42ab5e6210ca7a044f9c71ce36e9a391694d4536aff"
+      },
+      "key": "a308ab8390cf60aa4e96d9360c8c4609558ec900399c12412c2c4c2e99babd87",
+      "source": "---\ndocument_id: DOC-PERMISSIONS\ntitle: הרשאות\nowner_team: synthetic\nschema_version: 1\n---\n\n<!-- ss:section:SEC-PERMISSIONS -->\n## כותרת בדיקה\n\n\nמחיקה מותרת רק למשתמש שהוקצתה לו הרשאה מפורשת.\n\n| תפקיד | יכולת |\n|---|---|\n| קורא | צפייה בלבד |\n| עורך | שינוי בענף מורשה |\n",
+      "text": "כותרת בדיקה"
+    }
+  },
+  {
+    "model": {
+      "blocks": [
+        {
+          "key": "4814b0b81ffeab5aa5ae0b4112fb5cd93530e64975935e74c8e149bf2be08b0f",
+          "kind": "heading",
+          "markdown": "## ניהול פריטים\n",
+          "prefix": "\n<!-- ss:section:SEC-MEDIA -->\n",
+          "protected_reason": null,
+          "section_id": "SEC-MEDIA",
+          "source_end_byte": 158,
+          "source_start_byte": 131
+        },
+        {
+          "key": "7c7470ec913c832f18b524cd5921b0c3664ffb09885715487734a73fa5a6a521",
+          "kind": "paragraph",
+          "markdown": "מחיקה של פריט מציגה הודעת אישור לפני ביצוע.\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 238,
+          "source_start_byte": 159
+        },
+        {
+          "key": "eb4ca865b47503e4334c6bfaeb0e3993dc08551f43eb46437c29329f40cde6e4",
+          "kind": "paragraph",
+          "markdown": "![פיקסל בדיקה סינתטי](assets/5e3d382db4dd83d59aa5742793ad6b7903409e865c83bcbc54835049f043bc15.png)\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 354,
+          "source_start_byte": 239
+        },
+        {
+          "key": "2f26813c4164f65d8026a6b2759be0e4ddafff062a0fa441827b9a12ba791f86",
+          "kind": "paragraph",
+          "markdown": "[הרשאות](ss:DOC-PERMISSIONS#SEC-PERMISSIONS)\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 406,
+          "source_start_byte": 355
+        }
+      ],
+      "document_id": "DOC-MEDIA",
+      "preamble": "---\ndocument_id: DOC-MEDIA\ntitle: ספריית מדיה\nowner_team: synthetic\nschema_version: 1\n---\n",
+      "section_ids": [
+        "SEC-MEDIA"
+      ],
+      "sha256": "f8b412f27b268da47898603051b10d662ae4c9e4798623e14f9976fdc082efa5",
+      "suffix": ""
+    },
+    "name": "media",
+    "rename": {
+      "edit": {
+        "blocks": [
+          {
+            "action": "replace",
+            "key": "4814b0b81ffeab5aa5ae0b4112fb5cd93530e64975935e74c8e149bf2be08b0f",
+            "markdown": "## כותרת בדיקה\n\n"
+          },
+          {
+            "action": "keep",
+            "key": "7c7470ec913c832f18b524cd5921b0c3664ffb09885715487734a73fa5a6a521"
+          },
+          {
+            "action": "keep",
+            "key": "eb4ca865b47503e4334c6bfaeb0e3993dc08551f43eb46437c29329f40cde6e4"
+          },
+          {
+            "action": "keep",
+            "key": "2f26813c4164f65d8026a6b2759be0e4ddafff062a0fa441827b9a12ba791f86"
+          }
+        ],
+        "deleted_keys": [],
+        "deleted_section_ids": [],
+        "expected_sha256": "f8b412f27b268da47898603051b10d662ae4c9e4798623e14f9976fdc082efa5"
+      },
+      "key": "4814b0b81ffeab5aa5ae0b4112fb5cd93530e64975935e74c8e149bf2be08b0f",
+      "source": "---\ndocument_id: DOC-MEDIA\ntitle: ספריית מדיה\nowner_team: synthetic\nschema_version: 1\n---\n\n<!-- ss:section:SEC-MEDIA -->\n## כותרת בדיקה\n\n\nמחיקה של פריט מציגה הודעת אישור לפני ביצוע.\n\n![פיקסל בדיקה סינתטי](assets/5e3d382db4dd83d59aa5742793ad6b7903409e865c83bcbc54835049f043bc15.png)\n\n[הרשאות](ss:DOC-PERMISSIONS#SEC-PERMISSIONS)\n",
+      "text": "כותרת בדיקה"
+    }
+  },
+  {
+    "model": {
+      "blocks": [
+        {
+          "key": "1c6e16097837c684ccec6a9e0385f860891b19f23a2dbc78d9aa956d41d9d20e",
+          "kind": "heading",
+          "markdown": "## טיפול בהקלטה\n",
+          "prefix": "\n<!-- ss:section:SEC-RECORDINGS -->\n",
+          "protected_reason": null,
+          "section_id": "SEC-RECORDINGS",
+          "source_end_byte": 159,
+          "source_start_byte": 132
+        },
+        {
+          "key": "6f4cee76fbd3c0d29987b337fedf3bdf62a2ff5fcec3072cf3413dd8a8d53b5b",
+          "kind": "paragraph",
+          "markdown": "מְחִיקָה אינה אפשרית בזמן שהקלטה פעילה.\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 233,
+          "source_start_byte": 160
+        },
+        {
+          "key": "49f551db3b8d10d5c93d2f20a232c025a6c9a1d88cf12450d693a64f140f6bd1",
+          "kind": "list",
+          "markdown": "- ניסיון חוזר בודק מחדש את המצב.\n- תוצאה חלקית מפורטת עבור כל פריט.\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 352,
+          "source_start_byte": 234
+        }
+      ],
+      "document_id": "DOC-RECORDINGS",
+      "preamble": "---\ndocument_id: DOC-RECORDINGS\ntitle: הקלטות\nowner_team: synthetic\nschema_version: 1\n---\n",
+      "section_ids": [
+        "SEC-RECORDINGS"
+      ],
+      "sha256": "6f6a3a67af74bd9a2bdbf7b28ad39e3624f617863aff212e02d6ec2d3de592b5",
+      "suffix": ""
+    },
+    "name": "recordings",
+    "rename": {
+      "edit": {
+        "blocks": [
+          {
+            "action": "replace",
+            "key": "1c6e16097837c684ccec6a9e0385f860891b19f23a2dbc78d9aa956d41d9d20e",
+            "markdown": "## כותרת בדיקה\n\n"
+          },
+          {
+            "action": "keep",
+            "key": "6f4cee76fbd3c0d29987b337fedf3bdf62a2ff5fcec3072cf3413dd8a8d53b5b"
+          },
+          {
+            "action": "keep",
+            "key": "49f551db3b8d10d5c93d2f20a232c025a6c9a1d88cf12450d693a64f140f6bd1"
+          }
+        ],
+        "deleted_keys": [],
+        "deleted_section_ids": [],
+        "expected_sha256": "6f6a3a67af74bd9a2bdbf7b28ad39e3624f617863aff212e02d6ec2d3de592b5"
+      },
+      "key": "1c6e16097837c684ccec6a9e0385f860891b19f23a2dbc78d9aa956d41d9d20e",
+      "source": "---\ndocument_id: DOC-RECORDINGS\ntitle: הקלטות\nowner_team: synthetic\nschema_version: 1\n---\n\n<!-- ss:section:SEC-RECORDINGS -->\n## כותרת בדיקה\n\n\nמְחִיקָה אינה אפשרית בזמן שהקלטה פעילה.\n\n- ניסיון חוזר בודק מחדש את המצב.\n- תוצאה חלקית מפורטת עבור כל פריט.\n",
+      "text": "כותרת בדיקה"
+    }
+  },
+  {
+    "model": {
+      "blocks": [
+        {
+          "key": "3f3896f3da03558f7a5a4843e6530f273c1b95ce30732430dd99a0aef2526644",
+          "kind": "heading",
+          "markdown": "## מצבי ניגון\n",
+          "prefix": "\n<!-- ss:section:SEC-PLAYER -->\n",
+          "protected_reason": null,
+          "section_id": "SEC-PLAYER",
+          "source_end_byte": 141,
+          "source_start_byte": 118
+        },
+        {
+          "key": "a5a208890018e349214f5987e8e167018bc5fb52f0a82c61355c92f8f7e9a5ba",
+          "kind": "paragraph",
+          "markdown": "לחצן הפעלה נגיש באמצעות מקלדת. 😀\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 203,
+          "source_start_byte": 142
+        },
+        {
+          "key": "67b8da0c682f63d62da92564722ede10401e24aad44cb776c66b558bcf73b8ad",
+          "kind": "code",
+          "markdown": "```typescript\nconst playbackState = \"paused\";\n```",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 253,
+          "source_start_byte": 204
+        },
+        {
+          "key": "564f6ba22d7c074ec07fd373d1c776ae03e29cf88af8e3f40ff1a48a652d9ec4",
+          "kind": "paragraph",
+          "markdown": "**English text** remains searchable.\n",
+          "prefix": "\n\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 292,
+          "source_start_byte": 255
+        }
+      ],
+      "document_id": "DOC-PLAYER",
+      "preamble": "---\ndocument_id: DOC-PLAYER\ntitle: נגן\nowner_team: synthetic\nschema_version: 1\n---\n",
+      "section_ids": [
+        "SEC-PLAYER"
+      ],
+      "sha256": "96a5622aa6d34b4a2e373b7aed030fa70792a7cb1ea086ad6e4ea4b0fc48ea80",
+      "suffix": ""
+    },
+    "name": "player",
+    "rename": {
+      "edit": {
+        "blocks": [
+          {
+            "action": "replace",
+            "key": "3f3896f3da03558f7a5a4843e6530f273c1b95ce30732430dd99a0aef2526644",
+            "markdown": "## כותרת בדיקה\n\n"
+          },
+          {
+            "action": "keep",
+            "key": "a5a208890018e349214f5987e8e167018bc5fb52f0a82c61355c92f8f7e9a5ba"
+          },
+          {
+            "action": "keep",
+            "key": "67b8da0c682f63d62da92564722ede10401e24aad44cb776c66b558bcf73b8ad"
+          },
+          {
+            "action": "keep",
+            "key": "564f6ba22d7c074ec07fd373d1c776ae03e29cf88af8e3f40ff1a48a652d9ec4"
+          }
+        ],
+        "deleted_keys": [],
+        "deleted_section_ids": [],
+        "expected_sha256": "96a5622aa6d34b4a2e373b7aed030fa70792a7cb1ea086ad6e4ea4b0fc48ea80"
+      },
+      "key": "3f3896f3da03558f7a5a4843e6530f273c1b95ce30732430dd99a0aef2526644",
+      "source": "---\ndocument_id: DOC-PLAYER\ntitle: נגן\nowner_team: synthetic\nschema_version: 1\n---\n\n<!-- ss:section:SEC-PLAYER -->\n## כותרת בדיקה\n\n\nלחצן הפעלה נגיש באמצעות מקלדת. 😀\n\n```typescript\nconst playbackState = \"paused\";\n```\n\n**English text** remains searchable.\n",
+      "text": "כותרת בדיקה"
+    }
+  },
+  {
+    "model": {
+      "blocks": [
+        {
+          "key": "068afc66fb18b7e2f49860c090191a2aadd8effca4327d4fa4fb22d23e07c986",
+          "kind": "heading",
+          "markdown": "## בדיקת התאוששות\n",
+          "prefix": "\n<!-- ss:section:SEC-OPERATIONS -->\n",
+          "protected_reason": null,
+          "section_id": "SEC-OPERATIONS",
+          "source_end_byte": 161,
+          "source_start_byte": 130
+        },
+        {
+          "key": "a1181c90dcf0768eee148473909f1691bcf90ce6461969d386de750aaffd85c6",
+          "kind": "paragraph",
+          "markdown": "פעולת מחיקה מתועדת ביומן אירועים סינתטי.\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 237,
+          "source_start_byte": 162
+        },
+        {
+          "key": "c87b1dc9c0a853b9b5e699827269b3c3b78b2bd263159f6863c6f78abe1f2951",
+          "kind": "quote",
+          "markdown": "> כשל ספק מוצג במפורש, ללא חיווי הצלחה.\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 307,
+          "source_start_byte": 238
+        }
+      ],
+      "document_id": "DOC-OPERATIONS",
+      "preamble": "---\ndocument_id: DOC-OPERATIONS\ntitle: תפעול\nowner_team: synthetic\nschema_version: 1\n---\n",
+      "section_ids": [
+        "SEC-OPERATIONS"
+      ],
+      "sha256": "4bd02a6e2c76d28628f08d5add2dd797448c62c1a60af5835ce2a8e07984c14f",
+      "suffix": ""
+    },
+    "name": "operations",
+    "rename": {
+      "edit": {
+        "blocks": [
+          {
+            "action": "replace",
+            "key": "068afc66fb18b7e2f49860c090191a2aadd8effca4327d4fa4fb22d23e07c986",
+            "markdown": "## כותרת בדיקה\n\n"
+          },
+          {
+            "action": "keep",
+            "key": "a1181c90dcf0768eee148473909f1691bcf90ce6461969d386de750aaffd85c6"
+          },
+          {
+            "action": "keep",
+            "key": "c87b1dc9c0a853b9b5e699827269b3c3b78b2bd263159f6863c6f78abe1f2951"
+          }
+        ],
+        "deleted_keys": [],
+        "deleted_section_ids": [],
+        "expected_sha256": "4bd02a6e2c76d28628f08d5add2dd797448c62c1a60af5835ce2a8e07984c14f"
+      },
+      "key": "068afc66fb18b7e2f49860c090191a2aadd8effca4327d4fa4fb22d23e07c986",
+      "source": "---\ndocument_id: DOC-OPERATIONS\ntitle: תפעול\nowner_team: synthetic\nschema_version: 1\n---\n\n<!-- ss:section:SEC-OPERATIONS -->\n## כותרת בדיקה\n\n\nפעולת מחיקה מתועדת ביומן אירועים סינתטי.\n\n> כשל ספק מוצג במפורש, ללא חיווי הצלחה.\n",
+      "text": "כותרת בדיקה"
+    }
+  },
+  {
+    "model": {
+      "blocks": [
+        {
+          "key": "8070c364cb73ce2d497046f38886655d620aac7e4d4d311eb36a525cc09145ea",
+          "kind": "heading",
+          "markdown": "## Rich editor\n",
+          "prefix": "\n<!-- ss:section:SEC-RICH -->\n",
+          "protected_reason": null,
+          "section_id": "SEC-RICH",
+          "source_end_byte": 161,
+          "source_start_byte": 146
+        },
+        {
+          "key": "83356e4925007dc059f3f594341eede64ac5a8341a069fdd215cc4f3a2caeda3",
+          "kind": "paragraph",
+          "markdown": "Hebrew שָׁלוֹם __bold__ *italic* ~~strike~~ [reference][target].\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 234,
+          "source_start_byte": 162
+        },
+        {
+          "key": "a1e17a438c8baf5fed9aa3de5599144749ee86a607be2066d8942f3443d4087d",
+          "kind": "list",
+          "markdown": "- [x] task\n- [ ] incomplete\n\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 264,
+          "source_start_byte": 235
+        },
+        {
+          "key": "b5d3c571b43831a56cf4923d6e09f56511d1be622d94f24669bc7d88062b0443",
+          "kind": "quote",
+          "markdown": "> <!-- ss:section:SEC-NESTED -->\n> ### Nested\n>\n> Quote with `code`\n",
+          "prefix": "",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 332,
+          "source_start_byte": 264
+        },
+        {
+          "key": "0fc85360970ee3598380ef2b8769e0f351783477b3d809fb79c30eac9273680b",
+          "kind": "code",
+          "markdown": "~~~rust\nlet value = \"```\";\n~~~",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 363,
+          "source_start_byte": 333
+        },
+        {
+          "key": "dc749bcd979c1361f10a4b876520c58fb252d5d703855a9b00c279ba7cf8b533",
+          "kind": "table",
+          "markdown": "| Left | Right |\n| :--- | ---: |\n| a \\| b | **text** |\n",
+          "prefix": "\n\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 420,
+          "source_start_byte": 365
+        },
+        {
+          "key": "f99a1808c8dd8433ecf400b71e93c5ba6076c6d7c74161f1d051f8d645c8d356",
+          "kind": "paragraph",
+          "markdown": "![תמונה](assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png)\n",
+          "prefix": "\n",
+          "protected_reason": null,
+          "section_id": null,
+          "source_end_byte": 512,
+          "source_start_byte": 421
+        },
+        {
+          "key": "b350e6e7c9e3afd45b69240b0f637aaaab28f70dd673625f19f2f20c7387a3ab",
+          "kind": "protected",
+          "markdown": "<script>protected()</script>\n",
+          "prefix": "\n",
+          "protected_reason": "UNSUPPORTED_EDITOR_BLOCK",
+          "section_id": null,
+          "source_end_byte": 542,
+          "source_start_byte": 513
+        },
+        {
+          "key": "33f67186ee1d2bdb5412c69b86bfc4326fe5336d4b75291e3ff088bff4877c2f",
+          "kind": "protected",
+          "markdown": "\n[target]: https://example.test/path \"reference title\"\n",
+          "prefix": "",
+          "protected_reason": "UNSUPPORTED_EDITOR_BLOCK",
+          "section_id": null,
+          "source_end_byte": 597,
+          "source_start_byte": 542
+        }
+      ],
+      "document_id": "DOC-RICH",
+      "preamble": "---\ndocument_id: DOC-RICH\ntitle: Rich editor\nowner_team: synthetic\nschema_version: 1\nextra: [preserved, values]\n---\n",
+      "section_ids": [
+        "SEC-RICH",
+        "SEC-NESTED"
+      ],
+      "sha256": "48a6515129d1b19d8c5af180ea6ef10d3de4aeca7d0cde9802ef06d6c6f39501",
+      "suffix": ""
+    },
+    "name": "gfm-protected",
+    "rename": {
+      "edit": {
+        "blocks": [
+          {
+            "action": "replace",
+            "key": "8070c364cb73ce2d497046f38886655d620aac7e4d4d311eb36a525cc09145ea",
+            "markdown": "## כותרת בדיקה\n\n"
+          },
+          {
+            "action": "keep",
+            "key": "83356e4925007dc059f3f594341eede64ac5a8341a069fdd215cc4f3a2caeda3"
+          },
+          {
+            "action": "keep",
+            "key": "a1e17a438c8baf5fed9aa3de5599144749ee86a607be2066d8942f3443d4087d"
+          },
+          {
+            "action": "keep",
+            "key": "b5d3c571b43831a56cf4923d6e09f56511d1be622d94f24669bc7d88062b0443"
+          },
+          {
+            "action": "keep",
+            "key": "0fc85360970ee3598380ef2b8769e0f351783477b3d809fb79c30eac9273680b"
+          },
+          {
+            "action": "keep",
+            "key": "dc749bcd979c1361f10a4b876520c58fb252d5d703855a9b00c279ba7cf8b533"
+          },
+          {
+            "action": "keep",
+            "key": "f99a1808c8dd8433ecf400b71e93c5ba6076c6d7c74161f1d051f8d645c8d356"
+          },
+          {
+            "action": "keep",
+            "key": "b350e6e7c9e3afd45b69240b0f637aaaab28f70dd673625f19f2f20c7387a3ab"
+          },
+          {
+            "action": "keep",
+            "key": "33f67186ee1d2bdb5412c69b86bfc4326fe5336d4b75291e3ff088bff4877c2f"
+          }
+        ],
+        "deleted_keys": [],
+        "deleted_section_ids": [],
+        "expected_sha256": "48a6515129d1b19d8c5af180ea6ef10d3de4aeca7d0cde9802ef06d6c6f39501"
+      },
+      "key": "8070c364cb73ce2d497046f38886655d620aac7e4d4d311eb36a525cc09145ea",
+      "source": "---\ndocument_id: DOC-RICH\ntitle: Rich editor\nowner_team: synthetic\nschema_version: 1\nextra: [preserved, values]\n---\n\n<!-- ss:section:SEC-RICH -->\n## כותרת בדיקה\n\n\nHebrew שָׁלוֹם __bold__ *italic* ~~strike~~ [reference][target].\n\n- [x] task\n- [ ] incomplete\n\n> <!-- ss:section:SEC-NESTED -->\n> ### Nested\n>\n> Quote with `code`\n\n~~~rust\nlet value = \"```\";\n~~~\n\n| Left | Right |\n| :--- | ---: |\n| a \\| b | **text** |\n\n![תמונה](assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png)\n\n<script>protected()</script>\n\n[target]: https://example.test/path \"reference title\"\n",
+      "text": "כותרת בדיקה"
+    }
+  }
+]

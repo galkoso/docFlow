@@ -553,3 +553,19 @@ Checkboxes represent verified work only.
   creation models have optional OpenAPI support; the exported contract and
   generated TypeScript types are updated, and Angular builds successfully.
   Proposal browsing/detail/context endpoints and the creation UI follow next.
+
+- Proposal browsing/detail APIs: scoped GET /proposals supports literal title/ref
+  search, status/team/owner/repository filters and bounded keyset pagination.
+  Cursors bind actor, filters, limit and exact timestamp/UUID order; foreign
+  repositories are hidden. GET /proposals/:id exposes recorded versions, metadata,
+  current capabilities and separate live Git observations. Missing/moved refs,
+  provider failures and outdated targets do not overwrite recorded head/base or
+  change workflow state; scope and capabilities reload after provider awaits.
+  GET /proposals/options provides bounded current repository/team/eligible-owner
+  choices without provider configuration. Equal base/head gives exact zero
+  change counts; other counts remain unknown until the diff stage computes them.
+  Three new HTTP scenarios cover tied-timestamp pagination, cursor/filter/actor
+  mismatch, literal metacharacters, scope, collaborator permissions, provider
+  changes, closed branches, revocation and eligible choices. All nine proposal
+  API scenarios, the remaining API tests and workspace Clippy pass. OpenAPI and
+  generated client types are updated; proposal list/detail UI follows separately.

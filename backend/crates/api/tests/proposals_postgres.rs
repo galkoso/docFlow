@@ -522,3 +522,286 @@ async fn index_job_status_uses_snapshot_scope_and_reports_real_worker_phase(pool
     assert_eq!(ready["phase"], "READY");
     assert!(ready["creation"].is_null());
 }
+
+async fn colleague(pool: &PgPool, existing: &User, role: &str) -> User {
+    let actor = Uuid::new_v4();
+    sqlx::query("INSERT INTO users(id,issuer,external_subject,display_name) VALUES($1,'fixture',$1::text,'Synthetic colleague')").bind(actor).execute(pool).await.unwrap();
+    sqlx::query("INSERT INTO memberships(organization_id,user_id,role) SELECT organization_id,$2,$3 FROM repositories WHERE id=$1").bind(existing.repository).bind(actor).bind(role).execute(pool).await.unwrap();
+    let credentials = SessionStore::new(pool.clone())
+        .mint(actor, 3600)
+        .await
+        .unwrap();
+    User {
+        actor,
+        repository: existing.repository,
+        team: existing.team,
+        token: credentials.session_cookie_value().into(),
+        csrf: credentials.csrf_cookie_value().into(),
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn proposal_list_filters_and_cursors_preserve_scope_order_and_literal_queries(pool: PgPool) {
+    let actor = user(&pool, "CONTRIBUTOR").await;
+    let foreign = user(&pool, "ADMIN").await;
+    let reader = colleague(&pool, &actor, "READER").await;
+    let (app, provider, _) = app(&pool, &actor);
+    let mut ids = vec![];
+    for (index, title) in ["Alpha literal%", "Beta הצעה", "Gamma הצעה"]
+        .into_iter()
+        .enumerate()
+    {
+        let mut body = input(&actor);
+        body["branch"] = format!("change/{index}-browse").into();
+        body["title"] = title.into();
+        let (status, ticket) = create(&app, &actor, &body, &format!("browse-{index}")).await;
+        assert_eq!(status, StatusCode::ACCEPTED);
+        ids.push(ticket["proposal_id"].clone());
+    }
+    sqlx::query("UPDATE proposals SET updated_at='2026-11-15T00:00:00.123456Z'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let foreign_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO proposals(id,organization_id,repository_id,title,branch,owner_id,author_id,team_id,description,ui_impact) SELECT $1,r.organization_id,r.id,'Private foreign','change/foreign',$3,$3,$4,'Private foreign description','UNDECIDED' FROM repositories r WHERE r.id=$2")
+        .bind(foreign_id).bind(foreign.repository).bind(foreign.actor).bind(foreign.team).execute(&pool).await.unwrap();
+    let reads = provider.reads.load(Ordering::SeqCst);
+    let (status, first) = get(&app, &actor, "/api/v1/proposals?limit=2").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(first["proposals"].as_array().unwrap().len(), 2);
+    assert!(first["proposals"][0]["head_sha"].is_null());
+    assert!(first["proposals"][0]["changed_documents"].is_null());
+    let cursor = first["next_cursor"].as_str().unwrap();
+    let (status, last) = get(
+        &app,
+        &actor,
+        &format!("/api/v1/proposals?limit=2&cursor={cursor}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(last["proposals"].as_array().unwrap().len(), 1);
+    assert!(last["next_cursor"].is_null());
+    let mut seen: Vec<_> = first["proposals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(last["proposals"].as_array().unwrap())
+        .map(|row| row["proposal_id"].clone())
+        .collect();
+    seen.sort_by_key(|value| value.as_str().unwrap().to_owned());
+    ids.sort_by_key(|value| value.as_str().unwrap().to_owned());
+    assert_eq!(seen, ids);
+    for suffix in ["limit=1", "limit=2&q=Beta", "limit=2&state=DRAFT"] {
+        assert_eq!(
+            get(
+                &app,
+                &actor,
+                &format!("/api/v1/proposals?{suffix}&cursor={cursor}")
+            )
+            .await
+            .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    assert_eq!(
+        get(
+            &app,
+            &reader,
+            &format!("/api/v1/proposals?limit=2&cursor={cursor}")
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    for query in ["limit=0", "limit=201", "state=INVALID", "cursor=bad"] {
+        assert_eq!(
+            get(&app, &actor, &format!("/api/v1/proposals?{query}"))
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    for (query, count) in [("q=ALPHA", 1), ("q=%25", 1), ("q=_", 0), ("state=DRAFT", 0)] {
+        let (status, page) = get(&app, &actor, &format!("/api/v1/proposals?{query}")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(page["proposals"].as_array().unwrap().len(), count);
+    }
+    let (_, page) = get(
+        &app,
+        &actor,
+        &format!(
+            "/api/v1/proposals?owner_id={}&team_id={}&repository_id={}",
+            actor.actor, actor.team, actor.repository
+        ),
+    )
+    .await;
+    assert_eq!(page["proposals"].as_array().unwrap().len(), 3);
+    assert_eq!(
+        get(
+            &app,
+            &actor,
+            &format!("/api/v1/proposals?repository_id={}", foreign.repository)
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        get(&app, &actor, &format!("/api/v1/proposals/{foreign_id}"))
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        provider.reads.load(Ordering::SeqCst),
+        reads,
+        "list and denied reads must not consult Git"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn proposal_detail_keeps_recorded_versions_while_reporting_provider_changes(pool: PgPool) {
+    let actor = user(&pool, "CONTRIBUTOR").await;
+    let reader = colleague(&pool, &actor, "READER").await;
+    let editor = colleague(&pool, &actor, "CONTRIBUTOR").await;
+    let (app, provider, worker) = app(&pool, &actor);
+    let (_, ticket) = create(&app, &actor, &input(&actor), "detail").await;
+    let id = ticket["proposal_id"].as_str().unwrap();
+    let uri = format!("/api/v1/proposals/{id}");
+    let reads = provider.reads.load(Ordering::SeqCst);
+    let (_, pending) = get(&app, &actor, &uri).await;
+    assert_eq!(pending["synchronization"]["state"], "provisioning");
+    assert_eq!(pending["capabilities"]["can_edit"], false);
+    assert_eq!(pending["creation_job_id"], ticket["job_id"]);
+    assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
+    assert!(matches!(
+        worker.run_once().await.unwrap(),
+        ProvisionWork::Completed(_)
+    ));
+    let (status, ready) = get(&app, &actor, &uri).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(ready["state"], "DRAFT");
+    assert_eq!(ready["head_sha"], OLD);
+    assert_eq!(ready["changed_documents"], 0);
+    assert_eq!(ready["capabilities"]["can_edit"], true);
+    assert_eq!(ready["synchronization"]["state"], "in_sync");
+    assert_eq!(ready["synchronization"]["base_outdated"], false);
+    assert_eq!(ready["links"][0]["kind"], "ticket");
+    assert_eq!(
+        get(&app, &reader, &uri).await.1["capabilities"]["can_edit"],
+        false
+    );
+    assert_eq!(
+        get(&app, &editor, &uri).await.1["capabilities"]["can_edit"],
+        false
+    );
+    sqlx::query("INSERT INTO proposal_collaborators(organization_id,proposal_id,user_id,access) SELECT organization_id,id,$2,'EDIT' FROM proposals WHERE id=$1").bind(Uuid::parse_str(id).unwrap()).bind(editor.actor).execute(&pool).await.unwrap();
+    assert_eq!(
+        get(&app, &editor, &uri).await.1["capabilities"]["can_edit"],
+        true
+    );
+    provider.main.store(1, Ordering::SeqCst);
+    let (_, outdated) = get(&app, &actor, &uri).await;
+    assert_eq!(outdated["synchronization"]["base_outdated"], true);
+    assert_eq!(outdated["synchronization"]["current_main_sha"], NEW);
+    assert_eq!(outdated["target_sha"], OLD);
+    provider.refs.lock().unwrap().insert(
+        "change/25-new-proposal".into(),
+        CommitSha::parse(NEW).unwrap(),
+    );
+    let (_, moved) = get(&app, &actor, &uri).await;
+    assert_eq!(moved["synchronization"]["state"], "head_moved");
+    assert_eq!(moved["synchronization"]["actual_head_sha"], NEW);
+    assert_eq!(moved["head_sha"], OLD);
+    provider.online.store(false, Ordering::SeqCst);
+    let (status, unavailable) = get(&app, &actor, &uri).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        unavailable["synchronization"]["state"],
+        "provider_unavailable"
+    );
+    assert!(unavailable["synchronization"]["actual_head_sha"].is_null());
+    assert_eq!(unavailable["head_sha"], OLD);
+    assert_eq!(unavailable["state"], "DRAFT");
+    provider.online.store(true, Ordering::SeqCst);
+    provider.refs.lock().unwrap().clear();
+    assert_eq!(
+        get(&app, &actor, &uri).await.1["synchronization"]["state"],
+        "provider_missing"
+    );
+    sqlx::query("UPDATE proposals SET state='CLOSED' WHERE id=$1")
+        .bind(Uuid::parse_str(id).unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE memberships SET role='MAINTAINER' WHERE user_id=$1")
+        .bind(actor.actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, closed) = get(&app, &actor, &uri).await;
+    assert_eq!(closed["capabilities"]["can_edit"], false);
+    assert_eq!(closed["capabilities"]["can_reopen"], false);
+    provider.refs.lock().unwrap().insert(
+        "change/25-new-proposal".into(),
+        CommitSha::parse(OLD).unwrap(),
+    );
+    assert_eq!(
+        get(&app, &actor, &uri).await.1["capabilities"]["can_reopen"],
+        true
+    );
+    *provider.revoke.lock().unwrap() = Some((pool.clone(), actor.actor));
+    assert_eq!(get(&app, &actor, &uri).await.0, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn proposal_choices_include_only_current_scoped_teams_and_eligible_owners(pool: PgPool) {
+    let actor = user(&pool, "CONTRIBUTOR").await;
+    let reader = colleague(&pool, &actor, "READER").await;
+    let editor = colleague(&pool, &actor, "CONTRIBUTOR").await;
+    let foreign = user(&pool, "ADMIN").await;
+    let (app, provider, _) = app(&pool, &actor);
+    let (status, options) = get(&app, &actor, "/api/v1/proposals/options").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(options["repositories"].as_array().unwrap().len(), 1);
+    assert_eq!(options["repositories"][0]["can_create"], true);
+    assert_eq!(options["teams"][0]["team_id"], actor.team.to_string());
+    let owners = options["owners"].as_array().unwrap();
+    assert_eq!(owners.len(), 2);
+    assert!(
+        owners
+            .iter()
+            .all(|owner| owner["owner_id"] != reader.actor.to_string()
+                && owner["owner_id"] != foreign.actor.to_string())
+    );
+    assert_eq!(
+        get(&app, &reader, "/api/v1/proposals/options").await.1["repositories"][0]["can_create"],
+        false
+    );
+    assert_eq!(
+        get(
+            &app,
+            &actor,
+            &format!(
+                "/api/v1/proposals/options?repository_id={}",
+                foreign.repository
+            )
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
+        .bind(editor.actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&app, &actor, "/api/v1/proposals/options").await.1["owners"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(provider.reads.load(Ordering::SeqCst), 0);
+}

@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod contract;
+pub mod proposal_reads;
 pub mod proposals;
 pub mod specification;
 
@@ -258,7 +259,7 @@ mod tests {
         let response = app()
             .oneshot(
                 Request::builder()
-                    .uri("/api/v1/proposals/unknown")
+                    .uri("/api/v1/unrecognized")
                     .body(Body::empty())
                     .unwrap(),
             )

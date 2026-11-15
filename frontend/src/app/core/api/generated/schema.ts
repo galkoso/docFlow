@@ -143,9 +143,41 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["list"];
         put?: never;
         post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["detail"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -379,6 +411,12 @@ export interface components {
             review_domains: string[];
             role: string;
         };
+        OwnerChoice: {
+            display_name: string;
+            /** Format: uuid */
+            owner_id: string;
+            repository_ids: string[];
+        };
         /** Format: binary */
         PngDisplay: string;
         Profile: {
@@ -395,9 +433,77 @@ export interface components {
             read_specification: boolean;
             review: boolean;
         };
+        ProposalCapabilities: {
+            can_close: boolean;
+            can_edit: boolean;
+            can_reopen: boolean;
+        };
+        ProposalChoices: {
+            owners: components["schemas"]["OwnerChoice"][];
+            repositories: components["schemas"]["RepositoryChoice"][];
+            teams: components["schemas"]["TeamChoice"][];
+        };
+        ProposalDetail: components["schemas"]["ProposalSummary"] & {
+            /** Format: uuid */
+            author_id: string;
+            capabilities: components["schemas"]["ProposalCapabilities"];
+            description: string;
+            initial_mode: components["schemas"]["InitialMode"];
+            links: components["schemas"]["ProposalLink"][];
+            synchronization: components["schemas"]["ProposalSync"];
+            ui_impact: components["schemas"]["UiImpact"];
+            ui_impact_reason?: string | null;
+        };
         ProposalLink: {
             kind: components["schemas"]["LinkKind"];
             url: string;
+        };
+        ProposalPage: {
+            next_cursor?: string | null;
+            proposals: components["schemas"]["ProposalSummary"][];
+        };
+        ProposalSummary: {
+            base_sha?: string | null;
+            branch: string;
+            /**
+             * Format: int64
+             * @description Unknown until an actual diff has been computed; equal base/head is exactly zero.
+             */
+            changed_documents?: number | null;
+            /** Format: int64 */
+            changed_sections?: number | null;
+            creation_error_code?: string | null;
+            /** Format: uuid */
+            creation_job_id?: string | null;
+            head_sha?: string | null;
+            /** Format: int64 */
+            number: number;
+            /** Format: uuid */
+            owner_id: string;
+            owner_name: string;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: uuid */
+            repository_id: string;
+            state: string;
+            target_branch: string;
+            target_sha?: string | null;
+            /** Format: uuid */
+            team_id: string;
+            team_name: string;
+            title: string;
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        ProposalSync: {
+            actual_head_sha?: string | null;
+            base_outdated?: boolean | null;
+            current_main_sha?: string | null;
+            main_error_code?: string | null;
+            /** Format: int64 */
+            retry_after_seconds?: number | null;
+            state: components["schemas"]["SyncState"];
         };
         ReadFinding: {
             code: string;
@@ -429,6 +535,12 @@ export interface components {
         RenderKind: "open" | "close" | "text" | "break" | "rule" | "image" | "unsupported" | "task_marker";
         /** @enum {string} */
         RenderTag: "paragraph" | "heading" | "quote" | "list" | "item" | "table" | "table_head" | "table_row" | "table_cell" | "emphasis" | "strong" | "strike" | "code_block" | "inline_code" | "link";
+        RepositoryChoice: {
+            can_create: boolean;
+            default_branch: string;
+            /** Format: uuid */
+            repository_id: string;
+        };
         RepositoryList: {
             repositories: components["schemas"]["RepositorySummary"][];
         };
@@ -472,6 +584,14 @@ export interface components {
             snapshot_sha: string;
             updated_at: string;
             version_selected: boolean;
+        };
+        /** @enum {string} */
+        SyncState: "provisioning" | "in_sync" | "head_moved" | "provider_missing" | "provider_unavailable" | "not_configured";
+        TeamChoice: {
+            name: string;
+            repository_ids: string[];
+            /** Format: uuid */
+            team_id: string;
         };
         /** @enum {string} */
         UiImpact: "yes" | "no" | "undecided";
@@ -761,6 +881,65 @@ export interface operations {
             };
         };
     };
+    list: {
+        parameters: {
+            query?: {
+                repository_id?: string;
+                state?: string;
+                team_id?: string;
+                owner_id?: string;
+                q?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalPage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     create: {
         parameters: {
             query?: never;
@@ -846,6 +1025,120 @@ export interface operations {
                 };
             };
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    options: {
+        parameters: {
+            query?: {
+                repository_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalChoices"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

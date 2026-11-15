@@ -20,9 +20,19 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route(
             "/api/v1/proposals",
-            post(create).layer(DefaultBodyLimit::max(128 * 1024)),
+            post(create)
+                .get(crate::proposal_reads::list)
+                .layer(DefaultBodyLimit::max(128 * 1024)),
         )
         .route("/api/v1/jobs/{job}", get(job_status))
+        .route(
+            "/api/v1/proposals/options",
+            get(crate::proposal_reads::options),
+        )
+        .route(
+            "/api/v1/proposals/{proposal}",
+            get(crate::proposal_reads::detail),
+        )
 }
 
 #[derive(Serialize, utoipa::ToSchema)]

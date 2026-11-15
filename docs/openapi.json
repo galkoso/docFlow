@@ -339,6 +339,129 @@
       }
     },
     "/api/v1/proposals": {
+      "get": {
+        "tags": [
+          "crate::proposal_reads"
+        ],
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "repository_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
       "post": {
         "tags": [
           "crate::proposals"
@@ -463,6 +586,157 @@
             }
           },
           "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/options": {
+      "get": {
+        "tags": [
+          "crate::proposal_reads"
+        ],
+        "operationId": "options",
+        "parameters": [
+          {
+            "name": "repository_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalChoices"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}": {
+      "get": {
+        "tags": [
+          "crate::proposal_reads"
+        ],
+        "operationId": "detail",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/json": {
                 "schema": {
@@ -1631,6 +1905,30 @@
           }
         }
       },
+      "OwnerChoice": {
+        "type": "object",
+        "required": [
+          "owner_id",
+          "display_name",
+          "repository_ids"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "repository_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "PngDisplay": {
         "type": "string",
         "format": "binary"
@@ -1689,6 +1987,105 @@
           }
         }
       },
+      "ProposalCapabilities": {
+        "type": "object",
+        "required": [
+          "can_edit",
+          "can_close",
+          "can_reopen"
+        ],
+        "properties": {
+          "can_close": {
+            "type": "boolean"
+          },
+          "can_edit": {
+            "type": "boolean"
+          },
+          "can_reopen": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProposalChoices": {
+        "type": "object",
+        "required": [
+          "repositories",
+          "teams",
+          "owners"
+        ],
+        "properties": {
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerChoice"
+            }
+          },
+          "repositories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepositoryChoice"
+            }
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamChoice"
+            }
+          }
+        }
+      },
+      "ProposalDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProposalSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "description",
+              "author_id",
+              "initial_mode",
+              "ui_impact",
+              "links",
+              "capabilities",
+              "synchronization"
+            ],
+            "properties": {
+              "author_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "capabilities": {
+                "$ref": "#/components/schemas/ProposalCapabilities"
+              },
+              "description": {
+                "type": "string"
+              },
+              "initial_mode": {
+                "$ref": "#/components/schemas/InitialMode"
+              },
+              "links": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ProposalLink"
+                }
+              },
+              "synchronization": {
+                "$ref": "#/components/schemas/ProposalSync"
+              },
+              "ui_impact": {
+                "$ref": "#/components/schemas/UiImpact"
+              },
+              "ui_impact_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
       "ProposalLink": {
         "type": "object",
         "required": [
@@ -1704,6 +2101,180 @@
           }
         },
         "additionalProperties": false
+      },
+      "ProposalPage": {
+        "type": "object",
+        "required": [
+          "proposals"
+        ],
+        "properties": {
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposalSummary"
+            }
+          }
+        }
+      },
+      "ProposalSummary": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "number",
+          "repository_id",
+          "title",
+          "branch",
+          "state",
+          "owner_id",
+          "owner_name",
+          "team_id",
+          "team_name",
+          "version",
+          "target_branch",
+          "updated_at"
+        ],
+        "properties": {
+          "base_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "branch": {
+            "type": "string"
+          },
+          "changed_documents": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Unknown until an actual diff has been computed; equal base/head is exactly zero."
+          },
+          "changed_sections": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "creation_error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "creation_job_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "head_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_name": {
+            "type": "string"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "target_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "team_name": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ProposalSync": {
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "actual_head_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "base_outdated": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "current_main_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "main_error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retry_after_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "state": {
+            "$ref": "#/components/schemas/SyncState"
+          }
+        }
       },
       "ReadFinding": {
         "type": "object",
@@ -1869,6 +2440,26 @@
           "inline_code",
           "link"
         ]
+      },
+      "RepositoryChoice": {
+        "type": "object",
+        "required": [
+          "repository_id",
+          "default_branch",
+          "can_create"
+        ],
+        "properties": {
+          "can_create": {
+            "type": "boolean"
+          },
+          "default_branch": {
+            "type": "string"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       },
       "RepositoryList": {
         "type": "object",
@@ -2042,6 +2633,41 @@
           },
           "version_selected": {
             "type": "boolean"
+          }
+        }
+      },
+      "SyncState": {
+        "type": "string",
+        "enum": [
+          "provisioning",
+          "in_sync",
+          "head_moved",
+          "provider_missing",
+          "provider_unavailable",
+          "not_configured"
+        ]
+      },
+      "TeamChoice": {
+        "type": "object",
+        "required": [
+          "team_id",
+          "name",
+          "repository_ids"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "repository_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },

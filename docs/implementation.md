@@ -705,3 +705,19 @@ Checkboxes represent verified work only.
   scenarios; workspace Clippy passes. A configured recovery policy now requires
   PostgreSQL availability at startup, documented in README. No content, buffer
   versions or migration checksums are rewritten by expiry maintenance.
+
+- Editor source boundary: document-engine now exposes a bounded lossless block
+  model and assembler. Retained blocks preserve raw Markdown, unknown YAML,
+  heading markers, code fences, link definitions and image paths. Unsupported
+  source becomes protected atoms; rich edits cannot silently replace/delete it.
+  Full ordered requests require explicit block and section deletions, enforce
+  source-hash identity, preserve renamed/moved heading IDs, reject duplicate IDs
+  including nested headings, and reparse to detect consumed neighbor boundaries.
+  Removed IDs are returned for the later repository reference validator. Eight
+  engine scenarios cover the six repository fixtures, all supported block kinds,
+  nested IDs, protected source, partial/stale/duplicate requests, moves/deletions,
+  UTF-8/Hebrew preservation and the 10,000-block/2MiB limits. This is the server
+  source-preservation foundation; rich browser editing, repository reference
+  validation and atomic Git persistence remain required. The protocol and its
+  limits are recorded in editor-source-model.md.
+  All 34 document-engine tests and workspace Clippy pass.

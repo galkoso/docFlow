@@ -1,5 +1,6 @@
 //! Commit-pinned document processing. Search consumes visible blocks, never HTML.
 pub mod catalog;
+pub mod editing;
 pub mod find;
 pub mod index;
 pub mod markdown;

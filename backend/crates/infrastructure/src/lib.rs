@@ -4,6 +4,7 @@ pub mod github_source;
 pub mod index_worker;
 pub mod login_flows;
 pub mod oidc;
+pub mod proposals;
 pub mod search_index;
 pub mod secrets;
 pub mod sessions;

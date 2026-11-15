@@ -37,5 +37,9 @@ required-features = ["postgres-tests"]
 name = "search_postgres"
 required-features = ["postgres-tests"]
 
+[[test]]
+name = "proposals_postgres"
+required-features = ["postgres-tests"]
+
 [lints]
 workspace = true

@@ -491,3 +491,17 @@ Checkboxes represent verified work only.
   owner equivalence and intent changes. Application/infrastructure tests and
   workspace Clippy pass. This is the creation model; API and Git provisioning
   are not exposed by this commit.
+
+- Atomic proposal reservation: an additive migration records initial navigation
+  mode and typed links, and enforces one CREATE journal/job per proposal.
+  PgProposals rechecks active actor/owner eligibility and same-organization team
+  scope, serializes idempotency keys and atomically writes PROVISIONING identity,
+  permanent case-folded branch reservation, CREATE operation, queued provisioning
+  job, audit and outbox event. Same-intent replay returns the original ticket;
+  changed intent conflicts without additional work. No provider call occurs
+  inside the transaction and no Git success is implied by reservation. Three
+  PostgreSQL scenarios prove concurrent replay, collision rollback, permanent
+  reservation after closure and scope/revocation checks. Application and all
+  infrastructure tests, API compatibility tests and workspace Clippy pass; the
+  migration is applied locally. Provisioning execution, API endpoints and UI
+  remain the next layer.

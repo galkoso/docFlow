@@ -635,3 +635,22 @@ Checkboxes represent verified work only.
   records, no provider reads during provisioning and the eventual verified head.
   All 17 infrastructure and 10 API proposal scenarios pass; workspace Clippy
   passes. This preserves source-version visibility without claiming completion.
+
+- Private proposal reader API: proposal-scoped specification, document, literal
+  find, visible-highlight and raster-display routes read the recorded head or a
+  proven ancestor. They preserve closed/missing-ref history, reject arbitrary
+  commits and return an explicit preparation conflict before a verified head
+  exists. Current membership and recorded scope are checked before reads, after
+  waits and before publishing CPU/provider results, including cache hits. A
+  separate four-snapshot cache never feeds approved-book provenance or indexing;
+  proposal search computes the complete pinned snapshot without enqueueing main
+  jobs. Three HTTP/PostgreSQL scenarios cover cross-proposal cursor boundaries,
+  private/main isolation, pinned content/history, changed anchors, pending/closed
+  states, membership loss and image-read revocation. Full workspace tests and
+  Clippy pass; OpenAPI and generated client types include all five routes.
+  The continuous proposal UI follows separately. Proposal search performance at
+  the maximum book size is not yet measured; the approved-book benchmark remains
+  separate evidence.
+  Unique OpenAPI operation IDs have a regression assertion after generated
+  client compilation exposed a naming collision. Angular build and all 46
+  existing frontend tests pass against the regenerated contract.

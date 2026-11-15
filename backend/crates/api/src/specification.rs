@@ -181,7 +181,7 @@ fn query_hash(query: &str) -> String {
     format!("{:x}", Sha256::digest(query.as_bytes()))
 }
 
-fn offset(
+pub(crate) fn offset(
     cursor: Option<&str>,
     repository: Uuid,
     commit: &CommitSha,
@@ -206,7 +206,7 @@ fn offset(
     Ok(cursor.offset)
 }
 
-fn next_cursor(
+pub(crate) fn next_cursor(
     repository: Uuid,
     commit: &str,
     query: &str,
@@ -315,6 +315,12 @@ pub(crate) fn failure(error: BookError) -> Response {
             "לא ניתן לחפש בגרסה זו עד לתיקון בעיות המבנה באפיון.",
             false,
         ),
+        BookError::ProposalNotReady => (
+            StatusCode::CONFLICT,
+            "PROPOSAL_NOT_READY",
+            "ענף ההצעה עדיין אינו מאומת. יש לבדוק את מצב ההכנה.",
+            false,
+        ),
         BookError::InvalidQuery(code) => (
             StatusCode::BAD_REQUEST,
             code,
@@ -391,7 +397,11 @@ pub(crate) async fn repositories(State(state): State<AppState>, headers: HeaderM
     }
 }
 
-fn metadata(repository_id: Uuid, book: &BookSnapshot, version_selected: bool) -> Specification {
+pub(crate) fn metadata(
+    repository_id: Uuid,
+    book: &BookSnapshot,
+    version_selected: bool,
+) -> Specification {
     Specification {
         branch: "main".into(),
         repository_id,
@@ -523,7 +533,7 @@ pub(crate) async fn document(
     }
 }
 
-fn render_document(book: &BookSnapshot, document: &str) -> Result<Response, BookError> {
+pub(crate) fn render_document(book: &BookSnapshot, document: &str) -> Result<Response, BookError> {
     let matching: Vec<_> = book
         .documents
         .iter()

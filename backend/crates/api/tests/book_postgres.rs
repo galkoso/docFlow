@@ -268,6 +268,215 @@ fn highlight(repository: Uuid, commit: &str, document: &str, windows: serde_json
     )
 }
 
+async fn proposal(pool: &PgPool, actor: Uuid, repository: Uuid, head: Option<&str>) -> Uuid {
+    let id = Uuid::new_v4();
+    let team = Uuid::new_v4();
+    sqlx::query("INSERT INTO teams(id,organization_id,name) SELECT $1,organization_id,$1::text FROM repositories WHERE id=$2")
+        .bind(team).bind(repository).execute(pool).await.unwrap();
+    sqlx::query("INSERT INTO proposals(id,organization_id,repository_id,title,branch,owner_id,author_id,team_id,description,ui_impact,state,base_sha,head_sha,target_sha) SELECT $1,organization_id,id,'Synthetic proposal',$3,$4,$4,$5,'Synthetic read-only proposal','UNDECIDED',CASE WHEN $6::text IS NULL THEN 'PROVISIONING' ELSE 'DRAFT' END,$7,$6,$7 FROM repositories WHERE id=$2")
+        .bind(id).bind(repository).bind(format!("change/{id}")).bind(actor).bind(team).bind(head).bind(OLD).execute(pool).await.unwrap();
+    id
+}
+
+fn proposal_uri(uri: String, repository: Uuid, proposal: Uuid) -> String {
+    uri.replace(
+        &format!("repositories/{repository}"),
+        &format!("proposals/{proposal}"),
+    )
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn proposal_book_keeps_private_versions_search_and_cache_out_of_main(pool: PgPool) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    let private = proposal(&pool, actor, repository, Some(NEW)).await;
+    let other = proposal(&pool, actor, repository, Some(NEW)).await;
+    let (app, provider, _) = fixture(&pool);
+    let (status, book) = get(
+        &app,
+        &token,
+        &format!("/api/v1/proposals/{private}/specification"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(book["branch"], format!("change/{private}"));
+    assert_eq!(book["repository_id"], repository.to_string());
+    assert_eq!(book["snapshot_sha"], NEW);
+    assert_eq!(book["version_selected"], false);
+    assert_eq!(book["documents"].as_array().unwrap().len(), 6);
+    let doc_uri = format!("/api/v1/proposals/{private}/documents/DOC-PERMISSIONS?commit={NEW}");
+    let reads = provider.reads.load(Ordering::SeqCst);
+    let (status, document) = get(&app, &token, &doc_uri).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(document["snapshot_sha"], NEW);
+    assert!(document["markdown"].as_str().unwrap().contains("צפייה"));
+    assert!(!document["markdown"].as_str().unwrap().contains("מחיקה"));
+    assert_eq!(
+        provider.reads.load(Ordering::SeqCst),
+        reads,
+        "authorized proposal cache reused"
+    );
+    let (status, found) = get(
+        &app,
+        &token,
+        &proposal_uri(search(repository, NEW, None), repository, private),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(found["total_matches"].as_u64().unwrap() < 4);
+    let cursor = found["next_cursor"].as_str().unwrap();
+    let (status, _) = get(
+        &app,
+        &token,
+        &proposal_uri(search(repository, NEW, Some(cursor)), repository, other),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, history) = get(
+        &app,
+        &token,
+        &format!("/api/v1/proposals/{private}/specification?commit={OLD}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(history["snapshot_sha"], OLD);
+    assert_eq!(history["version_selected"], true);
+    let (_, old_search) = get(
+        &app,
+        &token,
+        &proposal_uri(search(repository, OLD, None), repository, private),
+    )
+    .await;
+    assert_eq!(old_search["total_matches"], 4);
+    let unknown = "3".repeat(40);
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!("/api/v1/proposals/{private}/specification?commit={unknown}")
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    for uri in [
+        format!("/api/v1/repositories/{repository}/specification?commit={NEW}"),
+        search(repository, NEW, None),
+    ] {
+        assert_eq!(
+            get(&app, &token, &uri).await.0,
+            StatusCode::NOT_FOUND,
+            "draft SHA cannot become approved through cache/index"
+        );
+    }
+    let counts: (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM search_index_snapshots),(SELECT count(*) FROM jobs)",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        counts,
+        (0, 0),
+        "proposal reads must never enqueue approved indexing"
+    );
+    let uri = proposal_uri(
+        highlight(repository, OLD, "DOC-PERMISSIONS", serde_json::json!([])),
+        repository,
+        private,
+    );
+    assert_eq!(get(&app, &token, &uri).await.0, StatusCode::OK);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn proposal_reader_rechecks_scope_for_cached_history_pending_closed_and_revoked_access(
+    pool: PgPool,
+) {
+    let (owner, repository, _, _) = setup(&pool).await;
+    let (viewer, _, _, token) = setup(&pool).await;
+    sqlx::query("INSERT INTO memberships(organization_id,user_id,role) SELECT organization_id,$2,'READER' FROM repositories WHERE id=$1")
+        .bind(repository).bind(viewer).execute(&pool).await.unwrap();
+    let pending = proposal(&pool, owner, repository, None).await;
+    let ready = proposal(&pool, owner, repository, Some(NEW)).await;
+    let (app, provider, _) = fixture(&pool);
+    let uri = format!("/api/v1/proposals/{ready}/specification?commit={NEW}");
+    assert_eq!(get(&app, &token, &uri).await.0, StatusCode::OK);
+    let reads = provider.reads.load(Ordering::SeqCst);
+    let (status, pending_response) = get(
+        &app,
+        &token,
+        &format!("/api/v1/proposals/{pending}/specification"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(pending_response["error"]["code"], "PROPOSAL_NOT_READY");
+    assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
+    sqlx::query("UPDATE proposals SET state='CLOSED' WHERE id=$1")
+        .bind(ready)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&app, &token, &uri).await.0,
+        StatusCode::OK,
+        "closed branch keeps readable history"
+    );
+    sqlx::query("UPDATE proposals SET head_sha=$2 WHERE id=$1")
+        .bind(ready)
+        .bind(OLD)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&app, &token, &uri).await.0,
+        StatusCode::NOT_FOUND,
+        "a cached SHA must prove ancestry again after head changes"
+    );
+    let uri = format!("/api/v1/proposals/{ready}/specification?commit={OLD}");
+    assert_eq!(get(&app, &token, &uri).await.0, StatusCode::OK);
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1 AND organization_id=(SELECT organization_id FROM repositories WHERE id=$2)")
+        .bind(viewer).bind(repository).execute(&pool).await.unwrap();
+    let reads = provider.reads.load(Ordering::SeqCst);
+    assert_eq!(get(&app, &token, &uri).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
+    assert_eq!(
+        get(
+            &app,
+            &token,
+            &format!("/api/v1/proposals/{}/specification", Uuid::new_v4())
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn proposal_images_are_pinned_private_derivatives_and_recheck_revocation(pool: PgPool) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    let id = proposal(&pool, actor, repository, Some(OLD)).await;
+    let (app, provider, _) = fixture(&pool);
+    let uri = format!("/api/v1/proposals/{id}/assets/{ASSET}?commit={OLD}");
+    let image = response(&app, &token, &uri).await;
+    assert_eq!(image.status(), StatusCode::OK);
+    assert_eq!(image.headers()["content-type"], "image/png");
+    assert_eq!(image.headers()["cache-control"], "no-store");
+    assert!(
+        image
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .starts_with(b"\x89PNG")
+    );
+    *provider.revoke_after_asset.lock().unwrap() = Some((pool.clone(), actor));
+    assert_eq!(
+        response(&app, &token, &uri).await.status(),
+        StatusCode::NOT_FOUND,
+        "revoked during provider await"
+    );
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn indexed_find_reports_progress_then_survives_restart_and_keeps_failures_explicit(
     pool: PgPool,

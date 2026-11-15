@@ -244,9 +244,9 @@ fn classify(error: BookError, attempt: i32) -> (&'static str, Option<u32>) {
         | BookError::Provider(GitError::BranchMissing | GitError::FileMissing) => {
             ("SOURCE_NOT_AVAILABLE", None)
         }
-        BookError::SearchSnapshotNotReady | BookError::InvalidCatalog => {
-            ("SEARCH_SNAPSHOT_INVALID", None)
-        }
+        BookError::SearchSnapshotNotReady
+        | BookError::InvalidCatalog
+        | BookError::ProposalNotReady => ("SEARCH_SNAPSHOT_INVALID", None),
         BookError::BookTooLarge => ("FILE_TOO_LARGE", None),
         BookError::InvalidQuery(code) | BookError::InvalidAsset(code) => (code, None),
         BookError::Provider(_) => ("INDEX_SOURCE_REJECTED", None),

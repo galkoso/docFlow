@@ -1,10 +1,38 @@
 use async_trait::async_trait;
 use specspace_application::book::{BookError, ReadAuthorization};
+use specspace_application::proposal_reader::{ProposalReadAuthorization, ProposalReadScope};
+use specspace_domain::BranchName;
+use specspace_git_adapter::CommitSha;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 pub struct PgReadAuthorization {
     pool: PgPool,
+}
+
+pub struct PgProposalReadAuthorization {
+    pool: PgPool,
+}
+impl PgProposalReadAuthorization {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+#[async_trait]
+impl ProposalReadAuthorization for PgProposalReadAuthorization {
+    async fn resolve(&self, actor: Uuid, proposal: Uuid) -> Result<ProposalReadScope, BookError> {
+        let row: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
+            "SELECT p.repository_id,p.branch,p.head_sha FROM proposals p JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id JOIN memberships m ON m.organization_id=p.organization_id JOIN users u ON u.id=m.user_id WHERE p.id=$1 AND u.id=$2 AND u.status='ACTIVE'"
+        ).bind(proposal).bind(actor).fetch_optional(&self.pool).await.map_err(|_| BookError::AuthorizationUnavailable)?;
+        let (repository, branch, head) = row.ok_or(BookError::NotFound)?;
+        Ok(ProposalReadScope {
+            repository,
+            branch: BranchName::parse(branch)
+                .map_err(|_| BookError::InvalidRepositoryConfiguration)?,
+            head: CommitSha::parse(head.ok_or(BookError::ProposalNotReady)?)
+                .map_err(|_| BookError::InvalidRepositoryConfiguration)?,
+        })
+    }
 }
 
 impl PgReadAuthorization {

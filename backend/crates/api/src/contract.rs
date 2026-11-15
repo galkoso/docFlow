@@ -8,7 +8,8 @@ use utoipa::{
     info(title = "SpecSpace API", version = "0.1.0"),
     paths(crate::live, crate::ready, crate::auth::login, crate::auth::availability, crate::auth::callback, crate::auth::logout, crate::auth::me,
         crate::specification::repositories, crate::specification::specification, crate::specification::document, crate::specification::find, crate::specification::asset,
-        crate::specification::highlights, crate::proposals::create, crate::proposals::job_status, crate::proposal_reads::list, crate::proposal_reads::detail, crate::proposal_reads::options, crate::creation_context::prepare),
+        crate::specification::highlights, crate::proposals::create, crate::proposals::job_status, crate::proposal_reads::list, crate::proposal_reads::detail, crate::proposal_reads::options, crate::creation_context::prepare,
+        crate::proposal_content::specification, crate::proposal_content::document, crate::proposal_content::find, crate::proposal_content::highlights, crate::proposal_content::asset),
     components(schemas(crate::Health, crate::ErrorBody, crate::ApiError, crate::auth::Profile, crate::auth::Membership, crate::auth::ProfileCapabilities,
         crate::auth::AuthAvailability, specspace_document_engine::find::MatchWindow)),
     modifiers(&SessionSecurity)
@@ -27,6 +28,24 @@ impl Modify for SessionSecurity {
                     "__Host-specspace-session",
                 ))),
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn operation_ids_are_unique_for_generated_clients() {
+        let document = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let mut ids = std::collections::HashSet::new();
+        for path in document["paths"].as_object().unwrap().values() {
+            for operation in path.as_object().unwrap().values() {
+                if let Some(id) = operation["operationId"].as_str() {
+                    assert!(ids.insert(id), "duplicate OpenAPI operationId {id}");
+                }
+            }
         }
     }
 }

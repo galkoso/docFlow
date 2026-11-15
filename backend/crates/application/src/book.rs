@@ -20,6 +20,7 @@ pub enum BookError {
     BookTooLarge,
     ProcessingUnavailable,
     SearchSnapshotNotReady,
+    ProposalNotReady,
     InvalidQuery(&'static str),
     RepositoryNotConfigured,
     InvalidRepositoryConfiguration,
@@ -168,6 +169,32 @@ impl BookService {
             .authorization
             .can_read(actor, self.repository_id)
             .await?
+        {
+            return Err(BookError::NotFound);
+        }
+        self.load_commit(actor, commit).await
+    }
+
+    /// Used by the isolated proposal reader after resolving current scope.
+    pub(crate) async fn load_proposal_at(
+        &self,
+        actor: Uuid,
+        commit: CommitSha,
+        head: &CommitSha,
+    ) -> Result<BookSnapshot, BookError> {
+        if !self
+            .authorization
+            .can_read(actor, self.repository_id)
+            .await?
+        {
+            return Err(BookError::NotFound);
+        }
+        if &commit != head
+            && !self
+                .provider
+                .is_ancestor(&commit, head)
+                .await
+                .map_err(BookError::Provider)?
         {
             return Err(BookError::NotFound);
         }

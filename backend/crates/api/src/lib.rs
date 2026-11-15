@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod contract;
 pub mod creation_context;
+pub mod proposal_content;
 pub mod proposal_reads;
 pub mod proposals;
 pub mod specification;
@@ -14,8 +15,10 @@ use axum::{
     routing::get,
 };
 use serde::Serialize;
+use specspace_application::proposal_reader::ProposalReader;
 use specspace_application::reader::{BookProviderFactory, BookReader};
 use specspace_git_adapter::app_auth::GitHubAppKey;
+use specspace_infrastructure::authorization::PgProposalReadAuthorization;
 use specspace_infrastructure::oidc::Oidc;
 use specspace_infrastructure::{authorization::PgReadAuthorization, github_source::PgGitHubSource};
 use specspace_infrastructure::{
@@ -34,6 +37,7 @@ pub struct AppState {
     pub oidc: Option<Arc<Oidc>>,
     pub cookies: auth::CookiePolicy,
     pub books: Arc<BookReader>,
+    pub proposal_books: Arc<ProposalReader>,
     pub search_index: Arc<PgSearchIndex>,
     index_source: Arc<dyn IndexSource>,
     book_source: Arc<dyn BookProviderFactory>,
@@ -58,11 +62,17 @@ impl AppState {
             Some(books.clone()),
         ));
         let provisioning = Arc::new(PgProvisioning::new(database.clone()));
+        let proposal_books = Arc::new(ProposalReader::new(
+            Arc::new(PgProposalReadAuthorization::new(database.clone())),
+            Arc::new(PgReadAuthorization::new(database.clone())),
+            source.clone(),
+        ));
         Self {
             database,
             oidc: None,
             cookies: auth::CookiePolicy::unconfigured(),
             books,
+            proposal_books,
             search_index,
             index_source,
             book_source: source,
@@ -81,6 +91,11 @@ impl AppState {
     /// Reader and background indexer must use the same configured source/cache.
     pub fn configure_book_source(&mut self, source: Arc<dyn BookProviderFactory>) {
         self.book_source = source.clone();
+        self.proposal_books = Arc::new(ProposalReader::new(
+            Arc::new(PgProposalReadAuthorization::new(self.database.clone())),
+            Arc::new(PgReadAuthorization::new(self.database.clone())),
+            source.clone(),
+        ));
         self.books = Arc::new(
             BookReader::new(
                 Arc::new(PgReadAuthorization::new(self.database.clone())),
@@ -137,6 +152,7 @@ pub fn router(state: AppState) -> Router {
         .merge(auth::routes())
         .merge(specification::routes())
         .merge(proposals::routes())
+        .merge(proposal_content::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))
         .fallback(not_found)

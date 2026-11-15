@@ -82,22 +82,15 @@ struct Payload {
     source_map: Vec<u8>,
 }
 
-// Materialize distinct keys and evaluate substring through an exact payload
-// lookup. Keep large text out of materialized intermediates; the lateral boundary
-// also bounds repeated predicate work when table statistics are still fresh.
-const CANDIDATES: &str = "WITH wanted AS MATERIALIZED (
-  SELECT DISTINCT text_hash FROM search_index_blocks
-  WHERE organization_id=$1 AND repository_id=$2 AND snapshot_sha=$3 AND normalizer_version=$4
-), matching AS MATERIALIZED (
-  SELECT w.text_hash FROM wanted w CROSS JOIN LATERAL (
-    SELECT strpos(t.normalized_text,$5)>0 AS matched FROM search_index_texts t
-    WHERE t.organization_id=$1 AND t.normalizer_version=$4 AND t.text_hash=w.text_hash OFFSET 0
-  ) p WHERE p.matched
-)
-SELECT b.book_order,b.document_id,b.section_id,b.block_id,b.text_hash
-FROM search_index_blocks b JOIN matching m ON m.text_hash=b.text_hash
-WHERE b.organization_id=$1 AND b.repository_id=$2 AND b.snapshot_sha=$3 AND b.normalizer_version=$4
-ORDER BY b.book_order";
+// Load only uncached payloads that match the literal normalized needle. Exact
+// scoped-key lateral lookups avoid rescanning or detoasting unrelated cached
+// text. References are read separately under the same repeatable-read snapshot.
+const MISSING_PAYLOADS: &str = "SELECT t.text_hash,t.original_text,t.normalized_text,t.source_map
+FROM unnest($3::text[]) AS wanted(hash) CROSS JOIN LATERAL (
+  SELECT text_hash,original_text,normalized_text,source_map FROM search_index_texts
+  WHERE organization_id=$1 AND normalizer_version=$2 AND text_hash=wanted.hash
+    AND strpos(normalized_text,$4)>0 OFFSET 0
+) t";
 
 pub struct PgSearchIndex {
     pool: PgPool,
@@ -388,18 +381,13 @@ impl PgSearchIndex {
         let references = if needle.is_empty() || needle.contains('\0') {
             vec![]
         } else {
-            sqlx::query_as::<_, Reference>(CANDIDATES)
-                .bind(organization)
-                .bind(repository)
-                .bind(commit.as_str())
-                .bind(NORMALIZER_VERSION)
-                .bind(&needle)
-                .fetch_all(&mut *tx)
-                .await?
+            sqlx::query_as::<_, Reference>("SELECT book_order,document_id,section_id,block_id,text_hash FROM search_index_blocks WHERE organization_id=$1 AND repository_id=$2 AND snapshot_sha=$3 AND normalizer_version=$4 ORDER BY book_order")
+                .bind(organization).bind(repository).bind(commit.as_str()).bind(NORMALIZER_VERSION)
+                .fetch_all(&mut *tx).await?
         };
         let mut texts = HashMap::new();
         tracing::debug!(
-            phase = "candidates",
+            phase = "references",
             elapsed_ms = started.elapsed().as_millis() as u64,
             blocks = references.len(),
             "search index read"
@@ -408,7 +396,9 @@ impl PgSearchIndex {
         {
             let mut cache = self.cache.lock().await;
             for reference in &references {
-                if texts.contains_key(&reference.text_hash) {
+                if texts.contains_key(&reference.text_hash)
+                    || missing.contains(&reference.text_hash)
+                {
                     continue;
                 }
                 if let Some(position) = cache.iter().position(|entry| {
@@ -426,8 +416,13 @@ impl PgSearchIndex {
         let payloads = if hashes.is_empty() {
             vec![]
         } else {
-            sqlx::query_as::<_, Payload>("SELECT text_hash,original_text,normalized_text,source_map FROM search_index_texts WHERE organization_id=$1 AND normalizer_version=$2 AND text_hash=ANY($3)")
-                .bind(organization).bind(NORMALIZER_VERSION).bind(&hashes).fetch_all(&mut *tx).await?
+            sqlx::query_as::<_, Payload>(MISSING_PAYLOADS)
+                .bind(organization)
+                .bind(NORMALIZER_VERSION)
+                .bind(&hashes)
+                .bind(&needle)
+                .fetch_all(&mut *tx)
+                .await?
         };
         tx.commit().await?;
         tracing::debug!(
@@ -458,9 +453,12 @@ impl PgSearchIndex {
             }
             let mut blocks = Vec::with_capacity(references.len());
             for reference in &references {
-                let text = texts
-                    .get(&reference.text_hash)
-                    .ok_or(IndexError::InvalidSnapshot)?;
+                // A missing uncached payload was filtered by the literal SQL
+                // predicate. Cached payloads are matched below in Rust; this is
+                // independent of the queries that first warmed the cache.
+                let Some(text) = texts.get(&reference.text_hash) else {
+                    continue;
+                };
                 blocks.push(IndexedBlock {
                     block: VisibleBlock {
                         document_id: &reference.document_id,

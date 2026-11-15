@@ -461,3 +461,23 @@ Checkboxes represent verified work only.
   pending-to-ready, background timing, cancellation, terminal/mismatched state
   and the retry bound. Angular production build and all 32 tests pass. Browser
   visual acceptance and end-to-end HTTP performance remain open.
+
+- Authenticated HTTP performance gate and fix: a real loopback Axum test uses
+  six distinct server sessions, PostgreSQL, a ten-connection pool, the actual
+  reader/worker/renderer, exactly 20MiB in 1,000 chapters and 8,000 matches.
+  Distinct visible payloads must exceed 19MiB so fixture deduplication cannot
+  hide database work. The initial valid workload failed at 1.875s search p95;
+  phase timings showed repeated SQL text scans and processing-slot queueing.
+  Search now reads immutable ordered references, matches verified cached
+  payloads in Rust and fetches only uncached matching payloads through scoped
+  SQL lookups in the same repeatable-read transaction. The 128MiB / 4,096-entry
+  cache and fresh ACL/provenance checks remain enforced. A new PostgreSQL test
+  compares successive disjoint queries, literal metacharacters, nonmatches and
+  paging against direct canonical search. Full backend tests and Clippy pass.
+  Explicit release HTTP measurement: fresh no-match p95 0.112s, first positive
+  query 0.655s, warm search p95 0.079s, chapter HTTP p95 0.035s and metadata HTTP
+  p95 0.047s, with 120 samples per route and no warm Git content fetches. The
+  earlier store-only benchmark also passes: cold 0.680s, warm p95 0.054s.
+  Reproduction commands and scope are recorded in docs/reader-performance.md.
+  In-app Browser still reports no available browsers; visual/accessibility
+  acceptance and browser-visible navigation/first-content timing remain open.

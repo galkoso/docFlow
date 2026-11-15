@@ -331,6 +331,53 @@ async fn durable_store_keeps_literal_matches_pinned_and_rechecks_revoked_access(
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn warm_payloads_do_not_restrict_later_queries_to_previous_matches(pool: PgPool) {
+    use specspace_application::search::IndexSnapshot;
+    use specspace_infrastructure::search_index::PgSearchIndex;
+    let fixture = create_fixture(&pool).await;
+    let snapshot = book(SHA, "alpha [x]*\n\nbeta % _ `\\`\n\nמְחיקה\n\nalpha beta");
+    let store = PgSearchIndex::new(pool);
+    let lease = store.claim(Uuid::new_v4(), 60).await.unwrap().unwrap();
+    store
+        .publish(&lease, &IndexSnapshot::build(&snapshot).unwrap())
+        .await
+        .unwrap();
+    // Include disjoint cold payloads, nonmatches among warm payloads, literal
+    // SQL metacharacters, shared blocks and offsets after partial cache warming.
+    for query in [
+        "alpha",
+        "beta",
+        "[x]*",
+        "%",
+        "_",
+        "\\",
+        "מחיקה",
+        "absent",
+        "ALPHA",
+        "כותרת",
+    ] {
+        for offset in [0, 1, 2, 10] {
+            let actual = store
+                .find(
+                    fixture.user,
+                    fixture.repository,
+                    &snapshot.commit,
+                    query,
+                    offset,
+                    1,
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                serde_json::to_value(actual).unwrap(),
+                serde_json::to_value(snapshot.find(query, offset, 1).unwrap()).unwrap(),
+                "query={query:?} offset={offset}"
+            );
+        }
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn index_queue_is_idempotent_and_expired_owners_cannot_publish(pool: PgPool) {
     use specspace_application::search::IndexSnapshot;
     use specspace_infrastructure::search_index::{IndexError, PgSearchIndex};

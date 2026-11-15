@@ -197,6 +197,13 @@ fn fixture(pool: &PgPool) -> (Router, Arc<Provider>, IndexWorker) {
         )
     })
     .collect();
+    fixture_with_files(pool, files)
+}
+
+fn fixture_with_files(
+    pool: &PgPool,
+    files: HashMap<String, String>,
+) -> (Router, Arc<Provider>, IndexWorker) {
     let provider = Arc::new(Provider {
         files,
         version: AtomicU8::new(0),
@@ -657,4 +664,268 @@ async fn image_proxy_is_private_pinned_validated_and_rechecks_access_after_proce
     *provider.revoke_after_asset.lock().unwrap() = Some((pool, actor));
     assert_eq!(get(&app, &token, &uri).await.0, StatusCode::NOT_FOUND);
     assert_eq!(get(&app, &token, &uri).await.0, StatusCode::UNAUTHORIZED);
+}
+
+/// Real local TCP/session/SQL gate. Provider latency, corporate-network latency
+/// and browser rendering are separate acceptance gates, not inferred here.
+#[sqlx::test(migrations = "../../migrations")]
+#[ignore = "release-mode 20MiB authenticated HTTP performance measurement"]
+async fn authenticated_http_six_readers_20mib_benchmark(pool: PgPool) {
+    use std::time::{Duration, Instant};
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .without_time()
+        .with_ansi(false)
+        .try_init();
+    let (_, repository, _, token) = setup(&pool).await;
+    let organization: Uuid =
+        sqlx::query_scalar("SELECT organization_id FROM repositories WHERE id=$1")
+            .bind(repository)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let mut tokens = vec![token];
+    for _ in 0..5 {
+        let actor = Uuid::new_v4();
+        sqlx::query("INSERT INTO users(id,issuer,external_subject,display_name) VALUES($1,'fixture',$1::text,'Synthetic HTTP performance user')")
+            .bind(actor).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO memberships(organization_id,user_id,role) VALUES($1,$2,'CONTRIBUTOR')",
+        )
+        .bind(organization)
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+        tokens.push(
+            SessionStore::new(pool.clone())
+                .mint(actor, 3600)
+                .await
+                .unwrap()
+                .session_cookie_value()
+                .into(),
+        );
+    }
+    let count = 1000;
+    let target = 20 * 1024 * 1024;
+    let mut files = HashMap::new();
+    let mut catalog = vec![];
+    for index in 0..count {
+        let document = format!("DOC-{index:04}");
+        let path = format!("docs/{index:04}.md");
+        let mut source = format!(
+            "---\ndocument_id: {document}\ntitle: Synthetic\nowner_team: TEAM\nschema_version: 1\n---\n<!-- ss:section:SEC-{index:04} -->\n# פרק\n\n"
+        );
+        // Repeated filler alone would deduplicate most of the searchable book.
+        source.push_str(&format!("ייחודי{index:04} "));
+        let suffix = format!("{}מזהה{index:04}", "מחיקה SearchNeedle [x]*\n\n".repeat(8));
+        let size = target / count + usize::from(index < target % count);
+        let phrase = "טקסט הקשר עברי רגיל לבדיקת ביצועים. ";
+        source.push_str(&phrase.repeat((size - source.len() - suffix.len()) / phrase.len()));
+        source.push_str(&suffix);
+        source.extend(std::iter::repeat_n('x', size - source.len()));
+        assert_eq!(source.len(), size);
+        files.insert(path.clone(), source);
+        catalog.push(serde_json::json!({ "document_id": document, "path": path }));
+    }
+    let source_bytes: usize = files.values().map(String::len).sum();
+    assert_eq!(source_bytes, target);
+    files.insert(
+        ".specspace/catalog.json".into(),
+        serde_json::json!({ "schema_version": 1, "documents": catalog }).to_string(),
+    );
+    // Use the production connection limit, independently of sqlx::test's pool.
+    let http_pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(10)
+        .connect_with(pool.connect_options().as_ref().clone())
+        .await
+        .unwrap();
+    let (app, provider, worker) = fixture_with_files(&http_pool, files);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let (stop, stopped) = tokio::sync::oneshot::channel();
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async {
+                let _ = stopped.await;
+            })
+            .await
+            .unwrap();
+    });
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .unwrap();
+    let specification = format!("{base}/api/v1/repositories/{repository}/specification");
+    let catalog = http_json(&client, &tokens[0], &specification).await;
+    assert_eq!(catalog["documents"].as_array().unwrap().len(), count);
+    assert!(catalog["findings"].as_array().unwrap().is_empty());
+    let started = Instant::now();
+    assert!(matches!(
+        worker.run_once().await.unwrap(),
+        specspace_infrastructure::index_worker::WorkResult::Completed(_)
+    ));
+    let worker_seconds = started.elapsed().as_secs_f64();
+    let unique_payload_bytes: i64 = sqlx::query_scalar("SELECT coalesce(sum(octet_length(original_text)),0)::bigint FROM search_index_texts WHERE organization_id=$1")
+        .bind(organization).fetch_one(&http_pool).await.unwrap();
+    assert!(
+        unique_payload_bytes > 19 * 1024 * 1024,
+        "benchmark must scan distinct book payloads"
+    );
+    let fetches = provider.reads.load(Ordering::SeqCst);
+    // Start with no-result queries on a fresh process cache. Warming only
+    // matching payloads must not make this workload repeatedly scan all TOAST.
+    let mut empty_readers = tokio::task::JoinSet::new();
+    for token in &tokens {
+        let token = token.clone();
+        let client = client.clone();
+        let uri = http_search(&base, repository, "absent-needle", 0);
+        empty_readers.spawn(async move {
+            let mut durations = vec![];
+            for _ in 0..20 {
+                let started = Instant::now();
+                let page = http_json(&client, &token, &uri).await;
+                durations.push(started.elapsed().as_secs_f64());
+                assert_eq!(page["total_matches"], 0);
+            }
+            durations
+        });
+    }
+    let mut empty_durations = vec![];
+    while let Some(reader) = empty_readers.join_next().await {
+        empty_durations.extend(reader.unwrap());
+    }
+    let empty_p95 = p95(&mut empty_durations);
+    let cold = Instant::now();
+    let page = http_json(
+        &client,
+        &tokens[0],
+        &http_search(&base, repository, "מחיקה", 0),
+    )
+    .await;
+    let cold_seconds = cold.elapsed().as_secs_f64();
+    assert_eq!(page["total_matches"], 8000);
+    let mut readers = tokio::task::JoinSet::new();
+    for (reader, (token, query)) in tokens
+        .into_iter()
+        .zip([
+            "מחיקה",
+            "מְחיקה",
+            "מ\u{200f}חיקה",
+            "מחיק",
+            "SEARCHNEEDLE",
+            "[x]*",
+        ])
+        .enumerate()
+    {
+        let client = client.clone();
+        let base = base.clone();
+        let specification = specification.clone();
+        readers.spawn(async move {
+            let mut search = vec![];
+            let mut chapters = vec![];
+            let mut books = vec![];
+            for round in 0..20 {
+                let started = Instant::now();
+                let page = http_json(
+                    &client,
+                    &token,
+                    &http_search(&base, repository, query, reader * 1200 + round * 4),
+                )
+                .await;
+                search.push(started.elapsed().as_secs_f64());
+                assert_eq!(page["snapshot_sha"], OLD);
+                assert_eq!(page["total_matches"], 8000);
+                assert_eq!(page["matches"].as_array().unwrap().len(), 100);
+                let document = page["matches"][0]["document_id"].as_str().unwrap();
+                let started = Instant::now();
+                let chapter = http_json(
+                    &client,
+                    &token,
+                    &format!(
+                        "{base}/api/v1/repositories/{repository}/documents/{document}?commit={OLD}"
+                    ),
+                )
+                .await;
+                chapters.push(started.elapsed().as_secs_f64());
+                assert_eq!(chapter["snapshot_sha"], OLD);
+                assert_eq!(chapter["document_id"], document);
+                assert!(chapter["error_code"].is_null());
+                assert!(chapter["render_error"].is_null());
+                let started = Instant::now();
+                let book = http_json(&client, &token, &specification).await;
+                books.push(started.elapsed().as_secs_f64());
+                assert_eq!(book["snapshot_sha"], OLD);
+            }
+            (search, chapters, books)
+        });
+    }
+    let (mut search, mut chapters, mut books) = (vec![], vec![], vec![]);
+    while let Some(reader) = readers.join_next().await {
+        let (a, b, c) = reader.unwrap();
+        search.extend(a);
+        chapters.extend(b);
+        books.extend(c);
+    }
+    let samples = search.len();
+    let search_p95 = p95(&mut search);
+    let chapter_p95 = p95(&mut chapters);
+    let book_p95 = p95(&mut books);
+    let _ = stop.send(());
+    server.await.unwrap();
+    assert_eq!(
+        provider.reads.load(Ordering::SeqCst),
+        fetches,
+        "warm HTTP requests must not fetch Git content"
+    );
+    http_pool.close().await;
+    println!(
+        "source_bytes={source_bytes} unique_payload_bytes={unique_payload_bytes} documents={count} users=6 samples_per_route={samples} matches=8000 worker_seconds={worker_seconds:.3} fresh_no_match_http_p95_seconds={empty_p95:.3} subsequent_http_search_seconds={cold_seconds:.3} warm_http_search_p95_seconds={search_p95:.3} warm_http_chapter_p95_seconds={chapter_p95:.3} warm_http_metadata_p95_seconds={book_p95:.3}"
+    );
+    assert!(
+        search_p95 < 1.0,
+        "authenticated HTTP search p95 exceeded 1s: {search_p95:.3}"
+    );
+    assert!(
+        empty_p95 < 1.0,
+        "fresh no-match HTTP p95 exceeded 1s: {empty_p95:.3}"
+    );
+    assert!(
+        chapter_p95 < 1.5,
+        "HTTP chapter p95 exceeded 1.5s: {chapter_p95:.3}; browser navigation remains separate"
+    );
+    assert!(
+        book_p95 < 2.0,
+        "HTTP metadata p95 exceeded 2s: {book_p95:.3}; browser first content remains separate"
+    );
+}
+
+fn http_search(base: &str, repository: Uuid, query: &str, start: usize) -> String {
+    let mut params = url::form_urlencoded::Serializer::new(String::new());
+    params
+        .append_pair("q", query)
+        .append_pair("commit", OLD)
+        .append_pair("start_at", &start.to_string());
+    format!(
+        "{base}/api/v1/repositories/{repository}/find?{}",
+        params.finish()
+    )
+}
+
+async fn http_json(client: &reqwest::Client, token: &str, url: &str) -> serde_json::Value {
+    let response = client
+        .get(url)
+        .header("Cookie", format!("__Host-specspace-session={token}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    response.json().await.unwrap()
+}
+
+fn p95(values: &mut [f64]) -> f64 {
+    values.sort_by(f64::total_cmp);
+    values[(values.len() * 95).div_ceil(100) - 1]
 }

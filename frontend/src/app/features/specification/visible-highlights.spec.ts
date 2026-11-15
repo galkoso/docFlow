@@ -22,6 +22,26 @@ describe('Visible highlight windows', () => {
   afterEach(() => { state.ngOnDestroy(); http.verify(); vi.useRealTimers(); });
   function request() { return http.expectOne(req => req.url.endsWith('/D1/highlights')); }
   function reply(matches: Highlight[] = []) { return { snapshot_sha: context.commit, document_id: 'D1', query: 'מחיקה', matches }; }
+
+  it('clears cached highlights and cancels requests across proposals sharing a SHA', () => {
+    state.configure({ ...context, proposal: 'p1' }, 'מחיקה');
+    state.viewport(window(0), true); vi.advanceTimersByTime(200);
+    const pending = request();
+    expect(pending.request.url).toBe('/api/v1/proposals/p1/documents/D1/highlights');
+    state.configure({ ...context, proposal: 'p2' }, 'מחיקה');
+    expect(pending.cancelled).toBe(true);
+    vi.advanceTimersByTime(200);
+    const current = request();
+    expect(current.request.url).toBe('/api/v1/proposals/p2/documents/D1/highlights');
+    current.flush(reply([hit]));
+    expect(state.hits()).toEqual([hit]);
+    state.configure(context, 'מחיקה');
+    expect(state.hits()).toEqual([]);
+    vi.advanceTimersByTime(200);
+    const main = request();
+    expect(main.request.url).toBe('/api/v1/repositories/repo/documents/D1/highlights');
+    main.flush(reply());
+  });
   function windows(request: { request: { params: { get(name: string): string | null } } }): MatchWindow[] {
     return JSON.parse(atob(request.request.params.get('windows')!.replaceAll('-', '+').replaceAll('_', '/')));
   }

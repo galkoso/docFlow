@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Book, BookDocument } from '../../core/api/book-api';
+import type { ProposalDetail } from '../../core/api/proposal-api';
 import { BookState } from './book-state';
 
 const repository = '00000000-0000-0000-0000-000000000001';
@@ -13,6 +14,13 @@ const book: Book = { repository_id: repository, snapshot_sha: sha, branch: 'main
   ] };
 const document: BookDocument = { document_id: 'D1', snapshot_sha: sha, title: 'ראשון', blocks: [], render_events: [] };
 const base = `/api/v1/repositories/${repository}`;
+function proposal(id: string): ProposalDetail {
+  return { proposal_id: id, repository_id: repository, number: 25, title: 'הצעה חדשה', branch: `change/${id}`,
+    state: 'DRAFT', owner_id: 'owner', owner_name: 'בעלים', team_id: 'team', team_name: 'צוות', target_branch: 'main', version: 2,
+    updated_at: book.updated_at, base_sha: sha, head_sha: sha, target_sha: sha, description: 'תיאור הצעת השינוי', author_id: 'owner',
+    initial_mode: 'manual', ui_impact: 'undecided', links: [], capabilities: { can_edit: true, can_close: false, can_reopen: false },
+    synchronization: { state: 'in_sync', actual_head_sha: sha } };
+}
 
 describe('Disposable pinned book state', () => {
   let state: BookState;
@@ -29,6 +37,43 @@ describe('Disposable pinned book state', () => {
     http.expectOne('/api/v1/repositories').flush({ repositories: [{ repository_id: repository, default_branch: 'main' }] });
     http.expectOne(`${base}/specification`).flush(selected);
   }
+
+  it('loads chapters only through the selected proposal and cancels them across same-SHA proposals', () => {
+    state.openProposal('p1');
+    http.expectOne('/api/v1/proposals/p1').flush(proposal('p1'));
+    http.expectOne('/api/v1/proposals/p1/specification').flush({ ...book, branch: 'change/p1' });
+    http.expectOne(`/api/v1/proposals/p1/documents/D1?commit=${sha}`).flush(document);
+    expect(state.proposal()?.number).toBe(25);
+    state.loadDocument('D2');
+    const pending = http.expectOne(`/api/v1/proposals/p1/documents/D2?commit=${sha}`);
+    state.openProposal('p2', sha);
+    expect(pending.cancelled).toBe(true);
+    expect(state.documents()).toEqual({});
+    expect(state.proposal()).toBeNull();
+    http.expectOne('/api/v1/proposals/p2').flush(proposal('p2'));
+    http.expectOne(`/api/v1/proposals/p2/specification?commit=${sha}`).flush({ ...book, branch: 'change/p2' });
+    http.expectOne(`/api/v1/proposals/p2/documents/D1?commit=${sha}`).flush(document);
+    expect(state.proposalId()).toBe('p2');
+    http.expectNone('/api/v1/repositories');
+    http.expectNone(req => req.url.startsWith('/api/v1/repositories/'));
+  });
+
+  it('rejects unverified heads and mixed proposal metadata without falling back to main', () => {
+    state.openProposal('p1');
+    http.expectOne('/api/v1/proposals/p1').flush({ ...proposal('p1'), head_sha: null });
+    expect(state.error()).toContain('עדיין אינו מאומת');
+    http.expectNone('/api/v1/proposals/p1/specification');
+    state.openProposal('p1');
+    http.expectOne('/api/v1/proposals/p1').flush(proposal('p1'));
+    http.expectOne('/api/v1/proposals/p1/specification').flush({ ...book, branch: 'change/other' });
+    expect(state.book()).toBeNull();
+    expect(state.proposal()).toBeNull();
+    expect(state.error()).toContain('זהות ההצעה');
+    state.openProposal('p1');
+    http.expectOne('/api/v1/proposals/p1').flush({}, { status: 404, statusText: 'Not Found' });
+    expect(state.proposalId()).toBeUndefined();
+    http.expectNone('/api/v1/repositories');
+  });
 
   it('pins each chapter to the metadata SHA and deduplicates concurrent loads', () => {
     open();

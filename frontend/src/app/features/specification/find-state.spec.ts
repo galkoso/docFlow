@@ -32,6 +32,22 @@ describe('Snapshot-bound find controller', () => {
   }
   function initial() { find.search(query); vi.advanceTimersByTime(200); request().flush(page(0)); }
 
+  it('restarts search when proposal identity changes at the same repository and SHA', () => {
+    find.scope('repository', sha, 'p1');
+    find.search(query); vi.advanceTimersByTime(200);
+    const pending = http.expectOne(req => req.url === '/api/v1/proposals/p1/find');
+    find.scope('repository', sha, 'p2');
+    expect(pending.cancelled).toBe(true);
+    expect(find.total()).toBeNull();
+    vi.advanceTimersByTime(200);
+    http.expectOne(req => req.url === '/api/v1/proposals/p2/find').flush(page(0));
+    expect(find.total()).toBe(501);
+    find.scope('repository', sha);
+    expect(find.hits()).toEqual([]);
+    vi.advanceTimersByTime(200); request().flush(page(0, 0));
+    expect(find.total()).toBe(0);
+  });
+
   function pending(commit = sha) {
     request().flush({ error: { code: 'SEARCH_SNAPSHOT_NOT_READY', retryable: true,
       details: { snapshot_sha: commit }, message_he: 'החיפוש נמצא בהכנה' } }, { status: 409, statusText: 'Conflict' });

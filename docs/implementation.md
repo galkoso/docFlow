@@ -654,3 +654,19 @@ Checkboxes represent verified work only.
   Unique OpenAPI operation IDs have a regression assertion after generated
   client compilation exposed a naming collision. Angular build and all 46
   existing frontend tests pass against the regenerated contract.
+
+- Continuous proposal UI: /changes/:id/book reuses the bounded chapter reader
+  through proposal-scoped endpoints and is linked from verified proposal detail.
+  Number, title, branch, target and selected SHA remain visible; the page clearly
+  identifies proposal content and closed/merged history. Internal document/section
+  links preserve proposal identity and SHA. Search, visible highlights and hashed
+  image derivatives use the same private scope; switching proposals at an equal
+  repository/SHA cancels pending requests and clears derived data. Unknown access,
+  unverified heads and inconsistent metadata produce explicit errors, with no
+  approved-book fallback. Five new frontend scenarios cover chapter cancellation,
+  pending/mismatched metadata, same-SHA search/highlight isolation and route/label/
+  link/logout behavior, alongside private image-path assertions. Production build
+  and all 51 frontend tests pass. CI for the preceding API commit is green in both
+  workflows. In-app Browser availability was checked again and remains empty;
+  rendered visual/accessibility acceptance is still open. Editing, draft recovery,
+  atomic commits and subsequent review/import/merge stages remain required.

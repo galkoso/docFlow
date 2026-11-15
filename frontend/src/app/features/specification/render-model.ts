@@ -8,7 +8,7 @@ export const TEXT_WINDOW_UTF16 = 1024;
 export interface TextChunk { event: RenderEvent; window: MatchWindow | null; }
 export interface RenderNode { event: RenderEvent; children: RenderNode[]; chunks?: TextChunk[]; alignment?: 'left' | 'center' | 'right'; }
 export interface TextPart { text: string; matchId?: string; }
-export interface AssetContext { repository: string; commit: string; }
+export interface AssetContext { repository: string; commit: string; proposal?: string; }
 
 /** Split display leaves without splitting graphemes. A giant grapheme needs only
  * one short request window: canonical matches cover its entire original range. */
@@ -35,10 +35,12 @@ export function textChunks(event: RenderEvent): TextChunk[] {
 }
 
 export function assetSource(context: AssetContext | null, destination?: string | null): string | null {
+  const uuid = /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   if (!context || !destination || !/^assets\/[a-f0-9]{64}\.(png|jpg|jpeg|webp)$/.test(destination)
-    || !/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(context.repository)
+    || !uuid.test(context.repository) || (context.proposal !== undefined && !uuid.test(context.proposal))
     || !/^[a-f0-9]{40,128}$/.test(context.commit) || context.commit.length % 2 !== 0) return null;
-  return `/api/v1/repositories/${context.repository}/assets/${destination.slice(7)}?commit=${context.commit}`;
+  const scope = context.proposal ? `proposals/${context.proposal}` : `repositories/${context.repository}`;
+  return `/api/v1/${scope}/assets/${destination.slice(7)}?commit=${context.commit}`;
 }
 
 /** A bounded tree of inert events; markup is created only by the Angular template. */

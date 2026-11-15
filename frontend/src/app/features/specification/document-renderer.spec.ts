@@ -91,6 +91,10 @@ describe('Canonical document renderer', () => {
     expect(assetSource(context, 'assets/../secret.png')).toBeNull();
     expect(assetSource(context, 'https://tracker.example/pixel')).toBeNull();
     expect(assetSource({ ...context, commit: 'main' }, destination)).toBeNull();
+    const proposal = '00000000-0000-0000-0000-000000000002';
+    expect(assetSource({ ...context, proposal }, destination))
+      .toBe(`/api/v1/proposals/${proposal}/assets/${'b'.repeat(64)}.png?commit=${context.commit}`);
+    expect(assetSource({ ...context, proposal: '../main' }, destination)).toBeNull();
   });
 
   it('fails closed on malformed event nesting and excessive depth', async () => {

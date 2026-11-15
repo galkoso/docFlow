@@ -5,7 +5,7 @@ import { BookApi, Highlight, MatchWindow } from '../../core/api/book-api';
 import { bookError } from './book-state';
 import { TEXT_WINDOW_UTF16 } from './render-model';
 
-export interface HighlightContext { repository: string; commit: string; document: string; }
+export interface HighlightContext { repository: string; commit: string; document: string; proposal?: string; }
 export const windowKey = (window: MatchWindow) => `${window.block_id}:${window.start_utf16}:${window.end_utf16}`;
 const intersects = (hit: Highlight, window: MatchWindow) => hit.block_id === window.block_id
   && hit.end_utf16 > window.start_utf16 && hit.start_utf16 < window.end_utf16;
@@ -30,7 +30,7 @@ export class VisibleHighlights implements OnDestroy {
 
   configure(context: HighlightContext | null, query: string): void {
     if (context?.repository === this.context?.repository && context?.commit === this.context?.commit
-      && context?.document === this.context?.document && query === this.query) return;
+      && context?.document === this.context?.document && context?.proposal === this.context?.proposal && query === this.query) return;
     this.cancel();
     this.context = context;
     this.query = query;
@@ -100,7 +100,7 @@ export class VisibleHighlights implements OnDestroy {
     const generation = this.generation;
     const query = this.query;
     this.active = true;
-    this.request = this.api.highlights(context.repository, context.commit, context.document, query, windows).subscribe({
+    this.request = this.api.highlights(context.repository, context.commit, context.document, query, windows, context.proposal).subscribe({
       next: response => {
         if (generation !== this.generation) return;
         this.active = false;

@@ -36,8 +36,11 @@ export class Specification implements OnDestroy {
     return result;
   });
   readonly params = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
-  readonly canCreate = computed(() => this.state.repositories().some(repository => repository.repository_id === this.state.book()?.repository_id && repository.can_create));
-  private readonly selection = computed(() => JSON.stringify([this.params().get('repo'), this.params().get('commit')]));
+  private readonly routeParams = toSignal(this.route.paramMap, { initialValue: this.route.snapshot.paramMap });
+  readonly proposalId = computed(() => this.routeParams().get('id') ?? undefined);
+  readonly canCreate = computed(() => !this.proposalId()
+    && this.state.repositories().some(repository => repository.repository_id === this.state.book()?.repository_id && repository.can_create));
+  private readonly selection = computed(() => JSON.stringify([this.proposalId(), this.params().get('repo'), this.params().get('commit')]));
   readonly links = computed(() => {
     const book = this.state.book();
     const links: Record<string, string> = {};
@@ -46,7 +49,9 @@ export class Specification implements OnDestroy {
       for (const section of ['', ...document.sections.map(item => item.section_id)]) {
         const params = new URLSearchParams({ repo: book.repository_id, commit: book.snapshot_sha, doc: document.document_id });
         if (section) params.set('section', section);
-        const href = `/specification?${params}`;
+        const proposal = this.proposalId();
+        if (proposal) params.delete('repo');
+        const href = proposal ? `/changes/${encodeURIComponent(proposal)}/book?${params}` : `/specification?${params}`;
         const suffix = section ? `#${section}` : '';
         links[`ss:${document.document_id}${suffix}`] = href;
         links[`${document.path}${suffix}`] = href;
@@ -67,7 +72,7 @@ export class Specification implements OnDestroy {
     });
     effect(() => {
       const book = this.state.book();
-      untracked(() => this.find.scope(book?.repository_id, book?.snapshot_sha));
+      untracked(() => this.find.scope(book?.repository_id, book?.snapshot_sha, this.state.proposalId()));
     });
     effect(() => {
       const query = this.params().get('q') ?? '';
@@ -105,7 +110,12 @@ export class Specification implements OnDestroy {
   }
 
   ngOnDestroy() { this.state.clear(); this.find.clear(); }
-  retry() { this.state.open(this.params().get('repo') ?? undefined, this.params().get('commit') ?? undefined); }
+  retry() {
+    const proposal = this.proposalId();
+    const commit = this.params().get('commit') ?? undefined;
+    if (proposal) this.state.openProposal(proposal, commit);
+    else this.state.open(this.params().get('repo') ?? undefined, commit);
+  }
   latest() { void this.router.navigate([], { relativeTo: this.route, queryParams: { commit: null }, queryParamsHandling: 'merge' }); }
   selectRepository(value: string) { void this.router.navigate([], { relativeTo: this.route, queryParams: { repo: value } }); }
   denyAccess() {
@@ -149,6 +159,7 @@ export class Specification implements OnDestroy {
     const book = this.state.book();
     if (!book) return;
     void this.router.navigate([], { relativeTo: this.route,
-      queryParams: { repo: book.repository_id, commit: this.params().get('commit'), doc: document, section: section || null } });
+      queryParams: { repo: this.proposalId() ? null : book.repository_id,
+        commit: this.proposalId() ? book.snapshot_sha : this.params().get('commit'), doc: document, section: section || null }, queryParamsHandling: 'merge' });
   }
 }

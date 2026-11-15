@@ -93,6 +93,6 @@ export class DocumentRenderer {
   }
   internal(destination?: string | null): string | null {
     const link = destination ? this.internalLinks()[destination] : undefined;
-    return link?.startsWith('/specification?') ? link : null;
+    return link && (link.startsWith('/specification?') || /^\/changes\/[a-f0-9-]{36}\/book\?/.test(link)) ? link : null;
   }
 }

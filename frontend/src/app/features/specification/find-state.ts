@@ -10,6 +10,7 @@ export class FindState {
   private readonly api = inject(BookApi);
   private readonly book = inject(BookState);
   private repository?: string;
+  private proposal?: string;
   private commit?: string;
   private request?: Subscription;
   private timer?: ReturnType<typeof setTimeout>;
@@ -29,9 +30,10 @@ export class FindState {
   });
   readonly hits = computed(() => [...this.pages().values()].flatMap(page => page.matches));
 
-  scope(repository?: string, commit?: string): void {
-    if (this.repository === repository && this.commit === commit) return;
+  scope(repository?: string, commit?: string, proposal?: string): void {
+    if (this.repository === repository && this.commit === commit && this.proposal === proposal) return;
     this.repository = repository;
+    this.proposal = proposal;
     this.commit = commit;
     this.restart();
   }
@@ -45,6 +47,7 @@ export class FindState {
   clear(): void {
     this.query.set('');
     this.repository = undefined;
+    this.proposal = undefined;
     this.commit = undefined;
     this.restart();
   }
@@ -110,7 +113,7 @@ export class FindState {
     const generation = ++this.generation;
     this.loading.set(true);
     this.error.set(null);
-    this.request = this.api.find(repository, commit, query, start).subscribe({
+    this.request = this.api.find(repository, commit, query, start, this.proposal).subscribe({
       next: page => {
         if (generation !== this.generation) return;
         this.indexing.set(false);

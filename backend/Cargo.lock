@@ -2632,6 +2632,7 @@ dependencies = [
  "sha2 0.10.9",
  "specspace-application",
  "specspace-document-engine",
+ "specspace-domain",
  "specspace-git-adapter",
  "sqlx",
  "subtle",

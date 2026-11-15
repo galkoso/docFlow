@@ -21,6 +21,7 @@ subtle = "2.6"
 openidconnect = "4.1"
 specspace-git-adapter = { path = "../git-adapter" }
 specspace-document-engine = { path = "../document-engine" }
+specspace-domain = { path = "../domain" }
 zeroize = "1"
 
 [dev-dependencies]

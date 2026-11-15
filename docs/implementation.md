@@ -513,3 +513,24 @@ Checkboxes represent verified work only.
   A provider HTTP test proves one accepted create, a delayed uncertain result
   after rate-limited verification, and later observation of the existing ref.
   All eleven provider tests and workspace Clippy pass.
+
+- Proposal provisioning journal and worker: CREATE jobs have an independent
+  lease protocol, excluded from generic leasing. A short fenced transaction
+  records the mutation boundary before provider I/O. Expired preflight work may
+  restart; a started/uncertain operation can only observe its reserved ref.
+  A matching ref completes atomically as DRAFT with identical base/head/target,
+  a successful operation/job, audit and outbox event. Existing refs in fresh
+  work are rejected, and divergent/absent uncertain refs are never rewritten.
+  Attempts, heartbeat, timeout, delayed retry and terminal recovery status are
+  explicit. Actor/owner/team eligibility is checked before mutation and before
+  publishing; stale workers cannot settle work after lease loss. Job intent
+  binds repository remote and installation identity, preventing retargeting
+  after reconfiguration. No DB transaction spans a provider call. Fourteen
+  PostgreSQL scenarios cover reservation, phase recovery, rate limits before
+  and after writes, shutdown after accepted creation, missing/divergent refs,
+  moved main, existing branches, revocation, malformed payloads, exhaustion and
+  configuration changes. Full backend tests and workspace Clippy pass; the
+  added configuration/terminal-state cases pass in the final focused run.
+  API startup now runs one provisioning worker alongside two index workers;
+  its 30–3600s timeout defaults to 120s and uses the same graceful shutdown.
+  HTTP creation/list/job endpoints and the proposal UI remain the next stage.

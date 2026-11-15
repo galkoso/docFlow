@@ -87,16 +87,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|_| state.index_worker(Duration::from_secs(index_timeout)))
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| "INDEX_WORKER_TIMEOUT_SECONDS must be between 30 and 3600")?;
+    let proposal_timeout = std::env::var("PROPOSAL_WORKER_TIMEOUT_SECONDS")
+        .unwrap_or_else(|_| "120".into())
+        .parse::<u64>()?;
+    let proposal_worker = state
+        .proposal_worker(Duration::from_secs(proposal_timeout))
+        .map_err(|_| "PROPOSAL_WORKER_TIMEOUT_SECONDS must be between 30 and 3600")?;
     let (stop, stopped) = tokio::sync::watch::channel(false);
-    let handles: Vec<_> = workers
+    let mut handles: Vec<_> = workers
         .into_iter()
         .map(|worker| {
             let stopped = stopped.clone();
             tokio::spawn(async move { worker.run(stopped).await })
         })
         .collect();
+    handles.push(tokio::spawn(
+        async move { proposal_worker.run(stopped).await },
+    ));
     let shutdown_stop = stop.clone();
-    tracing::info!(%address, index_workers = 2, "API listening");
+    tracing::info!(%address, index_workers = 2, proposal_workers = 1, "API listening");
     let result = axum::serve(listener, router(state))
         .with_graceful_shutdown(async move {
             shutdown_signal().await;

@@ -17,6 +17,8 @@ use specspace_infrastructure::oidc::Oidc;
 use specspace_infrastructure::{authorization::PgReadAuthorization, github_source::PgGitHubSource};
 use specspace_infrastructure::{
     index_worker::{GitIndexSource, IndexSource, IndexWorker},
+    proposal_worker::ProposalWorker,
+    provisioning::{PgProvisioning, ProvisionError},
     search_index::{IndexError, PgSearchIndex},
 };
 use sqlx::PgPool;
@@ -31,6 +33,8 @@ pub struct AppState {
     pub books: Arc<BookReader>,
     pub search_index: Arc<PgSearchIndex>,
     index_source: Arc<dyn IndexSource>,
+    book_source: Arc<dyn BookProviderFactory>,
+    provisioning: Arc<PgProvisioning>,
     pub render_slots: Arc<tokio::sync::Semaphore>,
 }
 
@@ -47,9 +51,10 @@ impl AppState {
         );
         let index_source = Arc::new(GitIndexSource::new(
             database.clone(),
-            source,
+            source.clone(),
             Some(books.clone()),
         ));
+        let provisioning = Arc::new(PgProvisioning::new(database.clone()));
         Self {
             database,
             oidc: None,
@@ -57,6 +62,8 @@ impl AppState {
             books,
             search_index,
             index_source,
+            book_source: source,
+            provisioning,
             render_slots: Arc::new(tokio::sync::Semaphore::new(2)),
         }
     }
@@ -70,6 +77,7 @@ impl AppState {
 
     /// Reader and background indexer must use the same configured source/cache.
     pub fn configure_book_source(&mut self, source: Arc<dyn BookProviderFactory>) {
+        self.book_source = source.clone();
         self.books = Arc::new(
             BookReader::new(
                 Arc::new(PgReadAuthorization::new(self.database.clone())),
@@ -90,6 +98,13 @@ impl AppState {
             self.index_source.clone(),
             timeout,
         )
+    }
+
+    pub fn proposal_worker(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<ProposalWorker, ProvisionError> {
+        ProposalWorker::new(self.provisioning.clone(), self.book_source.clone(), timeout)
     }
 }
 

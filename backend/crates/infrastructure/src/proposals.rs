@@ -7,16 +7,18 @@ use specspace_application::proposal::{
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-const ACCESS: &str = "SELECT r.organization_id,m.role FROM repositories r JOIN memberships m ON m.organization_id=r.organization_id JOIN users u ON u.id=m.user_id WHERE r.id=$1 AND m.user_id=$2 AND u.status='ACTIVE'";
+const ACCESS: &str = "SELECT r.organization_id,r.remote_id,r.installation_id,m.role FROM repositories r JOIN memberships m ON m.organization_id=r.organization_id JOIN users u ON u.id=m.user_id WHERE r.id=$1 AND m.user_id=$2 AND u.status='ACTIVE'";
 const EXISTING: &str = "SELECT o.request_hash,p.id AS proposal_id,p.number,o.id AS operation_id,j.id AS job_id FROM git_operations o JOIN proposals p ON p.id=o.proposal_id AND p.organization_id=o.organization_id JOIN jobs j ON j.operation_id=o.id AND j.organization_id=o.organization_id AND j.kind='CREATE_PROPOSAL' WHERE o.organization_id=$1 AND o.actor_id=$2 AND o.kind='CREATE' AND o.idempotency_key=$3";
 
 #[derive(FromRow)]
 struct Scope {
     organization_id: Uuid,
     role: String,
+    remote_id: String,
+    installation_id: String,
 }
 impl Scope {
-    fn require_create(self) -> Result<Uuid, ProposalError> {
+    fn require_create(&self) -> Result<Uuid, ProposalError> {
         if self.role == "READER" {
             Err(ProposalError::Forbidden)
         } else {
@@ -110,14 +112,14 @@ impl PgProposals {
         // Hold current membership/user eligibility only for this short DB work.
         // No provider call may run while these locks are held.
         let access = format!("{ACCESS} FOR SHARE OF r,m,u");
-        let organization = sqlx::query_as::<_, Scope>(&access)
+        let scope = sqlx::query_as::<_, Scope>(&access)
             .bind(request.repository_id)
             .bind(actor)
             .fetch_optional(&mut *tx)
             .await
             .map_err(unavailable)?
-            .ok_or(ProposalError::NotFound)?
-            .require_create()?;
+            .ok_or(ProposalError::NotFound)?;
+        let organization = scope.require_create()?;
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
             .bind(format!("create:{organization}:{actor}:{}", key.as_str()))
             .execute(&mut *tx)
@@ -165,7 +167,7 @@ impl PgProposals {
         let job_id = Uuid::new_v4();
         sqlx::query("INSERT INTO jobs(id,organization_id,operation_id,kind,payload) VALUES($1,$2,$3,'CREATE_PROPOSAL',$4)")
             .bind(job_id).bind(organization).bind(operation_id)
-            .bind(serde_json::json!({"proposal_id":proposal_id,"repository_id":request.repository_id,"expected_source_sha":intent.source().as_str()}))
+            .bind(serde_json::json!({"proposal_id":proposal_id,"repository_id":request.repository_id,"expected_source_sha":intent.source().as_str(),"remote_id":scope.remote_id,"installation_id":scope.installation_id}))
             .execute(&mut *tx).await.map_err(unavailable)?;
         sqlx::query("INSERT INTO audit_events(id,organization_id,actor_id,action,entity_id,after_ref,operation_id,result) VALUES($1,$2,$3,'PROPOSAL_PROVISIONING',$4,$5,$6,'PENDING')")
             .bind(Uuid::new_v4()).bind(organization).bind(actor).bind(proposal_id).bind(intent.source().as_str()).bind(operation_id)

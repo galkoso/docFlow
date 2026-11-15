@@ -519,6 +519,7 @@ async fn foreign_repositories_and_revoked_sessions_never_receive_cached_content(
     let (app, provider, _worker) = fixture(&pool);
     let (_, repositories) = get(&app, &token, "/api/v1/repositories").await;
     assert_eq!(repositories["repositories"].as_array().unwrap().len(), 1);
+    assert_eq!(repositories["repositories"][0]["can_create"], false);
     assert_eq!(
         get(
             &app,

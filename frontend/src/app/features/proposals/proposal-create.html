@@ -1,0 +1,53 @@
+<a routerLink="/changes">לרשימת ההצעות</a>
+<header><h1>פתיחת הצעה לשינוי</h1><p class="page-description">פותחים ענף נפרד מהאפיון המאושר. התוכן יתחיל זהה לגרסת המקור.</p></header>
+@if (!session.profile()) {
+  <section class="empty-state"><h2>יש להתחבר כדי לפתוח הצעה</h2>
+    @if (session.status() === 'loading') {<p role="status">בודקים התחברות…</p>}
+    @else if (session.status() === 'unconfigured') {<a class="button" routerLink="/settings">הגדרת התחברות</a>}
+    @else {<a class="button" href="/api/v1/auth/login">התחברות ארגונית</a>}
+  </section>
+} @else {
+  @if (state.loading()) {<p role="status">טוענים מאגרים, צוותים ובעלים מורשים…</p>}
+  @if (state.error(); as error) {<p class="notice" role="alert">{{ error }}</p>}
+  @if (state.choices() && !state.choices()!.repositories.length) {<p><a routerLink="/settings">להגדרת סביבת העבודה</a></p>}
+  @if (state.choices()) {<button type="button" (click)="refreshChoices()" [disabled]="state.locked() || state.loading()">טעינת רשימות מורשות מחדש</button>}
+  @if (state.uncertain()) {
+    <section class="notice" aria-label="בקשת יצירה שתוצאתה טרם אומתה"><p>תוצאת הבקשה טרם אומתה. ניסיון נוסף ישלח בדיוק את אותה בקשה, כדי למנוע יצירה כפולה.</p>
+      <p>בעלים: {{ state.submittedLabels()?.owner }} · צוות: {{ state.submittedLabels()?.team }}</p>
+      <a routerLink="/changes" [queryParams]="{ repository_id: state.form().repository_id, q: state.form().branch }" target="_blank" rel="noopener">בדיקת רשימת ההצעות בחלון נוסף</a>
+      <button type="button" (click)="startFresh()" [disabled]="state.submitting()">הכנת טופס חדש</button>
+    </section>
+  }
+  <form (submit)="$event.preventDefault(); state.submit()">
+    <fieldset [disabled]="state.locked()"><legend>פרטי ההצעה</legend>
+      <label for="create-repository">מאגר</label><select #repository id="create-repository" [value]="state.form().repository_id" (change)="selectRepository(repository.value)" [disabled]="state.loading()">
+        <option value="">בחירת מאגר</option>@for (item of state.choices()?.repositories ?? []; track item.repository_id) {<option [value]="item.repository_id" [disabled]="!item.can_create">מאגר {{ item.repository_id.slice(0, 8) }}</option>}
+      </select>
+      <label for="create-title">שם ההצעה</label><input #title id="create-title" required maxlength="240" [value]="state.form().title" (input)="state.update('title', title.value)" aria-describedby="title-error" [attr.aria-invalid]="!!state.fieldErrors()['title']">
+      <small id="title-error" class="field-error">{{ state.fieldErrors()['title'] }}</small>
+      <label for="create-branch">שם הענף</label><div class="branch-control"><input #branch id="create-branch" dir="ltr" required maxlength="100" autocomplete="off" spellcheck="false" [value]="state.form().branch" (input)="state.update('branch', branch.value)" aria-describedby="branch-help branch-error" [attr.aria-invalid]="!!state.fieldErrors()['branch']"><button type="button" (click)="state.suggestBranch()" [disabled]="!state.context()">שם מוצע</button></div>
+      <small id="branch-help">מתחיל ב־<bdi>change/</bdi>. ניתן לערוך לפני יצירה; שם הענף יישאר קבוע לאחריה.</small><small id="branch-error" class="field-error">{{ state.fieldErrors()['branch'] }}</small>
+      @if (state.preparing()) {<p role="status">מכינים מספר הצעה ובודקים את גרסת המקור…</p>}
+      @if (state.context(); as context) {
+        <div class="source" aria-label="גרסת מקור לקריאה בלבד"><p>הצעה #{{ context.number }} · מקור: <bdi>{{ context.source_branch }}</bdi></p><code>{{ context.source_sha }}</code><p>ההכנה תקפה עד {{ context.expires_at | date:'dd/MM/yyyy HH:mm' }}</p>
+          <a routerLink="/specification" [queryParams]="{ repo: context.repository_id, commit: context.source_sha }" target="_blank" rel="noopener">בדיקת האפיון בגרסת המקור</a>
+        </div>
+      }
+      @if (state.movedSource(); as source) {<p class="notice">גרסת המקור החדשה: <code>{{ source }}</code>. יש לבדוק אותה ולהכין מחדש את הטופס לפני יצירה.</p>}
+      <button type="button" (click)="state.prepare(true)" [disabled]="state.preparing() || !state.canCreate()">בדיקת מקור והכנה מחדש</button>
+      @if (!state.context() && !state.preparing()) {<button type="button" (click)="state.prepare(false)" [disabled]="!state.canCreate()">ניסיון נוסף להכנת המקור</button>}
+      <label for="create-description">תיאור השינוי</label><textarea #description id="create-description" rows="6" required maxlength="20000" [value]="state.form().description" (input)="state.update('description', description.value)" aria-describedby="description-help description-error" [attr.aria-invalid]="!!state.fieldErrors()['description']"></textarea>
+      <small id="description-help">יש לתאר את המטרה, השינוי הצפוי ומה מחוץ לתכולה. 10–10,000 תווים.</small><small id="description-error" class="field-error">{{ state.fieldErrors()['description'] }}</small>
+      <div class="two-columns"><div><label for="create-team">צוות אחראי</label><select #team id="create-team" required aria-describedby="team-error" [attr.aria-invalid]="!!state.fieldErrors()['team_id']" [value]="state.form().team_id" (change)="state.update('team_id', team.value)"><option value="">בחירת צוות</option>@for (item of state.teams(); track item.team_id) {<option [value]="item.team_id">{{ item.name }}</option>}</select><small id="team-error" class="field-error">{{ state.fieldErrors()['team_id'] }}</small></div>
+        <div><label for="create-owner">בעלים</label><select #owner id="create-owner" required aria-describedby="owner-error" [attr.aria-invalid]="!!state.fieldErrors()['owner_id']" [value]="state.form().owner_id" (change)="state.update('owner_id', owner.value)"><option value="">בחירת בעלים</option>@for (item of state.owners(); track item.owner_id) {<option [value]="item.owner_id">{{ item.display_name }}</option>}</select><small id="owner-error" class="field-error">{{ state.fieldErrors()['owner_id'] }}</small></div></div>
+      @if (state.choices() && !state.teams().length) {<p class="notice">לא נמצא צוות מורשה במאגר זה. יש לעדכן את הצוותים בהגדרות סביבת העבודה.</p>}
+      <div class="two-columns"><div><label for="create-mode">מסלול התחלה</label><select #mode id="create-mode" [value]="state.form().initial_mode" (change)="state.update('initial_mode', mode.value)"><option value="manual">עריכה באתר</option><option value="ai">עבודה עם AI</option></select><small>אפשר לשלב את שני המסלולים באותה הצעה.</small></div>
+        <div><label for="create-impact">השפעת UI</label><select #impact id="create-impact" [value]="state.form().ui_impact" (change)="state.update('ui_impact', impact.value)"><option value="undecided">טרם הוכרעה</option><option value="yes">כן</option><option value="no">לא</option></select></div></div>
+      <label for="create-reason">נימוק להשפעת UI {{ state.form().ui_impact === 'no' ? '(חובה)' : '(רשות)' }}</label><textarea #reason id="create-reason" rows="2" aria-describedby="reason-error" [attr.aria-invalid]="!!state.fieldErrors()['reason']" maxlength="20000" [value]="state.form().reason" (input)="state.update('reason', reason.value)" [required]="state.form().ui_impact === 'no'"></textarea><small id="reason-error" class="field-error">{{ state.fieldErrors()['reason'] }}</small>
+      <details><summary>קישורים קשורים (רשות)</summary>@for (item of linkFields; track item[0]) {
+        <label [for]="'create-link-' + item[0]">{{ item[1] }}</label><input #link [id]="'create-link-' + item[0]" type="url" dir="ltr" maxlength="2000" [attr.aria-describedby]="'create-link-' + item[0] + '-error'" [attr.aria-invalid]="!!state.fieldErrors()[item[0]]" [value]="state.form()[item[0]]" (input)="state.update(item[0], link.value)"><small [id]="'create-link-' + item[0] + '-error'" class="field-error">{{ state.fieldErrors()[item[0]] }}</small>
+      }<small class="field-error">{{ state.fieldErrors()['links'] }}</small></details>
+    </fieldset>
+    <div class="actions"><button class="button" type="submit" [disabled]="state.submitting() || state.preparing() || !state.context() || (!state.uncertain() && !state.canCreate()) || !!state.ticket()">{{ state.submitting() ? 'שולחים בקשת יצירה…' : state.uncertain() ? 'ניסיון נוסף לאותה בקשה' : 'יצירת הצעה' }}</button><a routerLink="/changes">ביטול וחזרה לרשימה</a></div>
+  </form>
+}

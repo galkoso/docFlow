@@ -28,6 +28,8 @@ export class Proposals implements OnDestroy {
     return Object.fromEntries(['repository_id', 'state', 'owner_id', 'team_id', 'q', 'cursor'].map(key => [key, params.get(key) ?? undefined]));
   });
   readonly hasFilters = computed(() => Object.entries(this.filters()).some(([key, value]) => key !== 'cursor' && !!value));
+  readonly canCreate = computed(() => this.state.choices()?.repositories.some(item => item.can_create
+    && (!this.filters().repository_id || this.filters().repository_id === item.repository_id)) ?? false);
   readonly teams = computed(() => this.state.choices()?.teams.filter(item => !this.filters().repository_id
     || item.repository_ids.includes(this.filters().repository_id!)) ?? []);
   readonly owners = computed(() => this.state.choices()?.owners.filter(item => !this.filters().repository_id

@@ -36,6 +36,7 @@ export class Specification implements OnDestroy {
     return result;
   });
   readonly params = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
+  readonly canCreate = computed(() => this.state.repositories().some(repository => repository.repository_id === this.state.book()?.repository_id && repository.can_create));
   private readonly selection = computed(() => JSON.stringify([this.params().get('repo'), this.params().get('commit')]));
   readonly links = computed(() => {
     const book = this.state.book();

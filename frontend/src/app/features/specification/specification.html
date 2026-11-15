@@ -18,6 +18,7 @@
     <span>עדכון: {{ book.updated_at | date:'dd/MM/yyyy HH:mm' }}</span>
     <span>גרסה <code [title]="book.snapshot_sha">{{ book.snapshot_sha.slice(0, 12) }}</code></span>
     <button (click)="openFind()" aria-keyshortcuts="Control+f Meta+f">חיפוש בספר</button>
+    @if (canCreate()) {<a class="button" routerLink="/changes/new" [queryParams]="{ repo: book.repository_id }">פתיחת הצעה לשינוי</a>}
     <button (click)="book.version_selected ? latest() : retry()">{{ book.version_selected ? 'מעבר לגרסה העדכנית' : 'בדיקת עדכונים' }}</button>
   </div>
   @if (findOpen()) {

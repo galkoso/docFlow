@@ -605,3 +605,25 @@ Checkboxes represent verified work only.
   infrastructure and API tests pass; Clippy passes and migration 005 is applied
   locally. OpenAPI/client types are updated. The form UI follows in a separate
   commit.
+
+- Proposal creation UI: /changes/new now prepares an exact numbered main-source
+  preview, suggests an ASCII branch with a Hebrew-title fallback, preserves
+  custom branches, captures owner/team/mode/UI-impact reasoning and typed HTTPS
+  links, and submits through the existing idempotent CREATE API. Both the book
+  and proposal list expose a creation action using repository-specific server
+  capabilities. Source movement requires explicit preparation and a new click;
+  text remains intact. Uncertain requests freeze their original body/key and
+  are retried unchanged, with an explicit choice before abandoning them. Local
+  human-entered recovery data remains only in memory for the same identity and
+  is purged for a different identity; nothing resubmits on login. Navigation and
+  unload guards protect unsent input, and an accepted ticket opens its pending
+  proposal without claiming Git completion. Refreshed eligibility never silently
+  replaces a previously chosen owner/team. Field errors have labels/associations;
+  missing repository/team and authentication states remain explicit. Seven new
+  client scenarios cover preview/branch behavior, unchanged retries, source
+  movement, identity isolation, preparation retry keys, response mismatch and
+  owner fidelity. Angular production build and all 46 client tests pass. The
+  repository capability API is covered for Reader/Contributor; API tests and
+  workspace Clippy pass. Browser visual/accessibility acceptance remains open.
+  Proposal content reading/editing, review and the AI bundle workflow are still
+  required subsequent stages of the full specification.

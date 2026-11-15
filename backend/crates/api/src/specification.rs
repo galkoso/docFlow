@@ -19,6 +19,7 @@ use uuid::Uuid;
 pub struct RepositorySummary {
     pub repository_id: Uuid,
     pub default_branch: String,
+    pub can_create: bool,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -379,7 +380,7 @@ pub(crate) async fn repositories(State(state): State<AppState>, headers: HeaderM
         Ok(actor) => actor,
         Err(error) => return error.into_response(),
     };
-    let repositories = sqlx::query_as::<_, RepositorySummary>("SELECT r.id AS repository_id, r.default_branch FROM repositories r JOIN memberships m ON m.organization_id = r.organization_id JOIN users u ON u.id = m.user_id WHERE m.user_id = $1 AND u.status = 'ACTIVE' ORDER BY r.id LIMIT 201")
+    let repositories = sqlx::query_as::<_, RepositorySummary>("SELECT r.id AS repository_id, r.default_branch, m.role<>'READER' AS can_create FROM repositories r JOIN memberships m ON m.organization_id = r.organization_id JOIN users u ON u.id = m.user_id WHERE m.user_id = $1 AND u.status = 'ACTIVE' ORDER BY r.id LIMIT 201")
         .bind(actor.user_id).fetch_all(&state.database).await;
     match repositories {
         Ok(repositories) if repositories.len() <= 200 => {

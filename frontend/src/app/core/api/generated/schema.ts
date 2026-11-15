@@ -578,6 +578,7 @@ export interface components {
             repositories: components["schemas"]["RepositorySummary"][];
         };
         RepositorySummary: {
+            can_create: boolean;
             default_branch: string;
             /** Format: uuid */
             repository_id: string;

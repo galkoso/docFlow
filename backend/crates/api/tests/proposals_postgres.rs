@@ -812,6 +812,10 @@ async fn creation_context_previews_exact_number_source_and_survives_idempotent_r
 ) {
     let actor = user(&pool, "CONTRIBUTOR").await;
     let (app, provider, worker) = app(&pool, &actor);
+    assert_eq!(
+        get(&app, &actor, "/api/v1/repositories").await.1["repositories"][0]["can_create"],
+        true
+    );
     let prepare = serde_json::json!({"repository_id":actor.repository});
     let (status, context) = json(
         response(

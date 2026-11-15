@@ -1,4 +1,6 @@
-<header class="page-heading"><div><h1>הצעות שינוי</h1><p class="page-description">מגבשים שינוי בענף משלו, סוקרים יחד וממזגים לאחר אישור.</p></div></header>
+<header class="page-heading"><div><h1>הצעות שינוי</h1><p class="page-description">מגבשים שינוי בענף משלו, סוקרים יחד וממזגים לאחר אישור.</p></div>
+  @if (session.profile() && canCreate()) {<a class="button" routerLink="/changes/new" [queryParams]="{ repo: filters().repository_id }">פתיחת הצעה לשינוי</a>}
+</header>
 @if (session.profile()) {
   <form class="filters" aria-label="סינון הצעות" (submit)="$event.preventDefault()">
     <label class="search-field">חיפוש בשם או בענף<input #query type="search" maxlength="400" autocomplete="off" [value]="searchDraft()" (input)="search(query.value)"></label>

@@ -1,0 +1,13 @@
+header { margin-top: 1.5rem; } form { max-width: 780px; } h1, code { overflow-wrap: anywhere; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; } legend { font-size: 1.1rem; font-weight: bold; }
+label { display: block; margin: 1rem 0 .3rem; font-weight: bold; font-size: .9rem; }
+input, textarea, select { width: 100%; border: 1px solid #b9c6d7; background: white; padding: .6rem; border-radius: 5px; color: #23324b; min-width: 0; }
+button { border: 1px solid #cdd7df; border-radius: 5px; padding: .45rem .75rem; background: white; color: #23324b; cursor: pointer; }
+button.button { background: #3159d8; color: white; } button:disabled { opacity: .6; cursor: wait; }
+small { display: block; color: #697586; margin-top: .25rem; } .field-error { color: #a82d38; }
+.source { padding: .75rem 1rem; border-inline-start: 3px solid #8198c7; background: #f0f4fb; margin-block: 1rem; font-size: .9rem; }
+.source p { margin: .25rem 0; } .branch-control { display: flex; gap: .5rem; } .branch-control input { flex: 1; } .branch-control button { white-space: nowrap; }
+.two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-block: 1.5rem; }
+details { margin-top: 1.5rem; } summary { cursor: pointer; }
+@media (max-width: 500px) { .two-columns { grid-template-columns: 1fr; gap: 0; } .branch-control { flex-wrap: wrap; } .branch-control input { flex-basis: 100%; } }

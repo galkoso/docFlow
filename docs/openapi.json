@@ -2665,9 +2665,13 @@
         "type": "object",
         "required": [
           "repository_id",
-          "default_branch"
+          "default_branch",
+          "can_create"
         ],
         "properties": {
+          "can_create": {
+            "type": "boolean"
+          },
           "default_branch": {
             "type": "string"
           },

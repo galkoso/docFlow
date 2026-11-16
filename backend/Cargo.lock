@@ -2583,6 +2583,7 @@ name = "specspace-document-engine"
 version = "0.1.0"
 dependencies = [
  "image",
+ "percent-encoding",
  "pulldown-cmark",
  "serde",
  "serde_json",

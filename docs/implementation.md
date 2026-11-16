@@ -856,3 +856,24 @@ Checkboxes represent verified work only.
   reachability or authorization. The actual save planner, durable journal/worker,
   authenticated API and editor Git-save interaction remain required next work.
   The full backend workspace regression suite also passes after this change.
+
+- Candidate-book save validation: the document engine checks the complete new
+  catalog and source set, global nested/empty heading identities, orphan markers,
+  exact document/section ownership, incoming links from untouched chapters and
+  referenced asset existence. URI decoding is strict, once only, and constrained
+  to canonical repository paths. No external URL is fetched. Draft warnings keep
+  protected source and missing alt visible; review/merge must apply stricter
+  gates. Referenced images still require pinned hash/MIME/pixel verification by
+  the eventual save worker. Diagnostic output retains 1,000 findings with full
+  blocker/count/truncation metadata and bounded paths; internal identity/asset
+  maps are not serialized. Catalog diagnostics stream instead of accumulating
+  unbounded repeated findings. Tests exposed the parser's reference-expansion
+  fallback; a bounded callback probe now blocks incomplete checks without
+  narrowing first-definition-wins CommonMark semantics. Whole-book destination
+  and definition-scan work are also bounded. Fifteen new engine scenarios cover
+  actual six-document fixtures, cross-chapter deletions, URI attacks, diagnostic
+  bounds, parser exhaustion and adversarial duplicate definitions. All 49 engine
+  tests and workspace Clippy pass. Git save journaling, byte verification and
+  publication remain separate required work.
+  Full backend workspace regression checks pass; the editor contract fixture
+  regenerates without drift.

@@ -29,6 +29,42 @@ The existing adapter performs one atomic `createCommitOnBranch` request with the
 exact expected head and all file changes. It does not retry uncertain mutations.
 The new evidence read likewise performs no writes.
 
+## Implemented: candidate Markdown validation
+
+`save_validation::validate` checks a complete candidate book, including all
+`docs/*.md` files outside the catalog. Catalog mismatches, duplicate identities,
+heading identity/title problems, orphan section markers, disallowed link schemes, broken
+document/section references and absent image paths block a draft plan. Section
+identity checks include nested and empty headings; incoming links in untouched
+chapters are checked against the complete new book. Local fragments, `ss:` IDs
+and repository document paths resolve to exact document ownership. URI escapes
+are decoded once with strict UTF-8 and canonical repository-path validation.
+External URLs are never fetched.
+
+Protected HTML/unsupported heading levels remain visible warnings rather than
+being removed from source. Missing image alt is also a draft warning; it still
+must block review/merge as required by policy. The checker returns the exact set
+of referenced assets. Path existence is not media-byte verification: the worker
+must read these assets at the same pinned commit and verify hash, MIME and pixels
+before it can write a save. This checker does not authorize an operation or
+declare a proposal ready for review/merge.
+
+Reports keep at most 1,000 findings while retaining full reported counts and
+blocker counts, so late blockers cannot be hidden by warnings. Paths longer than
+240 characters are rejected with explicitly truncated diagnostic paths. Internal
+section/asset maps are excluded from diagnostic JSON. Catalog findings can be
+streamed without first materializing every repeated diagnostic.
+
+Reference processing has explicit resource bounds. Resolved-destination work is
+limited to 64MiB across validation passes, and definition scanning to 128MiB
+across the book. The checker also detects exhaustion of pulldown-cmark 0.13's
+reference expansion budget, which otherwise turns later reference uses into
+plain text. A callback probe counts original URL/title costs using short
+destinations. It preserves first-definition-wins semantics, escaped labels,
+multiline titles and quoted definitions; duplicate-definition rescanning is
+bounded. Exceeding a budget yields an incomplete blocking report, never a
+truncated valid result. These limits do not change source bytes.
+
 ## Required next implementation
 
 The save application/journal/worker must bind the entire immutable request to

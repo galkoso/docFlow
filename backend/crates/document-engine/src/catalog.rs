@@ -30,11 +30,26 @@ pub fn validate<'a>(
     documents: &'a [(&str, Document)],
 ) -> Result<Vec<&'a Document>, Vec<CatalogFinding>> {
     let mut findings = vec![];
-    let mut report = |code, path: &str| {
+    inspect(catalog, documents, |code, path| {
         findings.push(CatalogFinding {
             code,
             path: path.into(),
         })
+    })
+    .ok_or(findings)
+}
+
+/// Stream diagnostics without first allocating every finding. Callers can keep
+/// bounded output and full counts while retaining the complete validation pass.
+pub fn inspect<'a>(
+    catalog: &Catalog,
+    documents: &'a [(&str, Document)],
+    mut emit: impl FnMut(&'static str, &str),
+) -> Option<Vec<&'a Document>> {
+    let mut has_errors = false;
+    let mut report = |code, path: &str| {
+        has_errors = true;
+        emit(code, path);
     };
     if catalog.schema_version != 1 {
         report("UNSUPPORTED_SCHEMA", ".specspace/catalog.json");
@@ -97,11 +112,7 @@ pub fn validate<'a>(
             report("UNCATALOGUED_DOCUMENT", path);
         }
     }
-    if findings.is_empty() {
-        Ok(ordered)
-    } else {
-        Err(findings)
-    }
+    if has_errors { None } else { Some(ordered) }
 }
 
 #[cfg(test)]

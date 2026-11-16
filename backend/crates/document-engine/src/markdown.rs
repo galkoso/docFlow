@@ -100,7 +100,9 @@ pub(crate) fn allowed_destination(destination: &str, image: bool) -> bool {
         || (destination.starts_with("docs/") && !destination.contains(".."))
 }
 
-pub fn parse(source: &str) -> Result<Document, &'static str> {
+/// Read validated identity/metadata without expanding Markdown body references.
+/// The returned byte offset points to the exact unchanged body.
+pub fn front_matter(source: &str) -> Result<(FrontMatter, usize), &'static str> {
     if source.len() > 2 * 1024 * 1024 {
         return Err("FILE_TOO_LARGE");
     }
@@ -116,7 +118,11 @@ pub fn parse(source: &str) -> Result<Document, &'static str> {
     {
         return Err("INVALID_FRONT_MATTER");
     }
-    let offset = 4 + closing + 5;
+    Ok((metadata, 4 + closing + 5))
+}
+
+pub fn parse(source: &str) -> Result<Document, &'static str> {
+    let (metadata, offset) = front_matter(source)?;
     let body = &source[offset..];
     let mut document = Document {
         metadata,

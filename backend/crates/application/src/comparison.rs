@@ -2,7 +2,7 @@
 //! review success is implied. The caller must prove/pin the merge base and head,
 //! authorize the repository/proposal, and recheck access before serving a result.
 use crate::{draft::valid_document_id, save::SourceFile};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use specspace_document_engine::{catalog::Catalog, markdown};
 use specspace_domain::RepositoryPath;
@@ -24,13 +24,13 @@ pub enum ComparisonError {
     MissingSource,
     ContentMismatch,
 }
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Finding {
     pub code: String,
     pub path: String,
 }
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Side {
     pub path: String,
@@ -41,7 +41,7 @@ pub struct Side {
     pub document_id: Option<String>,
     pub catalog_position: Option<usize>,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum Kind {
@@ -164,8 +164,8 @@ impl Snapshot {
                 catalog_position: None,
             };
             if file_kind == Kind::Document {
-                match markdown::parse(source.as_ref().unwrap()) {
-                    Ok(document) => side.document_id = Some(document.metadata.document_id),
+                match markdown::front_matter(source.as_ref().unwrap()) {
+                    Ok((metadata, _)) => side.document_id = Some(metadata.document_id),
                     Err(code) => snapshot.finding(code, &path),
                 }
                 if side.executable {
@@ -277,7 +277,7 @@ impl Snapshot {
         }
     }
 }
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum Status {
@@ -286,7 +286,7 @@ pub enum Status {
     Modified,
     Renamed,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum MatchMethod {
@@ -294,7 +294,7 @@ pub enum MatchMethod {
     Path,
     ExactBlob,
 }
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Change {
     /// File-level identity binds both snapshots and paths; not a review approval.
@@ -308,7 +308,7 @@ pub struct Change {
     pub mode_changed: bool,
     pub catalog_position_changed: bool,
 }
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Inventory {
     pub id: String,

@@ -110,6 +110,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let save_worker = state
         .save_worker(Duration::from_secs(save_timeout))
         .map_err(|_| "SAVE_WORKER_TIMEOUT_SECONDS must be between 30 and 3600")?;
+    let comparison_timeout = std::env::var("COMPARISON_WORKER_TIMEOUT_SECONDS")
+        .unwrap_or_else(|_| "900".into())
+        .parse::<u64>()?;
+    let comparison_worker = state
+        .comparison_worker(Duration::from_secs(comparison_timeout))
+        .map_err(|_| "COMPARISON_WORKER_TIMEOUT_SECONDS must be between 30 and 900")?;
     let mut handles: Vec<_> = workers
         .into_iter()
         .map(|worker| {
@@ -117,6 +123,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::spawn(async move { worker.run(stopped).await })
         })
         .collect();
+    let comparison_stopped = stopped.clone();
+    handles.push(tokio::spawn(async move {
+        comparison_worker.run(comparison_stopped).await
+    }));
     let draft_stopped = stopped.clone();
     let save_stopped = stopped.clone();
     handles.push(tokio::spawn(
@@ -130,7 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         async move { proposal_worker.run(stopped).await },
     ));
     let shutdown_stop = stop.clone();
-    tracing::info!(%address, index_workers = 2, proposal_workers = 1, save_workers=1, "API listening");
+    tracing::info!(%address, index_workers = 2, proposal_workers = 1, save_workers=1, comparison_workers=1, "API listening");
     let result = axum::serve(listener, router(state))
         .with_graceful_shutdown(async move {
             shutdown_signal().await;

@@ -6,6 +6,7 @@ use crate::{
     save::SourceFile,
 };
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use specspace_domain::BranchName;
 use specspace_git_adapter::{CommitSha, FileEntry, GitError, GitProvider};
@@ -68,6 +69,35 @@ pub struct Selection {
     pub head: Option<CommitSha>,
     pub target: Option<CommitSha>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ComparisonSummary {
+    pub content_id: String,
+    pub proposal_id: Uuid,
+    pub repository_id: Uuid,
+    pub proposal_version: i64,
+    pub branch: String,
+    pub proposal_state: String,
+    pub head_sha: String,
+    pub target_sha: String,
+    pub merge_base_sha: String,
+    pub observed_main_sha: String,
+    pub observed_branch_sha: Option<String>,
+    pub recorded_head_sha: String,
+    pub recorded_base_sha: String,
+    pub historical_head: bool,
+    pub target_outdated: bool,
+    pub base_outdated: bool,
+    pub external_branch_change: bool,
+    pub before_file_count: usize,
+    pub after_file_count: usize,
+    pub changes_total: usize,
+    pub before_findings: Vec<crate::comparison::Finding>,
+    pub before_findings_total: usize,
+    pub after_findings: Vec<crate::comparison::Finding>,
+    pub after_findings_total: usize,
+}
 pub struct LoadedComparison {
     id: String,
     context: ReadContext,
@@ -81,6 +111,37 @@ pub struct LoadedComparison {
     inventory: Inventory,
 }
 impl LoadedComparison {
+    pub fn matches_context(&self, context: &ReadContext) -> bool {
+        self.context == *context
+    }
+    pub fn summary(&self) -> ComparisonSummary {
+        ComparisonSummary {
+            content_id: self.id.clone(),
+            proposal_id: self.proposal(),
+            repository_id: self.repository(),
+            proposal_version: self.version(),
+            branch: self.branch().as_str().into(),
+            proposal_state: self.state().into(),
+            head_sha: self.head.as_str().into(),
+            target_sha: self.target.as_str().into(),
+            merge_base_sha: self.merge_base.as_str().into(),
+            observed_main_sha: self.current_target.as_str().into(),
+            observed_branch_sha: self.branch_tip.as_ref().map(|s| s.as_str().into()),
+            recorded_head_sha: self.recorded_head().as_str().into(),
+            recorded_base_sha: self.recorded_base().as_str().into(),
+            historical_head: self.historical_head(),
+            target_outdated: self.target_outdated(),
+            base_outdated: self.base_outdated(),
+            external_branch_change: self.external_branch_change(),
+            before_file_count: self.inventory.before_file_count,
+            after_file_count: self.inventory.after_file_count,
+            changes_total: self.inventory.changes.len(),
+            before_findings: self.before.findings().to_vec(),
+            before_findings_total: self.before.findings_total(),
+            after_findings: self.after.findings().to_vec(),
+            after_findings_total: self.after.findings_total(),
+        }
+    }
     pub fn id(&self) -> &str {
         &self.id
     }

@@ -1,8 +1,8 @@
 # Commit-pinned proposal comparisons
 
 The raw engine, complete inventory preparation and authorized comparison loader
-are implemented. The proposal diff API, UI, semantic alignment and review
-anchors remain required work.
+and durable metadata jobs/pages are implemented. The HTTP diff routes, UI,
+file-level views and review anchors remain required work.
 
 ## Provider graph boundary
 
@@ -136,13 +136,59 @@ Three PostgreSQL scenarios cover real tenant/membership/account checks, Reader
 access, closed/provisioning context and bound settings/setup failures. The loader
 is wired into API application state but has no HTTP endpoint yet.
 
+## Implemented: durable progress and metadata pages
+
+Migration 008 adds actor-private comparison requests and ordered derived file
+rows. Reservation uses an immutable request fingerprint and exact replay key;
+identical concurrent requests return one ticket. A new request captures current
+server context and freezes its resolved head. An explicit target remains fixed;
+an omitted target means main observed by the successful load and is not
+advertised as a selected SHA before READY. Context changes before publication
+fail the job instead of retargeting its intent. Exact replay still returns the
+original ticket after later metadata changes, subject to current access/binding.
+
+One read-only worker claims expiring leases, rechecks context, honors provider
+backoff and publishes all metadata/file rows in one transaction. Restart or an
+expired lease can repeat reads safely. Stale owners cannot publish, fail or renew
+work. Loading heartbeats recheck access. Publication has a separately refreshed
+lease and a bounded transaction, avoiding a heartbeat blocking on its own row
+locks. Timeout/shutdown drops unfinished work; later claims recover by reading.
+Malformed/exhausted jobs terminate explicitly and are audited. No Git mutation,
+Git-operation journal reservation or approved-book index write occurs.
+
+Parent triggers preserve the original request and terminal descriptor. Child
+rows can be inserted/deleted only while publication is pending; READY requires
+complete contiguous ordinals, exact counts and matching scope/head/version.
+Terminal file rows cannot grow, change or disappear. Metadata is capped at 4MiB,
+each file record at 8KiB and the complete inventory at 40,000 changes. Neither
+Markdown nor binaries are stored. Inventory identity lookup reads validated front
+matter only, avoiding unnecessary Markdown body expansion.
+
+Status distinguishes queued, loading, publishing, retry wait, ready and failed.
+Current actor/membership/provider binding is checked on every status/page read;
+removing a Reader's membership is not blocked by the request's audit/history.
+A published historical comparison remains readable after a new head/closure,
+with current head/version returned separately from its frozen descriptor.
+One-to-100-file pages retain the snapshot/content identity and do no Git reads,
+even after a process restart. Per-actor admission serializes quota checks: two
+pending jobs and ten new requests per minute; exact replay is exempt.
+
+The API runtime starts one worker. `COMPARISON_WORKER_TIMEOUT_SECONDS` defaults to
+900 and accepts 30–900 seconds; apply migration 008 before starting it. Twelve
+PostgreSQL scenarios cover a 620-file multi-batch publication, empty comparisons,
+restart/paging, duplicate requests and quotas, stale owners, backoff, mid-batch
+rollback/reclaim, malformed/exhausted jobs, revocation and frozen scope, source
+privacy, incomplete database publication and immutable evidence. These are
+backend store/worker checks; no HTTP or browser acceptance is claimed yet.
+
 ## Remaining workflow
 
-The HTTP workflow must expose bounded, paginated comparison results with exact
-head/target/base identity and current authorization. Heavy cold loads still need
-job/cache integration, retained snapshot identity across pages and explicit
-progress/failure responses; repeatedly loading the whole book per page is not
-an acceptable serving strategy.
+The HTTP workflow must expose reservation/progress and durable paged metadata,
+using the stored snapshot identity for every subsequent page. File-level raw
+and readable views still need pinned body reads/verification, bounded windows
+and rechecks after rendering work. They must use stored paths/ref identities
+rather than reloading the whole book for each page. Runtime body caching,
+retention/operational pruning and cold-load performance still need hardening.
 Creation/deletion/renames, catalog moves and image changes need explicit evidence.
 Raw and AST-readable file views must page large content without hiding changes,
 preserve complete pinned identities, and bind hunks to file/section/content hashes

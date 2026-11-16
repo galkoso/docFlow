@@ -1,6 +1,8 @@
 //! PostgreSQL persistence primitives; provider calls never hold a DB transaction.
 pub mod authorization;
 pub mod comparison_authorization;
+pub mod comparison_worker;
+pub mod comparisons;
 pub mod creation_context;
 pub mod drafts;
 pub mod github_source;
@@ -44,7 +46,7 @@ pub async fn lease_job(
     sqlx::query_as::<_, LeasedJob>(
         "WITH candidate AS (
           SELECT id FROM jobs
-          WHERE state = 'QUEUED' AND kind NOT IN ('INDEX_SNAPSHOT','CREATE_PROPOSAL','SAVE_PROPOSAL') AND available_at <= now() AND attempts < max_attempts
+          WHERE state = 'QUEUED' AND kind NOT IN ('INDEX_SNAPSHOT','CREATE_PROPOSAL','SAVE_PROPOSAL','COMPARE_PROPOSAL') AND available_at <= now() AND attempts < max_attempts
           ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1
         )
         UPDATE jobs SET state = 'RUNNING', lease_owner = $1,

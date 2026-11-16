@@ -997,3 +997,21 @@ Checkboxes represent verified work only.
   final application tests (40), targeted PostgreSQL checks and workspace Clippy
   pass afterward. OpenAPI/editor fixtures have no drift; the restarted local API
   reports ready with the new loader initialized.
+
+- Durable comparison jobs and pages: migration 008 freezes actor/proposal/provider
+  context and read request identity, with exact-key replay and serialized admission
+  limits. A lease-fenced worker rechecks current scope, honors backoff and atomically
+  publishes metadata plus contiguous immutable file rows. Pending/ready/failed
+  state and bounded progress remain explicit; stale owners and partial DB writes
+  cannot expose READY. Every private page rechecks current access/binding and reads
+  persisted metadata without Git, including after restart. No source bodies or
+  binaries are stored, and this read work never reserves/mutates Git. Identity
+  extraction now parses front matter without expanding Markdown bodies. Twelve
+  PostgreSQL scenarios cover multi-batch/empty publication, crash rollback,
+  idempotency/quotas, immutable evidence, access changes, backoff and restart
+  paging. The runtime starts one comparison worker. HTTP routes, file-level raw/
+  readable views, body caching and review workflows remain subsequent work.
+  Full workspace regressions pass; the final lease-accessor refinement also
+  passes all twelve new PostgreSQL scenarios and workspace Clippy. OpenAPI and
+  editor fixtures regenerate without drift. Migration 008 applied locally and
+  the restarted API reports ready with one comparison worker running.

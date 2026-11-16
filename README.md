@@ -140,3 +140,10 @@ bodies; unresolved UNKNOWN saves retain their reservation and input pending
 operational resolution. Authenticated save submission is available through
 `POST /api/v1/proposals/:id/commits` and the editor Git-save controls.
 See [the save protocol](docs/commit-saves.md).
+
+
+Durable comparison preparation uses migration 008 and one read-only worker.
+`COMPARISON_WORKER_TIMEOUT_SECONDS` defaults to 900 (30–900 allowed). Metadata
+pages survive restart and recheck current access without reloading Git source;
+Markdown and binaries stay in Git. The HTTP diff routes and file views are still
+in progress. See [comparison boundaries and evidence](docs/diffs.md).

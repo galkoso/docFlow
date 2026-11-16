@@ -49,3 +49,7 @@ required-features = ["postgres-tests"]
 
 [lints]
 workspace = true
+
+[[test]]
+name = "comparisons_postgres"
+required-features = ["postgres-tests"]

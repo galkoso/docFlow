@@ -29,6 +29,10 @@ use specspace_infrastructure::drafts::PgDrafts;
 use specspace_infrastructure::oidc::Oidc;
 use specspace_infrastructure::{authorization::PgReadAuthorization, github_source::PgGitHubSource};
 use specspace_infrastructure::{
+    comparison_worker::ComparisonWorker,
+    comparisons::{ComparisonStoreError, PgComparisons},
+};
+use specspace_infrastructure::{
     index_worker::{GitIndexSource, IndexSource, IndexWorker},
     proposal_worker::ProposalWorker,
     provisioning::{PgProvisioning, ProvisionError},
@@ -50,6 +54,7 @@ pub struct AppState {
     pub books: Arc<BookReader>,
     pub proposal_books: Arc<ProposalReader>,
     pub comparisons: Arc<ComparisonReader>,
+    pub comparison_jobs: Arc<PgComparisons>,
     pub drafts: Arc<PgDrafts>,
     pub search_index: Arc<PgSearchIndex>,
     pub saves: Arc<PgSaves>,
@@ -90,6 +95,7 @@ impl AppState {
             .expect("fixed comparison timeout is valid"),
         );
         Self {
+            comparison_jobs: Arc::new(PgComparisons::new(database.clone())),
             comparisons,
             saves: Arc::new(PgSaves::new(database.clone())),
             drafts: Arc::new(PgDrafts::new(database.clone(), None)),
@@ -152,6 +158,17 @@ impl AppState {
             source,
             Some(self.books.clone()),
         ));
+    }
+
+    pub fn comparison_worker(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<ComparisonWorker, ComparisonStoreError> {
+        ComparisonWorker::new(
+            self.comparison_jobs.clone(),
+            self.comparisons.clone(),
+            timeout,
+        )
     }
 
     pub fn index_worker(&self, timeout: std::time::Duration) -> Result<IndexWorker, IndexError> {

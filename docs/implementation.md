@@ -805,3 +805,18 @@ Checkboxes represent verified work only.
   62 frontend tests pass. OpenAPI and generated client document the required
   recovery header. Editor page/autosave integration remains subsequent work.
   The full backend workspace regression suite and Angular production build pass.
+
+- Recovery autosave controller: component-owned memory binds every buffer and
+  immutable save intent to actor/proposal/document/base. Two idle seconds queue
+  one write; newer typing waits for its acknowledgement and returned CAS version.
+  Twenty-second timeouts, interrupted requests, service errors and invalid
+  acknowledgements retain the exact original request for explicit retry only.
+  Later conflicts cannot erase earlier uncertainty. Reads never replace local
+  input or acknowledge unknown writes. Existing/changed buffers require an
+  explicit restore/local choice; adopting another base is a separate action.
+  Same-actor session recovery rechecks context without automatic resend; account
+  changes or successful logout purge source, remote data and frozen requests.
+  Policy/permissions, byte bounds, Undo back to Git source, and closed-branch
+  recovery remain explicit. Twelve HTTP-controller scenarios pass; the frontend
+  suite passed all 74 tests before page integration. This controller does not
+  create Git commits; editor route integration follows as a separate stage.

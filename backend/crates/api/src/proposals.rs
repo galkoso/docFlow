@@ -196,6 +196,8 @@ pub struct JobStatus {
     pub phase: String,
     pub error_code: Option<String>,
     pub creation: Option<CreationResult>,
+    pub save: Option<crate::saves::SaveResult>,
+    pub save_failure: Option<crate::saves::SaveFailure>,
 }
 #[derive(sqlx::FromRow)]
 struct JobRow {
@@ -212,8 +214,8 @@ struct JobRow {
     index_state: Option<String>,
     index_error: Option<String>,
 }
-#[utoipa::path(get, path = "/api/v1/jobs/{job}", security(("sessionCookie" = [])), params(("job" = Uuid, Path)),
-    responses((status = 200, body = JobStatus), (status = 400, body = ErrorBody), (status = 401, body = ErrorBody), (status = 404, body = ErrorBody), (status = 503, body = ErrorBody)))]
+#[utoipa::path(get, path = "/api/v1/jobs/{job}", security(("sessionCookie" = [])), params(("job" = Uuid, Path), ("X-Expected-Actor" = Option<Uuid>, Header, description = "Required captured actor UUID for SAVE_PROPOSAL jobs")),
+    responses((status = 200, body = JobStatus), (status = 400, body = ErrorBody), (status = 401, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 503, body = ErrorBody)))]
 pub(crate) async fn job_status(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -226,6 +228,9 @@ pub(crate) async fn job_status(
     let Ok(Path(job)) = path else {
         return invalid_query();
     };
+    if let Some(response) = crate::saves::job_status(&state, &headers, &actor, job).await {
+        return response;
+    }
     // Resolve scope through linked durable records, never client-controlled JSON
     // repository IDs. Do not expose raw job payloads or provider configuration.
     let row = sqlx::query_as::<_, JobRow>("SELECT j.id AS job_id,j.kind,j.state,j.attempts,p.id AS proposal_id,p.branch,o.result_sha,o.state AS operation_state,o.error_code,j.result,s.state AS index_state,s.error_code AS index_error FROM jobs j LEFT JOIN git_operations o ON o.id=j.operation_id AND o.organization_id=j.organization_id AND o.kind='CREATE' LEFT JOIN proposals p ON p.id=o.proposal_id AND p.organization_id=j.organization_id LEFT JOIN search_index_snapshots s ON s.job_id=j.id AND s.organization_id=j.organization_id JOIN repositories r ON r.organization_id=j.organization_id AND r.id=CASE WHEN j.kind='CREATE_PROPOSAL' THEN p.repository_id WHEN j.kind='INDEX_SNAPSHOT' THEN s.repository_id END JOIN memberships m ON m.organization_id=r.organization_id JOIN users u ON u.id=m.user_id WHERE j.id=$1 AND m.user_id=$2 AND u.status='ACTIVE' AND j.kind IN ('CREATE_PROPOSAL','INDEX_SNAPSHOT')")
@@ -309,6 +314,8 @@ pub(crate) async fn job_status(
         phase: phase.into(),
         error_code,
         creation,
+        save: None,
+        save_failure: None,
     })
     .into_response()
 }

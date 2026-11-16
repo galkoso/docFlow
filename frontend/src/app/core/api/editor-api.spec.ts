@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { EditorApi, type SaveDraft } from './editor-api';
+import { EditorApi, type SaveDraft, type SaveRequest } from './editor-api';
 
 describe('Editor request identity', () => {
   it('retains the captured actor on an exact recovery retry after another request uses a different actor', () => {
@@ -27,4 +27,30 @@ describe('Editor request identity', () => {
     retry.flush({ error: { code: 'SESSION_IDENTITY_CHANGED' } }, { status: 409, statusText: 'Conflict' });
     http.verify();
   });
+  it('keeps Git submission identity, key and exact body independent of later polling identities', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(EditorApi);
+    const http = TestBed.inject(HttpTestingController);
+    const body: SaveRequest = {
+      expected_head_sha: '1'.repeat(40), expected_proposal_version: 7, message: 'Update chapter',
+      documents: [{ document_id: 'DOC-ONE', expected_document_sha256: 'a'.repeat(64), markdown: 'Exact source\r\n' }],
+    };
+    api.saveCommit('original', 'proposal', 'same-key', body).subscribe({ error: () => {} });
+    const first = http.expectOne('/api/v1/proposals/proposal/commits');
+    expect(first.request.headers.get('X-Expected-Actor')).toBe('original');
+    expect(first.request.headers.get('Idempotency-Key')).toBe('same-key');
+    first.error(new ProgressEvent('error'));
+    api.saveJob('another', 'job').subscribe();
+    const poll = http.expectOne('/api/v1/jobs/job');
+    expect(poll.request.headers.get('X-Expected-Actor')).toBe('another');
+    poll.flush({});
+    api.saveCommit('original', 'proposal', 'same-key', body).subscribe({ error: () => {} });
+    const retry = http.expectOne('/api/v1/proposals/proposal/commits');
+    expect(retry.request.body).toEqual(body);
+    expect(retry.request.headers.get('X-Expected-Actor')).toBe('original');
+    expect(retry.request.headers.get('Idempotency-Key')).toBe('same-key');
+    retry.flush({}, { status: 409, statusText: 'Conflict' });
+    http.verify();
+  });
+
 });

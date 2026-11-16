@@ -52,3 +52,7 @@ required-features = ["postgres-tests"]
 
 [lints]
 workspace = true
+
+[[test]]
+name = "saves_postgres"
+required-features = ["postgres-tests"]

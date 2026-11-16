@@ -911,3 +911,16 @@ Checkboxes represent verified work only.
   one worker with a configurable timeout. Authenticated submission, editor Git
   interaction, formal review consumers, operational resolution/retention and real
   provider/browser acceptance remain subsequent work.
+
+- Authenticated Git-save API: POST commits binds the captured actor, exact
+  idempotency key and expected head/version to server-resolved repository scope.
+  Accepted tickets claim queueing only. Exact retries survive head advancement
+  and closure without creating another operation; fresh stale/closed work fails.
+  GET jobs exposes actor-private typed outcomes and bounded diagnostics, requires
+  current edit access and never includes raw source/provider configuration.
+  Inconsistent success publications fail closed; UNKNOWN remains explicit.
+  Intent hashing uses a bounded CPU slot. Six PostgreSQL HTTP scenarios and one
+  Angular exact-retry identity scenario supplement the worker evidence. Full
+  backend tests/Clippy, production Angular build and all 85 frontend tests pass.
+  OpenAPI and generated types are updated. The editor Git control, local-edit
+  rebasing after a verified save and broader review workflows remain open.

@@ -13,6 +13,10 @@ export type DraftSnapshot = components['schemas']['DraftSnapshot'];
 export type DraftSaved = components['schemas']['DraftSaved'];
 export type SaveDraft = components['schemas']['SaveDraft'];
 export type DraftBuffer = components['schemas']['DraftBuffer'];
+export type SaveRequest = components['schemas']['SaveRequest'];
+export type SaveAccepted = components['schemas']['SaveAccepted'];
+export type SaveResult = components['schemas']['SaveResult'];
+export type SaveJob = components['schemas']['JobStatus'];
 
 @Injectable({ providedIn: 'root' })
 export class EditorApi {
@@ -42,6 +46,13 @@ export class EditorApi {
     return this.http.delete<void>(this.draft(proposal), {
       params: { document_id: document, expected_draft_version: String(version) }, headers: this.actor(actor),
     });
+  }
+  saveCommit(actor: string, proposal: string, key: string, body: SaveRequest) {
+    return this.http.post<SaveAccepted>(`/api/v1/proposals/${encodeURIComponent(proposal)}/commits`, body,
+      { headers: { ...this.actor(actor), 'Idempotency-Key': key } });
+  }
+  saveJob(actor: string, job: string) {
+    return this.http.get<SaveJob>(`/api/v1/jobs/${encodeURIComponent(job)}`, { headers: this.actor(actor) });
   }
   private document(proposal: string, document: string) {
     return `/api/v1/proposals/${encodeURIComponent(proposal)}/documents/${encodeURIComponent(document)}/editor`;

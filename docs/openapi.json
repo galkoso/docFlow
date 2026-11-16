@@ -240,6 +240,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "description": "Required captured actor UUID for SAVE_PROPOSAL jobs",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -271,6 +284,15 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -992,6 +1014,166 @@
             }
           },
           "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/commits": {
+      "post": {
+        "tags": [
+          "crate::saves"
+        ],
+        "operationId": "saveProposalCommit",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "description": "Actor captured with this immutable intent",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Queued only; no Git success is claimed",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Actor-bound job status URL"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3308,6 +3490,26 @@
           }
         }
       },
+      "DocumentSave": {
+        "type": "object",
+        "required": [
+          "document_id",
+          "expected_document_sha256",
+          "markdown"
+        ],
+        "properties": {
+          "document_id": {
+            "type": "string"
+          },
+          "expected_document_sha256": {
+            "type": "string"
+          },
+          "markdown": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "DocumentSummary": {
         "type": "object",
         "required": [
@@ -4058,6 +4260,26 @@
             ],
             "format": "uuid"
           },
+          "save": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SaveResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "save_failure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SaveFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "state": {
             "type": "string"
           }
@@ -4756,6 +4978,28 @@
           }
         }
       },
+      "SaveAccepted": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "operation_id",
+          "job_id"
+        ],
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SaveDraft": {
         "type": "object",
         "required": [
@@ -4786,6 +5030,204 @@
           }
         },
         "additionalProperties": false
+      },
+      "SaveFailure": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "validation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SaveValidationReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validation_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SaveFinding": {
+        "type": "object",
+        "required": [
+          "code",
+          "path",
+          "path_truncated",
+          "severity"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "path_truncated": {
+            "type": "boolean"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "source_end_byte": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "source_start_byte": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      },
+      "SaveRequest": {
+        "type": "object",
+        "required": [
+          "expected_head_sha",
+          "expected_proposal_version",
+          "message",
+          "documents"
+        ],
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentSave"
+            }
+          },
+          "expected_head_sha": {
+            "type": "string"
+          },
+          "expected_proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveResult": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "head_sha",
+          "proposal_version",
+          "no_op",
+          "reconciled",
+          "documents"
+        ],
+        "properties": {
+          "committed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedDocument"
+            }
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "no_op": {
+            "type": "boolean"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reconciled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SaveValidationReport": {
+        "type": "object",
+        "required": [
+          "findings",
+          "findings_total",
+          "findings_truncated",
+          "blockers_total",
+          "complete"
+        ],
+        "properties": {
+          "blockers_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaveFinding"
+            }
+          },
+          "findings_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "findings_truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SavedDocument": {
+        "type": "object",
+        "required": [
+          "document_id",
+          "path",
+          "sha256",
+          "bytes",
+          "normalization_changed",
+          "normalization_only"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "normalization_changed": {
+            "type": "boolean"
+          },
+          "normalization_only": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
       },
       "SearchHit": {
         "type": "object",

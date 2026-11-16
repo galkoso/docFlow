@@ -162,6 +162,18 @@ impl PgSaves {
         tx.commit().await?;
         Ok(context)
     }
+    /// Resolve server-owned scope for submission/replay, including closed proposals.
+    /// reserve still checks current access and requires editable state for new work.
+    pub async fn submission_repository(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+    ) -> Result<Uuid, SaveJournalError> {
+        let mut tx = self.transaction().await?;
+        let (context, _) = current(&mut tx, actor, proposal, false).await?;
+        tx.commit().await?;
+        Ok(context.repository)
+    }
     pub async fn reserve(
         &self,
         intent: &ValidatedSave,

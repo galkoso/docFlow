@@ -1,8 +1,8 @@
 # Git save boundary
 
 The editor currently provides local source and private recovery. The backend now
-has a durable Git save worker; authenticated save submission and the editor
-interaction are the next integration stage.
+has a durable Git save worker and authenticated submission. Connecting the
+editor interaction is the next integration stage.
 
 ## Implemented: pinned commit evidence
 
@@ -145,10 +145,37 @@ malformed jobs, immutable evidence and image verification. The complete backend
 workspace suite and Clippy pass. These deterministic provider tests do not claim
 real GitHub or browser acceptance.
 
+## Implemented: authenticated submission and status
+
+`POST /api/v1/proposals/:id/commits` requires session authentication, Origin/XSRF,
+`X-Expected-Actor` and `Idempotency-Key`. The body contains expected head/version,
+message and existing documents with exact base hashes and Markdown. Repository
+and provider context come from current server records. Intent hashing runs in a
+bounded CPU slot; reservation rechecks access after that work. Decoded content
+size violations return 413, malformed JSON 400, invalid intents 422, stale context
+or a conflicting mutation/key 409. Accepted requests return only a 202 ticket and
+job Location, never a saved SHA.
+
+Identical replays return the original job even after a head advance or closure,
+provided current access still permits the intent. They never retarget to a new
+base. `GET /api/v1/jobs/:id` requires the captured actor header for save jobs and
+current EDIT/owner/Admin scope; only the submitting actor can read private save
+results. It projects bounded typed diagnostics and verified outcome metadata,
+without raw source or provider configuration. Success requires both the operation
+and job publications; no-op outcomes carry no commit timestamp. UNKNOWN retains
+an explicit reconciliation phase even after retry exhaustion.
+
+Six PostgreSQL HTTP scenarios cover those boundaries, including account changes,
+CSRF, private polling, changed retries, closed-state replay and status publication.
+Synthetic outcome rows test HTTP projection; Git proof itself is exercised by
+the worker's twenty scenarios. Generated OpenAPI/client types and explicit-actor
+Angular methods expose the contract; a client test checks exact retry identity,
+key and source after an unrelated poll uses another actor.
+
 ## Required next implementation
 
-An authenticated API and the editor's Git-save interaction must connect this
-workflow, flush active fields, preserve later local edits and frozen retries,
+The editor's Git-save interaction must flush active fields, preserve later local
+edits and frozen retries,
 and show a verified SHA/time only after publication succeeds. Formal review,
 operational reconciliation, unresolved-input retention and real-provider/browser
 acceptance remain open.

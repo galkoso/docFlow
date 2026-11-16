@@ -216,6 +216,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/commits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["saveProposalCommit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/documents/{document}": {
         parameters: {
             query?: never;
@@ -528,6 +544,11 @@ export interface components {
             snapshot_sha: string;
             title: string;
         };
+        DocumentSave: {
+            document_id: string;
+            expected_document_sha256: string;
+            markdown: string;
+        };
         DocumentSummary: {
             document_id: string;
             error_code?: string | null;
@@ -722,6 +743,8 @@ export interface components {
             phase: string;
             /** Format: uuid */
             proposal_id?: string | null;
+            save?: components["schemas"]["SaveResult"] | null;
+            save_failure?: components["schemas"]["SaveFailure"] | null;
             state: string;
         };
         /** @enum {string} */
@@ -897,6 +920,14 @@ export interface components {
             /** Format: uuid */
             repository_id: string;
         };
+        SaveAccepted: {
+            /** Format: uuid */
+            job_id: string;
+            /** Format: uuid */
+            operation_id: string;
+            /** Format: uuid */
+            proposal_id: string;
+        };
         SaveDraft: {
             base_head_sha: string;
             content_utf8: string;
@@ -908,6 +939,52 @@ export interface components {
             expected_draft_version: number;
             /** Format: uuid */
             save_id: string;
+        };
+        SaveFailure: {
+            document_id?: string | null;
+            validation?: components["schemas"]["SaveValidationReport"] | null;
+            validation_code?: string | null;
+        };
+        SaveFinding: {
+            code: string;
+            path: string;
+            path_truncated: boolean;
+            severity: string;
+            source_end_byte?: number | null;
+            source_start_byte?: number | null;
+        };
+        SaveRequest: {
+            documents: components["schemas"]["DocumentSave"][];
+            expected_head_sha: string;
+            /** Format: int64 */
+            expected_proposal_version: number;
+            message: string;
+        };
+        SaveResult: {
+            committed_at?: string | null;
+            documents: components["schemas"]["SavedDocument"][];
+            head_sha: string;
+            no_op: boolean;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: int64 */
+            proposal_version: number;
+            reconciled: boolean;
+        };
+        SaveValidationReport: {
+            blockers_total: number;
+            complete: boolean;
+            findings: components["schemas"]["SaveFinding"][];
+            findings_total: number;
+            findings_truncated: boolean;
+        };
+        SavedDocument: {
+            bytes: number;
+            document_id: string;
+            normalization_changed: boolean;
+            normalization_only: boolean;
+            path: string;
+            sha256: string;
         };
         SearchHit: {
             block_id: string;
@@ -1175,7 +1252,10 @@ export interface operations {
     job_status: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required captured actor UUID for SAVE_PROPOSAL jobs */
+                "X-Expected-Actor"?: string | null;
+            };
             path: {
                 job: string;
             };
@@ -1208,6 +1288,14 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1697,6 +1785,104 @@ export interface operations {
                 };
             };
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    saveProposalCommit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Actor captured with this immutable intent */
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued only; no Git success is claimed */
+            202: {
+                headers: {
+                    /** @description Actor-bound job status URL */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveAccepted"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

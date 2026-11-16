@@ -105,8 +105,8 @@ for comparison and works without Git. It creates no Commit or review approval.
 Each user has up to 1,000 buffers / 20MiB per proposal, with 2MiB per document.
 An authenticated, CSRF-protected `DELETE` with document ID and expected draft
 version discards only that user's selected buffer. Recreated buffers receive new
-versions, protecting them from delayed requests. Git saves remain a separate
-implementation stage.
+versions, protecting them from delayed requests. Git saves use the separate
+journaled workflow below.
 
 All recovery requests require `X-Expected-Actor` with the UUID captured when the
 user began the intent. The server rejects a missing, malformed, duplicate or
@@ -135,5 +135,6 @@ commit/tree/content verification. It never repeats an uncertain Git write.
 `SAVE_WORKER_TIMEOUT_SECONDS` defaults to 900 (30–3600 allowed). Apply migration
 007 before starting this runtime. Known terminal saves purge private request
 bodies; unresolved UNKNOWN saves retain their reservation and input pending
-operational resolution. Save submission API and editor Git controls are still
-pending; see [the save protocol](docs/commit-saves.md).
+operational resolution. Authenticated save submission is available through
+`POST /api/v1/proposals/:id/commits`; editor Git controls are still pending.
+See [the save protocol](docs/commit-saves.md).

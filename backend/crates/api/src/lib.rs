@@ -6,6 +6,7 @@ pub mod editor;
 pub mod proposal_content;
 pub mod proposal_reads;
 pub mod proposals;
+pub mod saves;
 pub mod specification;
 
 use axum::{
@@ -177,6 +178,7 @@ pub fn router(state: AppState) -> Router {
         .merge(proposal_content::routes())
         .merge(drafts::routes())
         .merge(editor::routes())
+        .merge(saves::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))
         .fallback(not_found)

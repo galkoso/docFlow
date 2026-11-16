@@ -1,5 +1,9 @@
 use async_trait::async_trait;
-use specspace_application::{book::BookError, reader::BookProviderFactory};
+use specspace_application::{
+    book::BookError,
+    comparison_reader::{BoundProviderFactory, ComparisonReadError, RepositoryBinding},
+    reader::BookProviderFactory,
+};
 use specspace_git_adapter::{GitProvider, app_auth::GitHubAppKey};
 use sqlx::{FromRow, PgPool};
 use std::{
@@ -63,11 +67,16 @@ impl PgGitHubSource {
     }
 }
 
-#[async_trait]
-impl BookProviderFactory for PgGitHubSource {
-    async fn provider(&self, repository: Uuid) -> Result<Arc<dyn GitProvider>, BookError> {
-        let settings = sqlx::query_as::<_, RepositoryConnection>("SELECT remote_id, installation_id, default_branch FROM repositories WHERE id = $1 AND provider = 'GITHUB'")
-            .bind(repository).fetch_optional(&self.pool).await.map_err(|_| BookError::AuthorizationUnavailable)?.ok_or(BookError::NotFound)?;
+impl PgGitHubSource {
+    async fn settings(&self, repository: Uuid) -> Result<RepositoryConnection, BookError> {
+        sqlx::query_as::<_,RepositoryConnection>("SELECT remote_id,installation_id,default_branch FROM repositories WHERE id=$1 AND provider='GITHUB'")
+            .bind(repository).fetch_optional(&self.pool).await.map_err(|_|BookError::AuthorizationUnavailable)?.ok_or(BookError::NotFound)
+    }
+    async fn connect(
+        &self,
+        repository: Uuid,
+        settings: RepositoryConnection,
+    ) -> Result<Arc<dyn GitProvider>, BookError> {
         let remote_id = settings
             .remote_id
             .parse::<u64>()
@@ -114,5 +123,35 @@ impl BookProviderFactory for PgGitHubSource {
             connections.pop_front();
         }
         Ok(provider)
+    }
+}
+#[async_trait]
+impl BookProviderFactory for PgGitHubSource {
+    async fn provider(&self, repository: Uuid) -> Result<Arc<dyn GitProvider>, BookError> {
+        self.connect(repository, self.settings(repository).await?)
+            .await
+    }
+}
+#[async_trait]
+impl BoundProviderFactory for PgGitHubSource {
+    async fn provider_bound(
+        &self,
+        binding: &RepositoryBinding,
+    ) -> Result<Arc<dyn GitProvider>, ComparisonReadError> {
+        let settings = self
+            .settings(binding.repository)
+            .await
+            .map_err(ComparisonReadError::Source)?;
+        if settings.remote_id.parse::<u64>().ok() != Some(binding.remote_id)
+            || settings.installation_id.parse::<u64>().ok() != Some(binding.installation_id)
+            || settings.default_branch != "main"
+        {
+            return Err(ComparisonReadError::ContextChanged);
+        }
+        // Connect with the exact settings just matched, never another mutable
+        // lookup. The caller separately rechecks current proposal authorization.
+        self.connect(binding.repository, settings)
+            .await
+            .map_err(ComparisonReadError::Source)
     }
 }

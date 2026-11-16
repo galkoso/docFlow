@@ -1226,3 +1226,173 @@ async fn different_creation_keys_cannot_consume_one_context_concurrently(pool: P
         .unwrap();
     assert_eq!(count, 1);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn comparison_context_is_server_scoped_current_and_readable_by_readers_without_edit_assignment(
+    pool: PgPool,
+) {
+    use specspace_application::comparison_reader::{ComparisonAuthorization, ComparisonReadError};
+    use specspace_infrastructure::comparison_authorization::PgComparisonAuthorization;
+    let f = fixture(&pool, "CONTRIBUTOR").await;
+    let ticket = PgProposals::new(pool.clone())
+        .reserve(
+            f.actor,
+            &intent(&f, "change/comparison"),
+            &IdempotencyKey::parse("comparison-context").unwrap(),
+        )
+        .await
+        .unwrap();
+    sqlx::query("UPDATE proposals SET head_sha=repeat('2',40),state='DRAFT',version=2 WHERE id=$1")
+        .bind(ticket.proposal_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE memberships SET role='READER' WHERE user_id=$1")
+        .bind(f.actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let access = PgComparisonAuthorization::new(pool.clone());
+    let context = access.resolve(f.actor, ticket.proposal_id).await.unwrap();
+    assert_eq!(context.organization, f.organization);
+    assert_eq!(context.connection.repository, f.repository);
+    assert_eq!(context.recorded_head.as_str(), "2".repeat(40));
+    assert_eq!(context.version, 2);
+    assert_eq!(context.connection.installation_id, 7);
+    let other = fixture(&pool, "ADMIN").await;
+    assert!(matches!(
+        access.resolve(other.actor, ticket.proposal_id).await,
+        Err(ComparisonReadError::NotFound)
+    ));
+    sqlx::query("UPDATE proposals SET state='CLOSED',version=3 WHERE id=$1")
+        .bind(ticket.proposal_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let closed = access.resolve(f.actor, ticket.proposal_id).await.unwrap();
+    assert_eq!(closed.state, "CLOSED");
+    assert!(closed != context);
+    sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
+        .bind(f.actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        access.resolve(f.actor, ticket.proposal_id).await,
+        Err(ComparisonReadError::NotFound)
+    ));
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn bound_comparison_connections_reject_changed_configuration_before_attempting_app_authentication(
+    pool: PgPool,
+) {
+    use specspace_application::{
+        book::BookError,
+        comparison_reader::{BoundProviderFactory, ComparisonAuthorization, ComparisonReadError},
+    };
+    use specspace_infrastructure::{
+        comparison_authorization::PgComparisonAuthorization, github_source::PgGitHubSource,
+    };
+    let f = fixture(&pool, "CONTRIBUTOR").await;
+    let ticket = PgProposals::new(pool.clone())
+        .reserve(
+            f.actor,
+            &intent(&f, "change/bound-comparison"),
+            &IdempotencyKey::parse("bound-comparison").unwrap(),
+        )
+        .await
+        .unwrap();
+    let access = PgComparisonAuthorization::new(pool.clone());
+    assert!(matches!(
+        access.resolve(f.actor, ticket.proposal_id).await,
+        Err(ComparisonReadError::ProposalNotReady)
+    ));
+    sqlx::query("UPDATE proposals SET head_sha=repeat('2',40),state='DRAFT' WHERE id=$1")
+        .bind(ticket.proposal_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let context = access.resolve(f.actor, ticket.proposal_id).await.unwrap();
+    let source = PgGitHubSource::new(pool.clone(), None);
+    assert!(matches!(
+        source.provider_bound(&context.connection).await,
+        Err(ComparisonReadError::Source(
+            BookError::RepositoryNotConfigured
+        ))
+    ));
+    sqlx::query("UPDATE repositories SET installation_id='8' WHERE id=$1")
+        .bind(f.repository)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        source.provider_bound(&context.connection).await,
+        Err(ComparisonReadError::ContextChanged)
+    ));
+    let current = access.resolve(f.actor, ticket.proposal_id).await.unwrap();
+    assert_eq!(current.connection.installation_id, 8);
+    assert!(current != context);
+    sqlx::query("UPDATE repositories SET default_branch='other' WHERE id=$1")
+        .bind(f.repository)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        access.resolve(f.actor, ticket.proposal_id).await,
+        Err(ComparisonReadError::InvalidConfiguration)
+    ));
+    assert!(matches!(
+        source.provider_bound(&current.connection).await,
+        Err(ComparisonReadError::ContextChanged)
+    ));
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn comparison_membership_removal_and_invalid_provider_ids_never_produce_a_read_context(
+    pool: PgPool,
+) {
+    use specspace_application::comparison_reader::{ComparisonAuthorization, ComparisonReadError};
+    use specspace_infrastructure::comparison_authorization::PgComparisonAuthorization;
+    let f = fixture(&pool, "CONTRIBUTOR").await;
+    let ticket = PgProposals::new(pool.clone())
+        .reserve(
+            f.actor,
+            &intent(&f, "change/read-membership"),
+            &IdempotencyKey::parse("read-membership").unwrap(),
+        )
+        .await
+        .unwrap();
+    sqlx::query("UPDATE proposals SET head_sha=repeat('2',40),state='DRAFT' WHERE id=$1")
+        .bind(ticket.proposal_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let reader = Uuid::new_v4();
+    sqlx::query("INSERT INTO users(id,issuer,external_subject,display_name) VALUES($1,'fixture',$1::text,'Synthetic comparison reader')").bind(reader).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO memberships(organization_id,user_id,role) VALUES($1,$2,'READER')")
+        .bind(f.organization)
+        .bind(reader)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let access = PgComparisonAuthorization::new(pool.clone());
+    access.resolve(reader, ticket.proposal_id).await.unwrap();
+    sqlx::query("DELETE FROM memberships WHERE organization_id=$1 AND user_id=$2")
+        .bind(f.organization)
+        .bind(reader)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        access.resolve(reader, ticket.proposal_id).await,
+        Err(ComparisonReadError::NotFound)
+    ));
+    sqlx::query("UPDATE repositories SET remote_id='invalid' WHERE id=$1")
+        .bind(f.repository)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        access.resolve(f.actor, ticket.proposal_id).await,
+        Err(ComparisonReadError::InvalidConfiguration)
+    ));
+}

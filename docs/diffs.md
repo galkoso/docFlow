@@ -1,7 +1,8 @@
 # Commit-pinned proposal comparisons
 
-The raw comparison engine and provider merge-base read are implemented. The
-proposal diff API, UI, semantic alignment and review anchors remain required work.
+The raw engine, complete inventory preparation and authorized comparison loader
+are implemented. The proposal diff API, UI, semantic alignment and review
+anchors remain required work.
 
 ## Provider graph boundary
 
@@ -90,11 +91,58 @@ must additionally bind organization/proposal, current target, metadata version
 and provider configuration; planner IDs alone cannot authorize a resource or
 count as review evidence. Large inventory responses still need pagination.
 
+## Implemented: authorized loader and bound connections
+
+`ComparisonReader` resolves current server-owned actor/organization/proposal,
+recorded head/base, metadata version/state and repository connection. It rejects
+provisioning or invalid context before connecting. `PgComparisonAuthorization`
+requires an active user and current organization membership; Readers can read
+without an edit assignment. Closed/merged proposals remain readable. The context
+and provider settings are private server types, never browser-deserialized or
+serialized as a response.
+
+`PgGitHubSource::provider_bound` matches frozen numeric repository/installation
+settings, then connects using those exact values. It does not perform a second
+unbound lookup that could choose another connection during reconfiguration. The
+normal book reader and comparison reader share configured GitHub connection
+caching; an unbound test book provider is never implicitly a comparison provider.
+Current authorization/configuration/version is rechecked after connection,
+between snapshot loads, every eight text reads, after CPU work and before return.
+The caller can recheck a loaded result again after later rendering awaits.
+
+The loader captures the current main target and proves any selected historical
+head against the recorded proposal head, and any historical target against main.
+It resolves their merge base and loads the complete base/head trees and required
+text, checking declared limits before text I/O and actual sizes before retaining
+source. Preparation and blob/identity validation run on bounded blocking CPU.
+Main-only changes never enter the before side. Identical base/head commits share
+one prepared snapshot. This loader never writes Git or seeds main indexes/caches.
+
+After loading, main and branch observations are refreshed. Ordinary ref movement
+is reported separately while the comparison's head/target/base stay pinned; a
+force-push removing the selected target's main lineage rejects publication.
+Missing proposal branches remain explicit alongside recorded historical content.
+A comparison-view ID additionally binds organization/proposal, frozen connection,
+metadata version/state/branch and exact selected refs. It is not a review approval.
+
+One load runs per reader; extra loads receive Busy instead of queuing without a
+bound. A 30–900-second timeout is enforced (runtime configuration uses 900).
+Cancellation releases I/O capacity; CPU closures own the permit until their work
+finishes even if the caller disconnects. No read is automatically retried.
+Eight application scenarios cover merge-base correctness, main-only changes,
+lineage checks, empty-history sharing, revocation/reconfiguration/version races,
+ref movement, forged source/size limits, scope/readiness and cancellation/timeout.
+Three PostgreSQL scenarios cover real tenant/membership/account checks, Reader
+access, closed/provisioning context and bound settings/setup failures. The loader
+is wired into API application state but has no HTTP endpoint yet.
+
 ## Remaining workflow
 
-The application must capture authorized proposal head and current target,
-resolve their merge base, enumerate complete trees, resolve stable document IDs
-and catalog ordering, and recheck authorization before publishing results.
+The HTTP workflow must expose bounded, paginated comparison results with exact
+head/target/base identity and current authorization. Heavy cold loads still need
+job/cache integration, retained snapshot identity across pages and explicit
+progress/failure responses; repeatedly loading the whole book per page is not
+an acceptable serving strategy.
 Creation/deletion/renames, catalog moves and image changes need explicit evidence.
 Raw and AST-readable file views must page large content without hiding changes,
 preserve complete pinned identities, and bind hunks to file/section/content hashes

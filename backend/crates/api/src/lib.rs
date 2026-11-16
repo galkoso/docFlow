@@ -18,11 +18,13 @@ use axum::{
     routing::get,
 };
 use serde::Serialize;
+use specspace_application::comparison_reader::{BoundProviderFactory, ComparisonReader};
 use specspace_application::draft::DraftRetention;
 use specspace_application::proposal_reader::ProposalReader;
 use specspace_application::reader::{BookProviderFactory, BookReader};
 use specspace_git_adapter::app_auth::GitHubAppKey;
 use specspace_infrastructure::authorization::PgProposalReadAuthorization;
+use specspace_infrastructure::comparison_authorization::PgComparisonAuthorization;
 use specspace_infrastructure::drafts::PgDrafts;
 use specspace_infrastructure::oidc::Oidc;
 use specspace_infrastructure::{authorization::PgReadAuthorization, github_source::PgGitHubSource};
@@ -47,6 +49,7 @@ pub struct AppState {
     pub cookies: auth::CookiePolicy,
     pub books: Arc<BookReader>,
     pub proposal_books: Arc<ProposalReader>,
+    pub comparisons: Arc<ComparisonReader>,
     pub drafts: Arc<PgDrafts>,
     pub search_index: Arc<PgSearchIndex>,
     pub saves: Arc<PgSaves>,
@@ -78,7 +81,16 @@ impl AppState {
             Arc::new(PgReadAuthorization::new(database.clone())),
             source.clone(),
         ));
+        let comparisons = Arc::new(
+            ComparisonReader::new(
+                Arc::new(PgComparisonAuthorization::new(database.clone())),
+                source.clone(),
+                std::time::Duration::from_secs(900),
+            )
+            .expect("fixed comparison timeout is valid"),
+        );
         Self {
+            comparisons,
             saves: Arc::new(PgSaves::new(database.clone())),
             drafts: Arc::new(PgDrafts::new(database.clone(), None)),
             database,
@@ -95,10 +107,25 @@ impl AppState {
     }
 
     pub fn configure_github(&mut self, key: GitHubAppKey) {
-        self.configure_book_source(Arc::new(PgGitHubSource::new(
+        let source = Arc::new(PgGitHubSource::new(
             self.database.clone(),
             Some(Arc::new(key)),
-        )));
+        ));
+        self.configure_comparison_source(source.clone());
+        self.configure_book_source(source);
+    }
+
+    /// Comparison test/production sources must support frozen connection settings;
+    /// an unbound book source is never silently reused for this capability.
+    pub fn configure_comparison_source(&mut self, source: Arc<dyn BoundProviderFactory>) {
+        self.comparisons = Arc::new(
+            ComparisonReader::new(
+                Arc::new(PgComparisonAuthorization::new(self.database.clone())),
+                source,
+                std::time::Duration::from_secs(900),
+            )
+            .expect("fixed comparison timeout is valid"),
+        );
     }
 
     pub fn configure_draft_retention(&mut self, retention: DraftRetention) {

@@ -980,3 +980,20 @@ Checkboxes represent verified work only.
   Full backend workspace regressions passed before the final diagnostic/quota
   refinements; final application tests (32) and workspace Clippy pass afterward.
   OpenAPI and the cross-language editor fixture regenerate without drift.
+
+- Authorized comparison loader: current server scope binds actor/org/proposal,
+  repository configuration, recorded head/base and metadata version/state.
+  Frozen numeric GitHub connections prevent reconfiguration from retargeting a
+  read. The loader proves historical head/main selections, reads the merge-base
+  and head snapshots, checks bounds before I/O and validates source on bounded
+  CPU. Rechecks after provider/CPU work block revoked or changed context. Late
+  ref movement is reported without mixing source; removal of selected main
+  lineage fails closed. One load/timeout bounds work, and cancellation retains
+  the CPU permit until work ends. Eight application and three PostgreSQL
+  scenarios cover these boundaries. Runtime application state shares the actual
+  configured GitHub source; no HTTP diff route is claimed yet. Paged serving,
+  heavy-load jobs/cache, semantic views and review anchors remain next work.
+  Full workspace regression tests passed before the final readiness refinement;
+  final application tests (40), targeted PostgreSQL checks and workspace Clippy
+  pass afterward. OpenAPI/editor fixtures have no drift; the restarted local API
+  reports ready with the new loader initialized.

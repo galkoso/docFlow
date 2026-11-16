@@ -439,6 +439,7 @@ mod tests {
                 .files
                 .iter()
                 .map(|(path, source)| FileEntry {
+                    mode: specspace_git_adapter::FileMode::Regular,
                     path: RepositoryPath::parse(path).unwrap(),
                     blob_sha: CommitSha::parse(SHA).unwrap(),
                     size: source.len() as u64,

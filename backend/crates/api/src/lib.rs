@@ -31,6 +31,10 @@ use specspace_infrastructure::{
     provisioning::{PgProvisioning, ProvisionError},
     search_index::{IndexError, PgSearchIndex},
 };
+use specspace_infrastructure::{
+    save_worker::SaveWorker,
+    saves::{PgSaves, SaveJournalError},
+};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -44,6 +48,7 @@ pub struct AppState {
     pub proposal_books: Arc<ProposalReader>,
     pub drafts: Arc<PgDrafts>,
     pub search_index: Arc<PgSearchIndex>,
+    pub saves: Arc<PgSaves>,
     index_source: Arc<dyn IndexSource>,
     book_source: Arc<dyn BookProviderFactory>,
     provisioning: Arc<PgProvisioning>,
@@ -73,6 +78,7 @@ impl AppState {
             source.clone(),
         ));
         Self {
+            saves: Arc::new(PgSaves::new(database.clone())),
             drafts: Arc::new(PgDrafts::new(database.clone(), None)),
             database,
             oidc: None,
@@ -133,6 +139,12 @@ impl AppState {
         timeout: std::time::Duration,
     ) -> Result<ProposalWorker, ProvisionError> {
         ProposalWorker::new(self.provisioning.clone(), self.book_source.clone(), timeout)
+    }
+    pub fn save_worker(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<SaveWorker, SaveJournalError> {
+        SaveWorker::new(self.saves.clone(), self.book_source.clone(), timeout)
     }
 }
 

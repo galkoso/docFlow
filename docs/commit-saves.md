@@ -1,7 +1,8 @@
 # Git save boundary
 
-The editor currently provides local source and private recovery, not Git saves.
-This document records the save protocol as its implementation is added.
+The editor currently provides local source and private recovery. The backend now
+has a durable Git save worker; authenticated save submission and the editor
+interaction are the next integration stage.
 
 ## Implemented: pinned commit evidence
 
@@ -93,25 +94,63 @@ files, edit the catalog, or remove a source file. File creation/import workflows
 remain separate work. A plan is not authorization and does not call Git or the
 database; assets and current context still require worker verification.
 
+## Implemented: durable save journal and worker
+
+`PgSaves` reserves an immutable actor/proposal/repository-bound intent with its
+expected head, metadata version, branch and GitHub installation configuration.
+Concurrent identical idempotency keys return the original job; changed intents
+are rejected. One active Git mutation reserves the proposal, including UNKNOWN
+operations whose jobs have exhausted retries. Current active membership and
+owner/EDIT assignment (or audited Admin access) are checked at reservation,
+execution and publication. Reader access never permits saving.
+
+Migration 007 stores the private raw request separately from metadata-only job,
+audit and outbox payloads. Database triggers prevent changing the original scope,
+request or sealed manifest, and prevent deleting evidence rows. Definite terminal
+outcomes purge the raw request; unresolved UNKNOWN operations retain it until
+operational resolution. An administrative resolution flow and a bounded retention
+policy for that unresolved private input remain required operational work.
+
+The worker loads the complete pinned tree and Markdown snapshot, checks actual
+Git blob identities and declared sizes, prepares all documents together and
+validates the candidate book. Referenced images must be existing regular files
+with valid content-addressed names, MIME, hash and pixels. Unsupported modes
+cannot be edited. The worker seals a source-free manifest in PostgreSQL before
+one atomic Git write. No-op saves neither write Git nor change proposal version
+or approval state. The runtime starts one worker with a default 900-second task
+limit, configurable through `SAVE_WORKER_TIMEOUT_SECONDS` (30–3600 seconds).
+
+Jobs have expiring leases, heartbeats and fenced publication. A started operation
+never becomes a fresh write again. Recovery observes bounded commit ancestry and
+verifies the operation's exact parent, actor, complete tree, paths, file modes,
+changed bytes and Git blob hashes. The verified commit must remain reachable
+from the current branch. Later external descendants are allowed, while the
+recorded result remains this operation's own commit. An old or diverged branch,
+wrong evidence, permission revocation and uncertain verification remain explicit;
+none permits another mutation. Provider backoff is honored before and after the
+write, preserving UNKNOWN state during post-write verification failures.
+
+Only sealed verification evidence can publish success. Publication atomically
+updates the recorded proposal head/version, resets the state to DRAFT, emits a
+review-invalidation outbox event, completes the job and purges private input.
+A failed publication rolls back and is recovered by observation without a second
+commit. Formal review snapshots and approval invalidation consumers are still
+part of the forthcoming review service.
+
+Twenty PostgreSQL integration scenarios cover atomic two-document saving,
+no-ops, idempotency/concurrency, current ACL/configuration changes, lease fencing,
+crash/restart, post-Git database failure, provider backoff, unknown outcomes,
+forged evidence/content/modes, external descendants, bounded diagnostics,
+malformed jobs, immutable evidence and image verification. The complete backend
+workspace suite and Clippy pass. These deterministic provider tests do not claim
+real GitHub or browser acceptance.
+
 ## Required next implementation
 
-The save journal/worker must bind the planned intent to current authorization,
-immutable repository configuration, expected head and current metadata version.
-It must load the complete pinned snapshot itself, verify referenced media bytes,
-and persist the canonical plan before mutation. A no-op must not create a commit.
-All changed files must be one atomic mutation.
-
-The mutation boundary must be durable and lease-fenced, with current eligibility
-checked before Git I/O. After an uncertain write, recovery may only observe and
-verify the operation's commit against its expected parent, planned file content
-and complete tree changes. It must establish branch reachability and recheck
-current context before publishing recorded head/version and invalidating review
-state. Revocation, external advancement, missing/diverged refs and failures
-between Git and PostgreSQL must remain explicit; none authorize a blind retry.
-
-An authenticated API and the editor's Git-save interaction still need to connect
-this workflow, flush active fields, preserve later local edits and frozen retries,
-and show a verified SHA/time only after publication succeeds. Git-save acceptance
-and crash/restart tests remain open.
+An authenticated API and the editor's Git-save interaction must connect this
+workflow, flush active fields, preserve later local edits and frozen retries,
+and show a verified SHA/time only after publication succeeds. Formal review,
+operational reconciliation, unresolved-input retention and real-provider/browser
+acceptance remain open.
 
 Provider reference: [GitHub Git commit objects](https://docs.github.com/en/rest/git/commits?apiVersion=2026-03-10#get-a-commit).

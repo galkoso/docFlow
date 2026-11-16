@@ -17,6 +17,7 @@ tracing.workspace = true
 specspace-application = { path = "../application" }
 async-trait = "0.1"
 sha2 = "0.10"
+sha1 = "0.10"
 subtle = "2.6"
 openidconnect = "4.1"
 specspace-git-adapter = { path = "../git-adapter" }
@@ -40,6 +41,10 @@ required-features = ["postgres-tests"]
 
 [[test]]
 name = "proposals_postgres"
+required-features = ["postgres-tests"]
+
+[[test]]
+name = "saves_postgres"
 required-features = ["postgres-tests"]
 
 [lints]

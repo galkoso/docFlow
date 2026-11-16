@@ -894,3 +894,20 @@ Checkboxes represent verified work only.
   tests and workspace Clippy pass afterward. Worker authorization/provenance,
   referenced media verification, journal/reconciliation, API and editor Git-save
   integration remain required. These plans do not execute or claim Git saves.
+
+- Durable proposal saves: migration 007 reserves one active Git mutation per
+  proposal, immutable actor/provider/head/version-bound private intents and a
+  source-free sealed manifest. A lease-fenced worker validates the pinned complete
+  candidate, Git blob identities, modes and referenced media before one atomic
+  write. No-ops leave Git/version/approval state unchanged. Started operations
+  recover only through observation; exact content/tree/identity/reachability
+  evidence is required before transactional publication, DRAFT reset and review
+  invalidation outbox. Definite outcomes purge private input; unresolved UNKNOWN
+  retains its reservation and private input pending operational resolution.
+  Twenty new PostgreSQL scenarios cover concurrency/idempotency, revoked access,
+  malformed jobs, immutable evidence, lease expiry, crash and database failure
+  after Git, provider backoff during verification, forged evidence, external
+  descendants and image bytes. Full backend tests and Clippy pass. Runtime starts
+  one worker with a configurable timeout. Authenticated submission, editor Git
+  interaction, formal review consumers, operational resolution/retention and real
+  provider/browser acceptance remain subsequent work.

@@ -494,6 +494,11 @@ impl GitProvider for GitHub {
                 _ => return Err(GitError::InvalidResponse),
             }
             files.push(FileEntry {
+                mode: if entry["mode"] == "100755" {
+                    crate::FileMode::Executable
+                } else {
+                    crate::FileMode::Regular
+                },
                 path: RepositoryPath::parse(
                     entry["path"].as_str().ok_or(GitError::InvalidResponse)?,
                 )

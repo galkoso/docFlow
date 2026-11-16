@@ -128,3 +128,12 @@ uncommitted; unrepresentable rich edits export the actual editor state, protecte
 source model and unfinished fields as JSON instead of stale Markdown. No editor
 action currently creates a Git commit or submits a review. Browser layout,
 RTL/IME and accessibility acceptance remain open.
+
+
+The backend Git-save worker uses a durable journal, lease fencing and exact
+commit/tree/content verification. It never repeats an uncertain Git write.
+`SAVE_WORKER_TIMEOUT_SECONDS` defaults to 900 (30–3600 allowed). Apply migration
+007 before starting this runtime. Known terminal saves purge private request
+bodies; unresolved UNKNOWN saves retain their reservation and input pending
+operational resolution. Save submission API and editor Git controls are still
+pending; see [the save protocol](docs/commit-saves.md).

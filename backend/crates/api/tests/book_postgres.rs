@@ -119,6 +119,7 @@ impl GitProvider for Provider {
             .files
             .iter()
             .map(|(path, text)| FileEntry {
+                mode: specspace_git_adapter::FileMode::Regular,
                 path: RepositoryPath::parse(path).unwrap(),
                 blob_sha: CommitSha::parse(OLD).unwrap(),
                 size: text.len() as u64,

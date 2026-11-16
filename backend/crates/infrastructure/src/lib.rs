@@ -9,6 +9,9 @@ pub mod oidc;
 pub mod proposal_worker;
 pub mod proposals;
 pub mod provisioning;
+pub mod save_verification;
+pub mod save_worker;
+pub mod saves;
 pub mod search_index;
 pub mod secrets;
 pub mod sessions;
@@ -40,7 +43,7 @@ pub async fn lease_job(
     sqlx::query_as::<_, LeasedJob>(
         "WITH candidate AS (
           SELECT id FROM jobs
-          WHERE state = 'QUEUED' AND kind NOT IN ('INDEX_SNAPSHOT','CREATE_PROPOSAL') AND available_at <= now() AND attempts < max_attempts
+          WHERE state = 'QUEUED' AND kind NOT IN ('INDEX_SNAPSHOT','CREATE_PROPOSAL','SAVE_PROPOSAL') AND available_at <= now() AND attempts < max_attempts
           ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1
         )
         UPDATE jobs SET state = 'RUNNING', lease_owner = $1,

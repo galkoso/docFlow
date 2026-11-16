@@ -84,10 +84,17 @@ pub enum FileChange {
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FileMode {
+    Regular,
+    Executable,
+}
+
 pub struct FileEntry {
     pub path: RepositoryPath,
     pub blob_sha: CommitSha,
     pub size: u64,
+    pub mode: FileMode,
 }
 
 pub struct CommitMetadata {

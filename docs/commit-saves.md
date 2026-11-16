@@ -172,6 +172,28 @@ the worker's twenty scenarios. Generated OpenAPI/client types and explicit-actor
 Angular methods expose the contract; a client test checks exact retry identity,
 key and source after an unrelated poll uses another actor.
 
+## Implemented: component-owned client save lifecycle
+
+`GitSave` copies and freezes a bounded one-to-fifty-document intent and generates
+one idempotency key. It retains exact actor, source, hashes and expected context
+across interrupted requests. No timer or login refresh retries a POST. Once a
+valid ticket is received, all further requests observe that job. Revocation and
+uncertain status reads do not unlock another mutation; exhausted UNKNOWN work
+remains reserved and requires explicit observation/operational resolution.
+
+Safe GET polling can resume for the same actor. Missing submission receipts need
+an explicit exact retry. Account changes, explicit logout and destruction cancel
+requests/timers and purge private input/results. The controller checks response
+scope, phase, version progression, timestamps, no-op invariants and requested file
+identities before exposing success, and bounds diagnostic projections. A completed
+operation still guards another save until the caller confirms that its pinned
+source has been checked and installed. Its verified receipt can then remain
+visible without retaining the submitted source.
+
+Fourteen HTTP-controller scenarios pass, and the frontend suite now has 99
+passing tests. This service is not yet connected to the editor page; it does not
+by itself claim the interactive Git-save acceptance scenario.
+
 ## Required next implementation
 
 The editor's Git-save interaction must flush active fields, preserve later local

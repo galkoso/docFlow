@@ -924,3 +924,13 @@ Checkboxes represent verified work only.
   backend tests/Clippy, production Angular build and all 85 frontend tests pass.
   OpenAPI and generated types are updated. The editor Git control, local-edit
   rebasing after a verified save and broader review workflows remain open.
+
+- Client Git-save lifecycle: a component-owned controller freezes the original
+  actor/key/request, accepts one job, and observes without resending writes.
+  Uncertain responses and exhausted UNKNOWN jobs keep the mutation pending;
+  explicit exact retries, current-session recovery and private-state cleanup are
+  covered. Bounded typed outcome checks include no-op/version/document identity
+  invariants. Completed work stays pending until the editor installs a verified
+  pinned baseline. Fourteen new controller scenarios pass (99 frontend tests
+  total). Page controls, active-field flushing and preservation/rebasing of later
+  edits remain the next integration stage.

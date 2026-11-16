@@ -571,13 +571,9 @@ impl GitProvider for GitHub {
         })
     }
 
-    async fn is_ancestor(
-        &self,
-        ancestor: &CommitSha,
-        descendant: &CommitSha,
-    ) -> Result<bool, GitError> {
-        if ancestor == descendant {
-            return Ok(true);
+    async fn merge_base(&self, left: &CommitSha, right: &CommitSha) -> Result<CommitSha, GitError> {
+        if left == right {
+            return Ok(left.clone());
         }
         let response = self
             .client
@@ -585,28 +581,44 @@ impl GitProvider for GitHub {
                 "{}/repos/{}/compare/{}...{}",
                 self.rest_base,
                 self.repository,
-                ancestor.as_str(),
-                descendant.as_str()
+                left.as_str(),
+                right.as_str()
             ))
+            // File patches are returned only on page one. We need graph
+            // metadata only, including when page two contains no commits.
             .query(&[("per_page", "1"), ("page", "2")])
             .send()
             .await
             .map_err(|_| GitError::ProviderUnavailable)?;
         let data = Self::response(response, false).await?;
-        let base = data["base_commit"]["sha"]
-            .as_str()
-            .ok_or(GitError::InvalidResponse)?;
-        let merge_base = data["merge_base_commit"]["sha"]
-            .as_str()
-            .ok_or(GitError::InvalidResponse)?;
-        if base != ancestor.as_str() {
+        let oid = |value: &Value| {
+            CommitSha::parse(value.as_str().ok_or(GitError::InvalidResponse)?)
+                .map_err(|_| GitError::InvalidResponse)
+        };
+        let base = oid(&data["base_commit"]["sha"])?;
+        let common = oid(&data["merge_base_commit"]["sha"])?;
+        if base != *left {
             return Err(GitError::InvalidResponse);
         }
-        match data["status"].as_str() {
-            Some("ahead") => Ok(merge_base == ancestor.as_str()),
-            Some("behind" | "diverged") => Ok(false),
-            _ => Err(GitError::InvalidResponse),
+        let consistent = match data["status"].as_str() {
+            Some("ahead") => common == *left,
+            Some("behind") => common == *right,
+            Some("diverged") => common != *left && common != *right,
+            _ => false,
+        };
+        if !consistent {
+            return Err(GitError::InvalidResponse);
         }
+        Ok(common)
+    }
+    async fn is_ancestor(
+        &self,
+        ancestor: &CommitSha,
+        descendant: &CommitSha,
+    ) -> Result<bool, GitError> {
+        self.merge_base(ancestor, descendant)
+            .await
+            .map(|base| base == *ancestor)
     }
 }
 
@@ -628,6 +640,7 @@ mod tests {
 
     const OLD: &str = "1111111111111111111111111111111111111111";
     const NEW: &str = "2222222222222222222222222222222222222222";
+    const COMMON: &str = "3333333333333333333333333333333333333333";
 
     struct ProviderState {
         head: Mutex<String>,
@@ -635,6 +648,7 @@ mod tests {
         mode: AtomicU8,
         created_refs: AtomicUsize,
         commit_object: Mutex<Option<Value>>,
+        comparison_object: Mutex<Option<Value>>,
     }
 
     struct Fixture {
@@ -747,11 +761,27 @@ mod tests {
         )
     }
 
-    async fn comparison(State(state): State<Arc<ProviderState>>) -> Json<Value> {
+    async fn comparison(
+        State(state): State<Arc<ProviderState>>,
+        axum::extract::Query(query): axum::extract::Query<
+            std::collections::HashMap<String, String>,
+        >,
+    ) -> Response {
+        assert_eq!(query.get("page").map(String::as_str), Some("2"));
+        assert_eq!(query.get("per_page").map(String::as_str), Some("1"));
+        if state.mode.load(Ordering::SeqCst) == 30 {
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                [("Retry-After", "13")],
+                Json(json!({"message":"Synthetic rate limit"})),
+            )
+                .into_response();
+        }
+        if let Some(data) = state.comparison_object.lock().unwrap().clone() {
+            return Json(data).into_response();
+        }
         let diverged = state.mode.load(Ordering::SeqCst) == 6;
-        Json(
-            json!({"base_commit": {"sha": OLD}, "merge_base_commit": {"sha": if diverged { NEW } else { OLD }}, "status": if diverged { "diverged" } else { "ahead" }}),
-        )
+        Json(json!({"base_commit":{"sha":OLD}, "merge_base_commit":{"sha":if diverged {COMMON}else{OLD}}, "status":if diverged {"diverged"}else{"ahead"}})).into_response()
     }
 
     async fn fixture() -> Fixture {
@@ -761,6 +791,7 @@ mod tests {
             mode: AtomicU8::new(0),
             created_refs: AtomicUsize::new(0),
             commit_object: Mutex::new(None),
+            comparison_object: Mutex::new(None),
         });
         let app = Router::new()
             .route("/graphql", post(provider))
@@ -793,6 +824,60 @@ mod tests {
             state,
             server,
         }
+    }
+
+    #[tokio::test]
+    async fn merge_bases_bind_exact_inputs_validate_graph_relationship_and_preserve_provider_backoff()
+     {
+        let fixture = fixture().await;
+        let left = CommitSha::parse(OLD).unwrap();
+        let right = CommitSha::parse(NEW).unwrap();
+        assert_eq!(
+            fixture.adapter.merge_base(&left, &left).await.unwrap(),
+            left
+        );
+        for (status, common) in [("ahead", OLD), ("behind", NEW), ("diverged", COMMON)] {
+            *fixture.state.comparison_object.lock().unwrap() = Some(
+                json!({"base_commit":{"sha":OLD},"merge_base_commit":{"sha":common},"status":status}),
+            );
+            assert_eq!(
+                fixture
+                    .adapter
+                    .merge_base(&left, &right)
+                    .await
+                    .unwrap()
+                    .as_str(),
+                common
+            );
+            assert_eq!(
+                fixture.adapter.is_ancestor(&left, &right).await.unwrap(),
+                status == "ahead"
+            );
+        }
+        for data in [
+            json!({}),
+            json!({"base_commit":{"sha":NEW},"merge_base_commit":{"sha":COMMON},"status":"diverged"}),
+            json!({"base_commit":{"sha":OLD},"merge_base_commit":{"sha":"bad"},"status":"ahead"}),
+            json!({"base_commit":{"sha":OLD},"merge_base_commit":{"sha":NEW},"status":"ahead"}),
+            json!({"base_commit":{"sha":OLD},"merge_base_commit":{"sha":OLD},"status":"behind"}),
+            json!({"base_commit":{"sha":OLD},"merge_base_commit":{"sha":NEW},"status":"diverged"}),
+            json!({"base_commit":{"sha":OLD},"merge_base_commit":{"sha":OLD},"status":"identical"}),
+        ] {
+            *fixture.state.comparison_object.lock().unwrap() = Some(data);
+            assert_eq!(
+                fixture.adapter.merge_base(&left, &right).await,
+                Err(GitError::InvalidResponse)
+            );
+        }
+        fixture.state.mode.store(30, Ordering::SeqCst);
+        assert_eq!(
+            fixture.adapter.merge_base(&left, &right).await,
+            Err(GitError::RateLimited {
+                retry_after_seconds: Some(13)
+            })
+        );
+        assert!(fixture.state.mutations.lock().unwrap().is_empty());
+        assert_eq!(fixture.state.created_refs.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]

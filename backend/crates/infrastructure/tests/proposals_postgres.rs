@@ -672,6 +672,13 @@ impl specspace_git_adapter::GitProvider for WriteProvider {
     ) -> Result<specspace_git_adapter::CommitMetadata, specspace_git_adapter::GitError> {
         panic!("provisioning must not read commit content")
     }
+    async fn merge_base(
+        &self,
+        _: &specspace_git_adapter::CommitSha,
+        _: &specspace_git_adapter::CommitSha,
+    ) -> Result<specspace_git_adapter::CommitSha, specspace_git_adapter::GitError> {
+        Err(specspace_git_adapter::GitError::ProviderRejected)
+    }
     async fn is_ancestor(
         &self,
         _: &specspace_git_adapter::CommitSha,

@@ -315,6 +315,9 @@ impl GitProvider for Provider {
             ),
         })
     }
+    async fn merge_base(&self, _: &CommitSha, _: &CommitSha) -> Result<CommitSha, GitError> {
+        Err(GitError::ProviderRejected)
+    }
     async fn is_ancestor(
         &self,
         ancestor: &CommitSha,

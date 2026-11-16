@@ -398,6 +398,9 @@ mod tests {
                 committed_at: "2026-11-14T10:00:00Z".parse().unwrap(),
             })
         }
+        async fn merge_base(&self, _: &CommitSha, _: &CommitSha) -> Result<CommitSha, GitError> {
+            Err(GitError::ProviderRejected)
+        }
         async fn is_ancestor(
             &self,
             ancestor: &CommitSha,

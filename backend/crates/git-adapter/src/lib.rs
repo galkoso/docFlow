@@ -140,6 +140,9 @@ pub trait GitProvider: Send + Sync {
     /// Immutable commit evidence for reconciliation. Matching trailers alone
     /// never prove intended file contents, branch reachability or authorization.
     async fn commit_receipt(&self, commit: &CommitSha) -> Result<CommitReceipt, GitError>;
+    /// Provider-selected common ancestor for the two exact commits. This is a
+    /// diff base, not evidence of merge readiness or an authorization decision.
+    async fn merge_base(&self, left: &CommitSha, right: &CommitSha) -> Result<CommitSha, GitError>;
     async fn is_ancestor(
         &self,
         ancestor: &CommitSha,

@@ -159,6 +159,9 @@ impl GitProvider for Provider {
     async fn commit_metadata(&self, _: &CommitSha) -> Result<CommitMetadata, GitError> {
         panic!("creation must not load metadata")
     }
+    async fn merge_base(&self, _: &CommitSha, _: &CommitSha) -> Result<CommitSha, GitError> {
+        Err(GitError::ProviderRejected)
+    }
     async fn is_ancestor(&self, _: &CommitSha, _: &CommitSha) -> Result<bool, GitError> {
         panic!("creation must use the displayed source")
     }

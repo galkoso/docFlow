@@ -949,3 +949,19 @@ Checkboxes represent verified work only.
   unavailable, so visual/RTL/IME/accessibility and real-provider acceptance remain
   open. Multi-document dirty-buffer coordination, new-document/import workflows,
   diff, review, merge and operational reconciliation are still required.
+
+- Diff foundations: the provider exposes an exact merge-base capability; GitHub
+  validates returned graph identities/relationship metadata and avoids the
+  first-page patch list. Ancestor checks share that boundary; other test providers
+  reject unsupported merge-base work explicitly. A byte-preserving raw line
+  engine returns complete before/after ranges and hashes. Exact line interning,
+  a two-million-cell matrix budget, line limits and bounded output prevent
+  adversarial alignment expansion; coarse fallback is explicit and loses no
+  source. Four engine scenarios include exhaustive short-sequence comparison
+  against a brute-force minimality oracle and full reconstruction/coordinates;
+  one adapter scenario covers graph consistency and backoff. Pinned proposal
+  application/API/UI, semantic/move/image/catalog comparison and review anchors
+  remain required. `docs/diffs.md` records the implemented boundary and remaining
+  workflow; this does not complete DIFF-01–08 or any review acceptance scenario.
+  Full backend workspace tests and Clippy pass after these changes. OpenAPI and
+  the cross-language editor fixture regenerate without drift.

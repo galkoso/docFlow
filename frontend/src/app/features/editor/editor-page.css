@@ -1,6 +1,6 @@
 :host { display: block; max-width: 80rem; margin-inline: auto; color: #203346; }
 h1 { margin-block: .5rem 1rem; }
-header, .recovery, .preview { margin-block-end: 1.25rem; }
+header, .recovery, .preview, .git-save { margin-block-end: 1.25rem; }
 .version, .actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
 .version { background: #edf3f5; padding: .75rem; margin-block-end: .75rem; }
 .actions { margin-block: .75rem; }
@@ -8,7 +8,7 @@ button, a { min-height: 2.5rem; }
 button { border: 1px solid #9badba; background: #fff; color: #153e50; border-radius: .35rem; padding: .45rem .8rem; cursor: pointer; }
 button[aria-pressed=true] { background: #d5ece8; border-color: #27665d; }
 button:disabled { cursor: default; opacity: .6; }
-button:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px solid #147d94; outline-offset: 3px; }
+button:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid #147d94; outline-offset: 3px; }
 .notice, .recovery { padding: 1rem; border-inline-start: 4px solid #c39742; background: #fff9ed; }
 .recovery { background: #f2f7fa; border-color: #6c94a7; }
 .comparison { margin-block: 1rem; }
@@ -19,3 +19,7 @@ code { direction: ltr; unicode-bidi: isolate; overflow-wrap: anywhere; }
 textarea { box-sizing: border-box; width: 100%; min-height: 32rem; padding: 1rem; font: .95rem/1.7 monospace; border: 1px solid #9badba; border-radius: .4rem; resize: vertical; }
 .preview { border: 1px solid #cbd7df; padding: 1.25rem; }
 @media (max-width: 700px) { .columns { grid-template-columns: minmax(0, 1fr); } .actions button { flex-grow: 1; } }
+
+.git-save { border: 1px solid #6c94a7; border-radius: .4rem; padding: 1rem; background: #f2f7fa; overflow-wrap: anywhere; }
+.git-save label { display: block; margin-block-end: .4rem; }
+.git-save input { box-sizing: border-box; width: 100%; min-height: 2.5rem; padding: .5rem; font: inherit; }

@@ -934,3 +934,18 @@ Checkboxes represent verified work only.
   pinned baseline. Fourteen new controller scenarios pass (99 frontend tests
   total). Page controls, active-field flushing and preservation/rebasing of later
   edits remain the next integration stage.
+
+- Editor Git saving: page controls flush active fields, submit captured source
+  against exact head/version/hash, display bounded whole-book blockers and show
+  SHA/time only for verified publication. A matching pinned read is required
+  before advancing the local baseline; unavailable/mismatched reads keep the
+  operation pending and fence new writes. Promotion retains later raw typing,
+  rich history/fields and held unrepresentable state, with explicit canonical
+  LF/NFC serialization after verification. Recovery keeps older frozen writes
+  and CAS evidence across that base change. The actual router updates the commit
+  URL without dropping local edits; other document/base transitions remain
+  guarded. Eleven added page/router scenarios and three recovery scenarios pass
+  (113 frontend tests); Angular production build passes. Browser connection is
+  unavailable, so visual/RTL/IME/accessibility and real-provider acceptance remain
+  open. Multi-document dirty-buffer coordination, new-document/import workflows,
+  diff, review, merge and operational reconciliation are still required.

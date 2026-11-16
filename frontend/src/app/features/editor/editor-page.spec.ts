@@ -3,10 +3,10 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { BehaviorSubject } from 'rxjs';
-import { EditorModel, EditorSource, SourcePreview } from '../../core/api/editor-api';
+import { EditorModel, EditorSource, SourcePreview, SaveJob } from '../../core/api/editor-api';
 import { SessionState } from '../../core/auth/session-state';
 import { EditorPage } from './editor-page';
 import { RichEditor } from './rich-editor';
@@ -27,6 +27,18 @@ const context = { proposal_id: proposal, proposal_version: 1, proposal_state: 'D
 const buffer = { document_id: doc, base_head_sha: sha, version: 7, updated_at: '2026-11-16T00:00:00Z',
   expires_at: '2026-12-16T00:00:00Z', content_utf8: 'private recovery', base_is_current: true };
 
+const savedHead = 'b'.repeat(40), savedHash = 'c'.repeat(64);
+const saveTicket = { proposal_id: proposal, job_id: '00000000-0000-4000-8000-000000000003', operation_id: '00000000-0000-4000-8000-000000000004' };
+const normalize = (text: string) => text.replace(/\r\n?/g, '\n').normalize('NFC');
+function savedJob(noop = false): SaveJob {
+  return { job_id: saveTicket.job_id, proposal_id: proposal, kind: 'SAVE_PROPOSAL', state: 'SUCCEEDED', attempts: 1, phase: 'READY',
+    creation: null, error_code: null, save_failure: null, save: { proposal_id: proposal, head_sha: noop ? sha : savedHead,
+      proposal_version: noop ? 1 : 2, no_op: noop, reconciled: false, committed_at: noop ? null : '2026-11-16T00:00:00Z',
+      documents: noop ? [] : [{ document_id: doc, path: 'docs/one.md', sha256: savedHash, bytes: 100, normalization_changed: true, normalization_only: false }] } };
+}
+function savedSource(text: string): EditorSource {
+  return { ...source, snapshot_sha: savedHead, recorded_head_sha: savedHead, proposal_version: 2, markdown: normalize(text), sha256: savedHash, model: null };
+}
 describe('Proposal editor page', () => {
   const geometry = new Map<string, PropertyDescriptor | undefined>();
   beforeEach(() => {
@@ -55,6 +67,11 @@ describe('Proposal editor page', () => {
         { provide: ActivatedRoute, useValue: { paramMap: params, queryParamMap: query,
           snapshot: { paramMap: params.value, queryParamMap: query.value } } }],
     }).compileComponents();
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockImplementation((_commands, extras) => {
+      query.next(convertToParamMap({ commit: extras?.queryParams?.['commit'] ?? query.value.get('commit') }));
+      return Promise.resolve(true);
+    });
     const fixture = TestBed.createComponent(EditorPage), page = fixture.componentInstance;
     const http = TestBed.inject(HttpTestingController);
     const load = () => http.expectOne(request => request.url.endsWith(`/documents/${doc}/editor/source`));
@@ -66,7 +83,7 @@ describe('Proposal editor page', () => {
       expect(request.request.headers.get('X-Expected-Actor')).toBe(profile()?.user_id);
       request.flush(value); recovery().flush({ context, buffers }); fixture.detectChanges(); await fixture.whenStable();
     }
-    return { fixture, page, http, load, recovery, opened, rich, profile, logoutEpoch, session, guard: () => logoutGuard() };
+    return { fixture, page, http, load, recovery, opened, rich, profile, logoutEpoch, session, navigate, query, guard: () => logoutGuard() };
   }
 
   it('edits a stable heading, flushes recovery, labels the acknowledgement honestly and guards exit', async () => {
@@ -204,4 +221,175 @@ describe('Proposal editor page', () => {
     expect(page.recovery.content()).toBe('private unsaved route buffer');
     http.expectNone(request => request.url.includes('DOC-OTHER')); http.verify(); harness.fixture.destroy();
   });
+  it('saves exact active source, preserves later typing, advances URL/base and submits subsequent work against the verified version', async () => {
+    const { fixture, page, http, opened, load, recovery, navigate } = await create(); await opened(); page.sourceMode();
+    const first = markdown + '\r\nfirst change e\u0301'; page.sourceChanged(first); page.saveGit();
+    const request = http.expectOne(req => req.url.endsWith('/commits'));
+    expect(request.request.body).toMatchObject({ expected_head_sha: sha, expected_proposal_version: 1,
+      documents: [{ document_id: doc, expected_document_sha256: source.sha256, markdown: first }] });
+    const later = first + '\r\nlater local typing'; page.sourceChanged(later); page.saveGit(); http.expectNone(req => req.url.endsWith('/commits'));
+    request.flush(saveTicket); http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`).flush(savedJob()); fixture.detectChanges();
+    const fetch = load(); expect(fetch.request.params.get('commit')).toBe(savedHead); fetch.flush(savedSource(first));
+    recovery().flush({ context: { ...context, current_head_sha: savedHead, proposal_version: 2 }, buffers: [] });
+    fixture.detectChanges(); await fixture.whenStable();
+    expect(page.recovery.content()).toBe(later); expect(page.recovery.dirty()).toBe(true); expect(page.source()?.snapshot_sha).toBe(savedHead);
+    expect(page.git.pending()).toBe(false); expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { commit: savedHead }, replaceUrl: true }));
+    expect(fixture.nativeElement.textContent).toContain('שמירה אחרונה אומתה');
+    expect(fixture.nativeElement.textContent).toContain('יש עריכות מקומיות נוספות');
+    page.saveGit(); const next = http.expectOne(req => req.url.endsWith('/commits'));
+    expect(next.request.body.expected_head_sha).toBe(savedHead); expect(next.request.body.expected_proposal_version).toBe(2);
+    expect(next.request.body.documents[0].expected_document_sha256).toBe(savedHash); expect(next.request.body.documents[0].markdown).toBe(later);
+    next.flush({}, { status: 422, statusText: 'Invalid' }); fixture.destroy(); http.verify();
+  });
+
+  it('keeps rich history and newly opened unfinished fields when the accepted save becomes the new baseline', async () => {
+    const { fixture, page, http, opened, load, recovery, rich } = await create(); await opened();
+    const id = model.blocks.find(block => block.kind === 'heading')!.section_id!;
+    rich()!.focusSection(id); rich()!.block('h4'); const first = page.recovery.content(); page.saveGit();
+    const request = http.expectOne(req => req.url.endsWith('/commits')); rich()!.block('h3'); rich()!.openLink(); rich()!.linkUrl.set('unfinished later link');
+    const latest = page.recovery.content(); const instance = rich();
+    request.flush(saveTicket); http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`).flush(savedJob()); fixture.detectChanges();
+    load().flush(savedSource(first)); recovery().flush({ context: { ...context, current_head_sha: savedHead, proposal_version: 2 }, buffers: [] });
+    fixture.detectChanges(); await fixture.whenStable();
+    expect(rich()).toBe(instance); expect(rich()!.linkOpen()).toBe(true); expect(rich()!.linkUrl()).toBe('unfinished later link');
+    expect(page.recovery.content()).toBe(normalize(latest)); rich()!.closeLink(); rich()!.undo();
+    expect(page.recovery.content()).not.toBe(normalize(latest)); expect(page.recovery.dirty()).toBe(true);
+    page.saveGit(); const next = http.expectOne(req => req.url.endsWith('/commits'));
+    expect(next.request.body.expected_head_sha).toBe(savedHead); next.flush({}, { status: 422, statusText: 'Invalid' });
+    fixture.destroy(); http.verify();
+  });
+
+  it('flushes active rich fields before sending and blocks an invalid field without sending stale Markdown', async () => {
+    const { fixture, page, http, opened, rich } = await create(); await opened();
+    rich()!.openLink(); rich()!.linkUrl.set('javascript:alert(1)'); page.saveGit();
+    http.expectNone(req => req.url.endsWith('/commits')); expect(rich()!.linkOpen()).toBe(true);
+    rich()!.closeLink(); page.saveGit(); const request = http.expectOne(req => req.url.endsWith('/commits'));
+    expect(request.request.body.documents[0].markdown).toBe(page.recovery.content());
+    request.flush({}, { status: 422, statusText: 'Invalid' }); fixture.destroy(); http.verify();
+  });
+
+  it('withholds baseline promotion on mismatched source and retries only the pinned read', async () => {
+    const { fixture, page, http, opened, load, recovery } = await create(); await opened(); page.sourceMode();
+    const input = markdown + '\nchanged'; page.sourceChanged(input); page.saveGit();
+    http.expectOne(req => req.url.endsWith('/commits')).flush(saveTicket);
+    http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`).flush(savedJob()); fixture.detectChanges();
+    load().flush({ ...savedSource(input), markdown: 'wrong content' }); fixture.detectChanges();
+    expect(page.source()?.snapshot_sha).toBe(sha); expect(page.recovery.content()).toBe(input); expect(page.git.pending()).toBe(true);
+    expect(page.saveApplyError()).toBeTruthy(); page.saveGit(); http.expectNone(req => req.url.endsWith('/commits'));
+    page.installSaved(true); load().flush(savedSource(input));
+    recovery().flush({ context: { ...context, current_head_sha: savedHead, proposal_version: 2 }, buffers: [] });
+    fixture.detectChanges(); await fixture.whenStable(); expect(page.git.pending()).toBe(false); expect(page.recovery.dirty()).toBe(false);
+    vi.spyOn(window, 'confirm').mockReturnValue(false); expect(page.canLeave()).toBe(true); fixture.destroy(); http.verify();
+  });
+
+  it('reports a no-op without a commit time and guards an accepted operation even if local source is clean', async () => {
+    const { fixture, page, http, opened, load, recovery, navigate } = await create(); await opened(); page.saveGit();
+    http.expectOne(req => req.url.endsWith('/commits')).flush(saveTicket);
+    const poll = http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`);
+    vi.spyOn(window, 'confirm').mockReturnValue(false); expect(page.canLeave()).toBe(false);
+    const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent; page.beforeUnload(event); expect(event.defaultPrevented).toBe(true);
+    poll.flush(savedJob(true)); fixture.detectChanges(); load().flush(source); recovery().flush({ context, buffers: [] });
+    fixture.detectChanges(); await fixture.whenStable(); expect(page.git.result()?.committed_at).toBeNull(); expect(navigate).not.toHaveBeenCalled();
+    expect(page.recovery.dirty()).toBe(false); expect(page.canLeave()).toBe(true); expect(fixture.nativeElement.textContent).toContain('לא נוצר Commit');
+    fixture.destroy(); http.verify();
+  });
+
+  it('keeps an unrepresentable later rich edit and guards exit after installing the earlier verified save', async () => {
+    const { fixture, page, http, opened, load, recovery, rich } = await create(); await opened();
+    rich()!.focusSection(model.blocks.find(block => block.kind === 'heading')!.section_id!); rich()!.block('h4');
+    const first = page.recovery.content(); page.saveGit(); const request = http.expectOne(req => req.url.endsWith('/commits'));
+    rich()!.error.set('unrepresentable later state'); page.invalidRich();
+    request.flush(saveTicket); http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`).flush(savedJob()); fixture.detectChanges();
+    load().flush(savedSource(first)); recovery().flush({ context: { ...context, current_head_sha: savedHead, proposal_version: 2 }, buffers: [] });
+    fixture.detectChanges(); await fixture.whenStable(); expect(page.brokenRich()).toBe(true);
+    expect(rich()!.error()).toBe('unrepresentable later state'); expect(page.git.pending()).toBe(false);
+    page.saveGit(); http.expectNone(req => req.url.endsWith('/commits'));
+    vi.spyOn(window, 'confirm').mockReturnValue(false); expect(page.canLeave()).toBe(false);
+    rich()!.undo(); expect(page.brokenRich()).toBe(false); expect(page.recovery.dirty()).toBe(true);
+    fixture.destroy(); http.verify();
+  });
+
+  it('freezes an interrupted submission through same-user login and purges it on a different login', async () => {
+    const { fixture, page, http, opened, load, recovery, profile } = await create(); await opened(); page.sourceMode();
+    page.sourceChanged(markdown + '\nprivate original intent'); page.saveGit(); const first = http.expectOne(req => req.url.endsWith('/commits'));
+    const key = first.request.headers.get('Idempotency-Key'), body = first.request.body;
+    profile.set(null); fixture.detectChanges(); await fixture.whenStable(); expect(first.cancelled).toBe(true);
+    profile.set({ user_id: 'actor-a' }); fixture.detectChanges(); load().flush(source); recovery().flush({ context, buffers: [] });
+    fixture.detectChanges(); await fixture.whenStable(); expect(page.git.canRetry()).toBe(true); http.expectNone(req => req.url.endsWith('/commits'));
+    page.git.retry(); const retry = http.expectOne(req => req.url.endsWith('/commits'));
+    expect(retry.request.body).toEqual(body); expect(retry.request.headers.get('Idempotency-Key')).toBe(key);
+    retry.flush(saveTicket); const pending = http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`);
+    profile.set({ user_id: 'actor-b' }); fixture.detectChanges(); expect(pending.cancelled).toBe(true);
+    expect(page.git.result()).toBeNull(); expect(page.git.submitted()).toBeNull(); expect(page.git.ticket()).toBeNull();
+    load().flush(source); recovery().flush({ context, buffers: [] }); fixture.detectChanges(); await fixture.whenStable();
+    expect(page.recovery.content()).toBe(markdown); fixture.destroy(); http.verify();
+  });
+
+  it('installs its own saved historical snapshot read-only when another operation already advanced recorded state', async () => {
+    const { fixture, page, http, opened, load, recovery } = await create(); await opened(); page.sourceMode();
+    const first = markdown + '\nfirst'; page.sourceChanged(first); page.saveGit(); const request = http.expectOne(req => req.url.endsWith('/commits'));
+    page.sourceChanged(first + '\nlater local work'); request.flush(saveTicket);
+    http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`).flush(savedJob()); fixture.detectChanges();
+    load().flush({ ...savedSource(first), recorded_head_sha: 'd'.repeat(40), proposal_version: 3, can_edit: false });
+    recovery().flush({ context: { ...context, current_head_sha: 'd'.repeat(40), proposal_version: 3 }, buffers: [] });
+    fixture.detectChanges(); await fixture.whenStable(); expect(page.editable()).toBe(false);
+    expect(page.recovery.content()).toContain('later local work'); expect(page.source()?.snapshot_sha).toBe(savedHead);
+    expect(page.git.pending()).toBe(false); page.saveGit(); http.expectNone(req => req.url.endsWith('/commits'));
+    fixture.destroy(); http.verify();
+  });
+
+  it('shows incoming-reference blockers from untouched chapters without claiming a save or replacing source', async () => {
+    const { fixture, page, http, opened } = await create(); await opened(); page.sourceMode();
+    const local = markdown + '\nlocal edit'; page.sourceChanged(local); page.saveGit();
+    http.expectOne(req => req.url.endsWith('/commits')).flush(saveTicket);
+    const failed = savedJob(); failed.state = 'FAILED'; failed.phase = 'FAILED'; failed.save = null; failed.error_code = 'SAVE_VALIDATION_FAILED';
+    failed.save_failure = { validation: { complete: true, findings_total: 1, blockers_total: 1, findings_truncated: false, findings: [
+      { code: 'SECTION_MISSING', path: 'docs/untouched.md', path_truncated: false, severity: 'blocker', source_start_byte: 42, source_end_byte: 55 },
+    ] } };
+    http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`).flush(failed); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('docs/untouched.md'); expect(fixture.nativeElement.textContent).toContain('SECTION_MISSING');
+    expect(page.recovery.content()).toBe(local); expect(page.git.result()).toBeNull(); expect(page.source()?.snapshot_sha).toBe(sha);
+    fixture.destroy(); http.verify();
+  });
+
+  it('promotes its verified base through the actual router without discarding later edits or bypassing another document guard', async () => {
+    const profile = signal<{ user_id: string } | null>(null);
+    await TestBed.configureTestingModule({ imports: [EditorPage], providers: [provideHttpClient(), provideHttpClientTesting(),
+      provideRouter([{ path: 'changes/:id/edit/:document', component: EditorPage, canDeactivate: [editorExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange' }]),
+      { provide: SessionState, useValue: { profile, logoutEpoch: signal(0), status: () => 'authenticated', refresh: vi.fn(), guardLogout: () => () => {} } }],
+    }).compileComponents();
+    const harness = await RouterTestingHarness.create();
+    const page = await harness.navigateByUrl(`/changes/${proposal}/edit/${doc}?commit=${sha}`, EditorPage);
+    const http = TestBed.inject(HttpTestingController), router = TestBed.inject(Router);
+    profile.set({ user_id: 'actor-a' }); harness.detectChanges();
+    http.expectOne(req => req.url.endsWith('/editor/source')).flush(source);
+    http.expectOne(req => req.url.endsWith('/draft')).flush({ context, buffers: [] }); harness.detectChanges(); await harness.fixture.whenStable();
+    page.sourceMode(); const first = markdown + '\nfirst'; page.sourceChanged(first); page.saveGit();
+    const request = http.expectOne(req => req.url.endsWith('/commits')); page.sourceChanged(first + '\nlater');
+    request.flush(saveTicket); http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`).flush(savedJob()); harness.detectChanges();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    http.expectOne(req => req.url.endsWith('/editor/source')).flush(savedSource(first));
+    http.expectOne(req => req.url.endsWith('/draft')).flush({ context: { ...context, current_head_sha: savedHead, proposal_version: 2 }, buffers: [] });
+    harness.detectChanges(); await harness.fixture.whenStable();
+    expect(router.url).toContain(`commit=${savedHead}`); expect(confirm).not.toHaveBeenCalled();
+    expect(page.recovery.content()).toBe(first + '\nlater'); expect(page.source()?.snapshot_sha).toBe(savedHead);
+    const same = await harness.navigateByUrl(`/changes/${proposal}/edit/${doc}?commit=${savedHead}&section=SEC-NEXT`, EditorPage);
+    expect(same).toBe(page); expect(confirm).not.toHaveBeenCalled(); expect(page.recovery.content()).toContain('later');
+    await harness.navigateByUrl(`/changes/${proposal}/edit/DOC-OTHER?commit=${savedHead}`);
+    expect(confirm).toHaveBeenCalled(); expect(router.url).not.toContain('DOC-OTHER');
+    harness.fixture.destroy(); http.verify();
+  });
+
+  it('cancels an older refresh before the verified source is installed', async () => {
+    const { fixture, page, http, opened, load, recovery } = await create(); await opened(); page.sourceMode();
+    const input = markdown + '\nchanged'; page.sourceChanged(input); page.saveGit();
+    http.expectOne(req => req.url.endsWith('/commits')).flush(saveTicket);
+    const poll = http.expectOne(`/api/v1/jobs/${saveTicket.job_id}`);
+    page.refresh(); const old = load(); recovery().flush({ context, buffers: [] });
+    poll.flush(savedJob()); fixture.detectChanges(); expect(old.cancelled).toBe(true);
+    load().flush(savedSource(input)); recovery().flush({ context: { ...context, current_head_sha: savedHead, proposal_version: 2 }, buffers: [] });
+    fixture.detectChanges(); await fixture.whenStable(); expect(page.source()?.snapshot_sha).toBe(savedHead);
+    fixture.destroy(); http.verify();
+  });
+
 });

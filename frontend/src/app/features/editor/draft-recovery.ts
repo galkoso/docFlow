@@ -17,6 +17,7 @@ export class DraftRecovery {
   private scope: RecoveryScope | null = null;
   private original = '';
   private acknowledged: string | null = null;
+  private acknowledgedBase: string | null = null;
   private version = 0;
   private loaded = false;
   private active = false;
@@ -47,6 +48,17 @@ export class DraftRecovery {
     this.scope = { ...scope }; this.owner.set(scope.actor); this.original = original;
     this.content.set(original); this.active = true;
     this.inspect();
+  }
+
+  /** A verified save advances only the Git baseline. Frozen recovery writes
+   * retain their original base/key; known CAS acknowledgements remain usable. */
+  rebase(scope: RecoveryScope, original: string, content: string, inputReady = true): boolean {
+    if (!this.scope || !this.active || scope.actor !== this.scope.actor || scope.proposal !== this.scope.proposal
+      || scope.document !== this.scope.document) return false;
+    this.stopTimer(); this.scope = { ...scope }; this.original = original; this.content.set(content);
+    this.dirty.set(content !== original); this.inputReady = inputReady; this.context.set(null);
+    if (!this.busy) this.inspect();
+    return true;
   }
 
   /** Null means temporarily signed out/refreshing; a different login or a
@@ -102,11 +114,12 @@ export class DraftRecovery {
           return;
         }
         const changed = !!buffer && (!this.loaded || buffer.version !== this.version
-          || buffer.content_utf8 !== this.acknowledged || buffer.base_head_sha !== scope.base);
+          || buffer.content_utf8 !== this.acknowledged || buffer.base_head_sha !== this.acknowledgedBase);
         this.loaded = true; this.blocked = false;
         this.choiceRequired.set(changed);
         if (!changed) {
           this.version = buffer?.version ?? 0; this.acknowledged = buffer?.content_utf8 ?? null;
+          this.acknowledgedBase = buffer?.base_head_sha ?? null;
           this.savedBuffer.set(buffer); this.queue();
         } else this.status.set('idle');
       },
@@ -121,7 +134,7 @@ export class DraftRecovery {
     if (!this.active || this.busy || this.status() === 'loading' || !this.loaded || !this.remote()) return;
     const buffer = this.remote()!;
     this.releaseAttempt(); this.version = buffer.version;
-    this.acknowledged = buffer.base_head_sha === this.scope?.base ? buffer.content_utf8 ?? null : null;
+    this.acknowledged = buffer.content_utf8 ?? null; this.acknowledgedBase = buffer.base_head_sha;
     this.savedBuffer.set(buffer); this.choiceRequired.set(false); this.blocked = false;
     this.queue();
   }
@@ -132,7 +145,7 @@ export class DraftRecovery {
     if (!scope || !buffer || !this.active || this.busy || this.status() === 'loading' || buffer.content_utf8 == null
       || (buffer.base_head_sha !== scope.base && !adoptDifferentBase)) return false;
     this.releaseAttempt(); this.version = buffer.version;
-    this.acknowledged = buffer.base_head_sha === scope.base ? buffer.content_utf8 : null;
+    this.acknowledged = buffer.content_utf8; this.acknowledgedBase = buffer.base_head_sha;
     this.savedBuffer.set(buffer); this.choiceRequired.set(false); this.blocked = false;
     this.update(buffer.content_utf8);
     return true;
@@ -177,8 +190,9 @@ export class DraftRecovery {
         }
         this.context.set(saved.context); this.savedBuffer.set(saved.buffer);
         this.remote.set({ ...saved.buffer, content_utf8: attempt.body.content_utf8 });
-        this.version = saved.buffer.version; this.acknowledged = attempt.body.content_utf8;
-        this.releaseAttempt(); this.blocked = false; this.queue();
+        this.version = saved.buffer.version; this.acknowledged = attempt.body.content_utf8; this.acknowledgedBase = attempt.scope.base;
+        this.releaseAttempt(); this.blocked = false;
+        if (attempt.scope.base !== this.scope?.base) this.inspect(); else this.queue();
       },
       error: error => {
         if (generation !== this.generation || this.attempt !== attempt) return;
@@ -217,7 +231,7 @@ export class DraftRecovery {
       && (value.buffer.content_utf8 == null || value.buffer.content_utf8 === attempt.body.content_utf8);
   }
   private validContent(value: string): boolean { return !value.includes('\0') && new TextEncoder().encode(value).length <= MAX_BYTES; }
-  private needsSave(): boolean { return this.version ? this.content() !== this.acknowledged : this.content() !== this.original; }
+  private needsSave(): boolean { return this.version ? this.content() !== this.acknowledged || this.scope?.base !== this.acknowledgedBase : this.content() !== this.original; }
   private code(error: unknown): unknown { return error instanceof HttpErrorResponse ? error.error?.error?.code : null; }
   private message(error: unknown, fallback: string): string {
     const message: unknown = error instanceof HttpErrorResponse ? error.error?.error?.message_he : null;
@@ -237,7 +251,7 @@ export class DraftRecovery {
   private releaseAttempt(): void { this.attempt = null; this.pending.set(false); this.uncertain.set(false); }
   clear(): void {
     ++this.generation; this.stopTimer(); this.reading?.unsubscribe(); this.writing?.unsubscribe();
-    this.scope = null; this.original = ''; this.acknowledged = null; this.version = 0; this.loaded = false;
+    this.scope = null; this.original = ''; this.acknowledged = null; this.acknowledgedBase = null; this.version = 0; this.loaded = false;
     this.active = false; this.busy = false; this.blocked = false; this.inputReady = true; this.releaseAttempt();
     this.owner.set(null); this.content.set(''); this.status.set('idle'); this.context.set(null); this.remote.set(null);
     this.choiceRequired.set(false); this.error.set(''); this.authRequired.set(false); this.savedBuffer.set(null); this.dirty.set(false);

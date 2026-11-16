@@ -12,12 +12,56 @@
         <span>מסמך: <bdi>{{ source.document_id }}</bdi></span><span>מקור: <code>{{ source.snapshot_sha.slice(0, 12) }}</code></span></div>
       <a [routerLink]="['/changes', source.proposal_id, 'book']" [queryParams]="{ commit: source.snapshot_sha, doc: source.document_id }">לספר ההצעה</a>
     </header>
-    <p class="notice">עריכות כאן טרם נשמרו בענף Git ואינן זמינות לאישור. עותק התאוששות בשרת נשמר בנפרד.</p>
+    <p class="notice">שמירה בענף Git נעשית בכפתור ״שמירת טיוטה ב־Git״. עותק התאוששות בשרת נשמר בנפרד ואינו ניתן לאישור.</p>
     @if (!editable()) {<p class="notice" role="status">העריכה מושהית או מוצגת לקריאה בלבד. הטקסט המקומי נשמר להשוואה ולהתאוששות.</p>}
   }
   @if (loading()) {<p role="status">טוענים מקור ובודקים את הגרסה וההרשאות…</p>}
   @if (error()) {<p class="notice" role="alert">{{ error() }} <button (click)="refresh()">בדיקה מחדש</button></p>}
   @if (source()) {
+    <section class="git-save" aria-label="שמירה בענף Git">
+      <label for="commit-message">תיאור השמירה</label>
+      <input id="commit-message" #message [value]="commitMessage()" (input)="commitMessage.set(message.value)" maxlength="10000" />
+      <div class="actions">
+        <button (click)="saveGit()" [disabled]="!editable() || git.pending() || recovery.choiceRequired() || brokenRich()">שמירת טיוטה ב־Git</button>
+        @if (git.canRetry()) {<button (click)="git.retry()">ניסיון חוזר של אותה שמירה</button>}
+        @if (git.canCheck()) {<button (click)="git.check()">בדיקת עבודת השמירה</button>}
+        @if (git.status() === 'completed' && git.pending()) {<button (click)="installSaved(true)" [disabled]="applyingSave()">טעינת הגרסה שנשמרה</button>}
+      </div>
+      <p role="status" aria-live="polite">
+        @switch (git.status()) {
+          @case ('sending') {שולחים בקשת שמירה. טרם התקבל אישור לשמירה בענף.}
+          @case ('queued') {בקשת השמירה ממתינה לעבודה. טרם אומתה שמירה ב־Git.}
+          @case ('running') {בודקים ושומרים את הבקשה בענף…}
+          @case ('uncertain') {תוצאת הבקשה אינה ידועה. נשמרה הבקשה המקורית לניסיון חוזר מפורש.}
+          @case ('reconciling') {תוצאת הכתיבה בבירור. אין לשלוח שמירה חדשה עד בירור התוצאה.}
+          @case ('suspended') {בדיקת השמירה מושהית עד בדיקת ההתחברות.}
+          @case ('failed') {השמירה לא הושלמה. יש לבדוק את הממצאים והגרסה לפני שמירה חדשה.}
+          @case ('error') {לא ניתן לאשר כרגע את תוצאת השמירה. הטקסט המקומי נשמר.}
+        }
+      </p>
+      @if (git.result(); as result) {
+        @if (result.no_op) {<p>לא נוצר Commit: אין שינוי לעומת גרסת הענף שנבדקה.</p>}
+        @else {<p>שמירה אחרונה אומתה ב־Git: <code>{{ result.head_sha }}</code> · {{ result.committed_at | date:'dd/MM/yyyy HH:mm:ss' }}</p>}
+        @if (!git.pending() && (recovery.dirty() || brokenRich())) {<p>יש עריכות מקומיות נוספות שאינן כלולות בשמירה זו.</p>}
+        @if (result.documents.length) {
+          <ul>@for (document of result.documents; track document.document_id) {
+            @if (document.normalization_changed) {<li><bdi>{{ document.document_id }}</bdi>: נשמרה אחידות LF/NFC. @if (document.normalization_only) {השינוי בקובץ הוא נרמול בלבד.}</li>}
+          }</ul>
+        }
+      }
+      @if (applyingSave()) {<p role="status">טוענים את המקור המאומת כבסיס לעריכות הבאות…</p>}
+      @if (git.error()) {<p role="alert">{{ git.error() }} <code>{{ git.errorCode() }}</code></p>}
+      @if (saveApplyError()) {<p role="alert">{{ saveApplyError() }}</p>}
+      @if (git.failure(); as failure) {
+        @if (failure.document_id) {<p>מסמך לבדיקה: <bdi>{{ failure.document_id }}</bdi></p>}
+        @if (failure.validation_code) {<p>ממצא: <code>{{ failure.validation_code }}</code></p>}
+        @if (failure.validation; as validation) {
+          <p>{{ validation.blockers_total }} חסמים מתוך {{ validation.findings_total }} ממצאים. @if (!validation.complete) {הבדיקה לא הושלמה.}
+            @if (validation.findings_truncated) {מוצגים 1,000 הממצאים הראשונים.}</p>
+          <ul>@for (finding of validation.findings; track $index) {<li><code>{{ finding.code }}</code> · <bdi>{{ finding.path }}</bdi> · {{ finding.severity === 'blocker' ? 'חסם' : 'אזהרה' }} · מיקום: {{ finding.source_start_byte }}</li>}</ul>
+        }
+      }
+    </section>
     <section class="recovery" aria-label="מצב התאוששות">
       @if (brokenRich()) {<p role="alert">השינוי האחרון בעורך אינו מיוצג ב־Markdown ואינו כלול בגיבוי. יש לתקן, לבטל או להוריד עותק של מצב העורך.</p>}
       <p role="status" aria-live="polite">

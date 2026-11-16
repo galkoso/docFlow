@@ -120,13 +120,15 @@ The editor offers rich controls, complete source repair, server validation and
 an inert preview. Recovery autosaves after two idle seconds with one request at
 a time. An existing recovery copy requires an explicit choice; a different base
 requires an explicit adoption decision. Unknown results retain the exact intent
-for manual retry. No retry automatically follows login. Temporary same-user
+for manual retry. No write retry automatically follows login. Temporary same-user
 session refresh preserves local rich history and unfinished link/image fields;
 a different login or successful logout purges private memory. Navigation, unload
 and logout warn about uncommitted work. A permitted local download is labelled
 uncommitted; unrepresentable rich edits export the actual editor state, protected
-source model and unfinished fields as JSON instead of stale Markdown. No editor
-action currently creates a Git commit or submits a review. Browser layout,
+source model and unfinished fields as JSON instead of stale Markdown. The Git
+save button submits the current document and waits for verified publication.
+A pinned source check advances the base while preserving later edits and rich
+history. Review submission remains pending. Browser layout,
 RTL/IME and accessibility acceptance remain open.
 
 
@@ -136,5 +138,5 @@ commit/tree/content verification. It never repeats an uncertain Git write.
 007 before starting this runtime. Known terminal saves purge private request
 bodies; unresolved UNKNOWN saves retain their reservation and input pending
 operational resolution. Authenticated save submission is available through
-`POST /api/v1/proposals/:id/commits`; editor Git controls are still pending.
+`POST /api/v1/proposals/:id/commits` and the editor Git-save controls.
 See [the save protocol](docs/commit-saves.md).

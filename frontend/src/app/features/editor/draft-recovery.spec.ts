@@ -156,4 +156,40 @@ describe('Private draft recovery autosave', () => {
     expect(request.request.body.content_utf8).toBe('corrected document'); acknowledge(request);
     expect(recovery.status()).toBe('saved');
   });
+  it('advances a verified Git baseline without losing an older in-flight recovery write or its CAS version', () => {
+    open(); recovery.update('saved in Git'); recovery.flush(); const first = write();
+    const nextScope = { ...scope, base: 'b'.repeat(40) };
+    expect(recovery.rebase(nextScope, 'saved in Git', 'later typing')).toBe(true);
+    expect(first.cancelled).toBe(false); expect(recovery.dirty()).toBe(true);
+    acknowledge(first, 8); read().flush({ context: { ...context, current_head_sha: nextScope.base, proposal_version: 2 },
+      buffers: [buffer('saved in Git', 8)] });
+    expect(recovery.choiceRequired()).toBe(false); recovery.flush(); const later = write();
+    expect(later.request.body).toMatchObject({ base_head_sha: nextScope.base, expected_draft_version: 8, content_utf8: 'later typing' });
+    acknowledge(later, 9, { context: { ...context, current_head_sha: nextScope.base, proposal_version: 2 },
+      buffer: { ...buffer('later typing', 9), base_head_sha: nextScope.base, content_utf8: null } });
+  });
+
+  it('retains an uncertain old-base recovery intent until exact replay succeeds after Git advances', () => {
+    open(); recovery.update('earlier private input'); recovery.flush(); const first = write(); const original = first.request.body;
+    first.error(new ProgressEvent('error'));
+    const nextScope = { ...scope, base: 'b'.repeat(40) };
+    recovery.rebase(nextScope, 'canonical Git source', 'newer local input');
+    read().flush({ context: { ...context, current_head_sha: nextScope.base, proposal_version: 2 }, buffers: [buffer('earlier private input', 8)] });
+    expect(recovery.pending()).toBe(true); recovery.retry(); const retry = write(); expect(retry.request.body).toEqual(original);
+    acknowledge(retry, 8); read().flush({ context: { ...context, current_head_sha: nextScope.base, proposal_version: 2 }, buffers: [buffer('earlier private input', 8)] });
+    recovery.flush(); const next = write(); expect(next.request.body.base_head_sha).toBe(nextScope.base);
+    expect(next.request.body.expected_draft_version).toBe(8); expect(next.request.body.content_utf8).toBe('newer local input');
+    acknowledge(next, 9, { buffer: { ...buffer('newer local input', 9), base_head_sha: nextScope.base, content_utf8: null } });
+  });
+
+  it('requires comparison for an unknown newer recovery buffer after promotion and holds unrepresentable rich input', () => {
+    open(); recovery.update('known'); recovery.flush(); acknowledge(write(), 8);
+    const nextScope = { ...scope, base: 'b'.repeat(40) };
+    recovery.rebase(nextScope, 'Git content', 'last serializable source', false);
+    read().flush({ context: { ...context, current_head_sha: nextScope.base, proposal_version: 2 }, buffers: [buffer('other tab input', 9)] });
+    expect(recovery.choiceRequired()).toBe(true); expect(recovery.content()).toBe('last serializable source');
+    recovery.keepLocal(); recovery.flush(); vi.advanceTimersByTime(5000); http.expectNone(request => request.method === 'PUT');
+    expect(recovery.dirty()).toBe(true);
+  });
+
 });

@@ -1,8 +1,8 @@
 # Git save boundary
 
 The editor currently provides local source and private recovery. The backend now
-has a durable Git save worker and authenticated submission. Connecting the
-editor interaction is the next integration stage.
+has a durable Git save worker, authenticated submission and editor controls.
+Formal review and full acceptance remain separate required work.
 
 ## Implemented: pinned commit evidence
 
@@ -190,16 +190,50 @@ operation still guards another save until the caller confirms that its pinned
 source has been checked and installed. Its verified receipt can then remain
 visible without retaining the submitted source.
 
-Fourteen HTTP-controller scenarios pass, and the frontend suite now has 99
-passing tests. This service is not yet connected to the editor page; it does not
-by itself claim the interactive Git-save acceptance scenario.
+Fourteen HTTP-controller scenarios cover this lifecycle. The editor now uses
+this component-scoped service as described below.
+
+## Implemented: editor Git-save controls and baseline promotion
+
+The editor flushes active rich fields before capturing its current document,
+exact base hash and proposal head/version. Invalid fields and unrepresentable
+rich state block submission. The UI distinguishes sending, queued, verification,
+uncertain, failed and exhausted reconciliation outcomes, provides explicit retry
+or observation, shows whole-book blocker locations and labels no-op/normalization
+outcomes. SHA/time appears only for a published verified result.
+
+After success, a pinned source read must match the proposal/repository/document,
+receipt hash and exact canonical submitted bytes (or the original bytes for an
+unchanged document). A mismatch or unavailable read retains the old baseline and
+blocks a new save until explicit rechecking. Older in-flight refreshes are fenced
+out. Later external advancement installs the operation's own snapshot read-only.
+
+Promotion preserves later raw typing exactly, and retains the live rich state,
+Undo/Redo history and unfinished fields. Once this file's canonical bytes have
+been verified, rich serialization applies the same LF/NFC normalization to old
+lossless fragments; it does not replace the rich schema, source keys or history.
+Unrepresentable later state remains held, guarded and exportable. Recovery JSON
+records both current Git base and the older rich-model base/normalization mode.
+Recovery CAS tracking advances independently: an old in-flight or uncertain
+recovery request keeps its exact key/base/body. Its eventual acknowledgement
+supplies the CAS version for a later new-base buffer. Unknown newer buffers still
+require comparison; Git success cannot overwrite another tab's recovery data.
+
+A guarded same-document router transition replaces the URL's commit after
+promotion without discarding later edits. Other document/base navigation keeps
+the loss guard. Session interruption retains same-actor local work and exact
+requests; account changes/logout purge them. Eleven new page/router scenarios
+and three recovery scenarios pass alongside the earlier checks: 113 frontend
+tests total. Production Angular build passes. Tests use jsdom geometry mocks;
+no connected browser is available, so visual/RTL/IME/accessibility acceptance
+is not claimed. Real GitHub end-to-end acceptance is also still open.
 
 ## Required next implementation
 
-The editor's Git-save interaction must flush active fields, preserve later local
-edits and frozen retries,
-and show a verified SHA/time only after publication succeeds. Formal review,
-operational reconciliation, unresolved-input retention and real-provider/browser
-acceptance remain open.
+Formal review, diff/discussions, operational reconciliation, unresolved-input
+retention and real-provider/browser acceptance remain open. The current page
+edits one document at a time; the backend and client lifecycle support an atomic
+batch of up to fifty existing documents. Full-book dirty-buffer coordination and
+new-document/import workflows remain part of the larger specification.
 
 Provider reference: [GitHub Git commit objects](https://docs.github.com/en/rest/git/commits?apiVersion=2026-03-10#get-a-commit).

@@ -323,15 +323,31 @@ async fn editor_preview(
     body: &serde_json::Value,
     csrf: bool,
 ) -> (StatusCode, serde_json::Value) {
+    editor_post(
+        pool,
+        app,
+        actor,
+        &format!("/api/v1/proposals/{proposal}/documents/{document}/editor/preview"),
+        body,
+        csrf,
+    )
+    .await
+}
+async fn editor_post(
+    pool: &PgPool,
+    app: &Router,
+    actor: Uuid,
+    uri: &str,
+    body: &serde_json::Value,
+    csrf: bool,
+) -> (StatusCode, serde_json::Value) {
     let credentials = SessionStore::new(pool.clone())
         .mint(actor, 3600)
         .await
         .unwrap();
     let mut request = Request::builder()
         .method("POST")
-        .uri(format!(
-            "/api/v1/proposals/{proposal}/documents/{document}/editor/preview"
-        ))
+        .uri(uri)
         .header(
             "Cookie",
             format!(
@@ -708,6 +724,292 @@ async fn editor_rejects_catalog_and_front_matter_identity_mismatch_before_editin
     let (status, error) = editor_model(&app, &token, id, "DOC-OVERVIEW", OLD).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(error["error"]["code"], "EDITOR_DOCUMENT_ID_MISMATCH");
+}
+
+async fn editor_source(
+    app: &Router,
+    token: &str,
+    proposal: Uuid,
+    commit: &str,
+) -> (StatusCode, serde_json::Value) {
+    get(
+        app,
+        token,
+        &format!(
+            "/api/v1/proposals/{proposal}/documents/DOC-OVERVIEW/editor/source?commit={commit}"
+        ),
+    )
+    .await
+}
+fn source_request(commit: &str, source: &serde_json::Value, markdown: &str) -> serde_json::Value {
+    serde_json::json!({"commit":commit,"expected_proposal_version":1,"expected_document_sha256":source["sha256"],"markdown":markdown})
+}
+async fn source_preview(
+    pool: &PgPool,
+    app: &Router,
+    actor: Uuid,
+    proposal: Uuid,
+    body: &serde_json::Value,
+    csrf: bool,
+) -> (StatusCode, serde_json::Value) {
+    editor_post(
+        pool,
+        app,
+        actor,
+        &format!("/api/v1/proposals/{proposal}/documents/DOC-OVERVIEW/editor/source-preview"),
+        body,
+        csrf,
+    )
+    .await
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn source_mode_loads_broken_bytes_and_previews_repairs_and_unfinished_recovery_without_git_writes(
+    pool: PgPool,
+) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let id = proposal(&pool, actor, repository, Some(OLD)).await;
+    let (_, provider, _) = fixture(&pool);
+    let valid = provider.files["docs/overview.md"].clone();
+    let broken = "unfinished source ** שָׁלוֹם\r\n";
+    let mut files = provider.files.clone();
+    files.insert("docs/overview.md".into(), broken.into());
+    let (app, _, _) = fixture_with_files(&pool, files);
+    let (status, source) = editor_source(&app, &token, id, OLD).await;
+    assert_eq!(status, StatusCode::OK, "{source}");
+    assert_eq!(source["markdown"], broken);
+    assert_eq!(source["parse_error"], "FRONT_MATTER_REQUIRED");
+    assert!(source["model"].is_null());
+    assert_eq!(source["can_edit"], true);
+    let (status, repaired) = source_preview(
+        &pool,
+        &app,
+        actor,
+        id,
+        &source_request(OLD, &source, &valid),
+        true,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{repaired}");
+    assert!(repaired["parse_error"].is_null());
+    assert_eq!(repaired["base_parse_error"], "FRONT_MATTER_REQUIRED");
+    assert_eq!(repaired["model"]["document_id"], "DOC-OVERVIEW");
+    assert!(
+        repaired["preview"]["removed_section_ids"].is_null(),
+        "invalid original source makes removed-ID comparison unknown"
+    );
+    assert_eq!(
+        repaired["preview"]["base_document_sha256"],
+        source["sha256"]
+    );
+    assert_eq!(repaired["preview"]["markdown"], valid);
+    let unfinished = "---\ndocument_id: unfinished";
+    let (status, draft) = source_preview(
+        &pool,
+        &app,
+        actor,
+        id,
+        &source_request(OLD, &source, unfinished),
+        true,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(draft["preview"]["markdown"], unfinished);
+    assert!(!draft["parse_error"].is_null());
+    assert!(draft["model"].is_null());
+    assert_eq!(draft["preview"]["findings_total"], 1);
+    let mismatched = valid.replacen("DOC-OVERVIEW", "DOC-OTHER", 1);
+    let (_, identity) = source_preview(
+        &pool,
+        &app,
+        actor,
+        id,
+        &source_request(OLD, &source, &mismatched),
+        true,
+    )
+    .await;
+    assert_eq!(identity["model_error"], "EDITOR_DOCUMENT_ID_MISMATCH");
+    assert!(identity["model"].is_null());
+    let unchanged:(String,i64,i64,i64)=sqlx::query_as("SELECT p.head_sha,p.version,(SELECT count(*) FROM git_operations),(SELECT count(*) FROM draft_buffers) FROM proposals p WHERE id=$1")
+        .bind(id).fetch_one(&pool).await.unwrap();
+    assert_eq!(unchanged, (OLD.into(), 1, 0, 0));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn source_recovery_comparison_is_readonly_for_historical_or_closed_bases_and_rechecks_scope(
+    pool: PgPool,
+) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let id = proposal(&pool, actor, repository, Some(NEW)).await;
+    let (app, provider, _) = fixture(&pool);
+    let (_, old) = editor_source(&app, &token, id, OLD).await;
+    assert_eq!(old["can_edit"], false);
+    assert_eq!(old["recorded_head_sha"], NEW);
+    let body = source_request(
+        OLD,
+        &old,
+        &format!(
+            "{}\nLocal recovered paragraph.\n",
+            old["markdown"].as_str().unwrap()
+        ),
+    );
+    let (status, compared) = source_preview(&pool, &app, actor, id, &body, true).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(compared["can_edit"], false);
+    assert_eq!(compared["preview"]["base_snapshot_sha"], OLD);
+    sqlx::query("UPDATE proposals SET state='CLOSED' WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, closed) = editor_source(&app, &token, id, NEW).await;
+    assert_eq!(closed["can_edit"], false);
+    let body = source_request(NEW, &closed, closed["markdown"].as_str().unwrap());
+    assert_eq!(
+        source_preview(&pool, &app, actor, id, &body, true).await.1["can_edit"],
+        false
+    );
+    assert_eq!(
+        source_preview(&pool, &app, actor, id, &body, false).await.0,
+        StatusCode::FORBIDDEN
+    );
+    let mut stale = body.clone();
+    stale["expected_proposal_version"] = serde_json::json!(2);
+    assert_eq!(
+        source_preview(&pool, &app, actor, id, &stale, true).await.1["error"]["code"],
+        "EDITOR_VERSION_CHANGED"
+    );
+    stale = body.clone();
+    stale["expected_document_sha256"] = serde_json::json!("a".repeat(64));
+    assert_eq!(
+        source_preview(&pool, &app, actor, id, &stale, true).await.1["error"]["code"],
+        "EDITOR_BASE_MISMATCH"
+    );
+    let (foreign_actor, foreign_repository, _, _) = setup(&pool).await;
+    let foreign = proposal(&pool, foreign_actor, foreign_repository, Some(OLD)).await;
+    let reads = provider.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        editor_source(&app, &token, foreign, OLD).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        source_preview(&pool, &app, actor, foreign, &body, true)
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
+    sqlx::query("UPDATE memberships SET role='READER' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        source_preview(&pool, &app, actor, id, &body, true).await.0,
+        StatusCode::FORBIDDEN
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn source_mode_bounds_diagnostics_and_refuses_catalog_paths_outside_docs(pool: PgPool) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let id = proposal(&pool, actor, repository, Some(OLD)).await;
+    let (_, provider, _) = fixture(&pool);
+    let mut files = provider.files.clone();
+    files
+        .get_mut("docs/overview.md")
+        .unwrap()
+        .push_str(&format!(
+            "\n{}\n",
+            "text <span>unsupported</span> ".repeat(1100)
+        ));
+    let (app, _, _) = fixture_with_files(&pool, files);
+    let (_, source) = editor_source(&app, &token, id, OLD).await;
+    assert!(source["findings_total"].as_u64().unwrap() > 1000);
+    assert_eq!(source["findings"].as_array().unwrap().len(), 1000);
+    assert_eq!(source["findings_truncated"], true);
+    let (_, preview) = source_preview(
+        &pool,
+        &app,
+        actor,
+        id,
+        &source_request(OLD, &source, source["markdown"].as_str().unwrap()),
+        true,
+    )
+    .await;
+    assert!(preview["preview"]["findings_total"].as_u64().unwrap() > 1000);
+    assert_eq!(
+        preview["preview"]["findings"].as_array().unwrap().len(),
+        1000
+    );
+    let mut files = provider.files.clone();
+    let mut catalog: serde_json::Value =
+        serde_json::from_str(&files[".specspace/catalog.json"]).unwrap();
+    catalog["documents"][0]["path"] = serde_json::json!(".specspace/private.txt");
+    files.insert(
+        ".specspace/catalog.json".into(),
+        serde_json::to_string(&catalog).unwrap(),
+    );
+    files.insert(
+        ".specspace/private.txt".into(),
+        "outside-docs-secret-fixture".into(),
+    );
+    let (app, provider, _) = fixture_with_files(&pool, files);
+    let book = get(
+        &app,
+        &token,
+        &format!("/api/v1/proposals/{id}/specification"),
+    )
+    .await;
+    assert_eq!(book.0, StatusCode::OK);
+    let reads = provider.reads.load(Ordering::SeqCst);
+    let (status, error) = editor_source(&app, &token, id, OLD).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(!error.to_string().contains("outside-docs-secret-fixture"));
+    assert_eq!(provider.reads.load(Ordering::SeqCst), reads);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn source_repair_rechecks_permissions_after_fetching_an_unparseable_file(pool: PgPool) {
+    let (actor, repository, _, token) = setup(&pool).await;
+    sqlx::query("UPDATE memberships SET role='CONTRIBUTOR' WHERE user_id=$1")
+        .bind(actor)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let id = proposal(&pool, actor, repository, Some(OLD)).await;
+    let (_, provider, _) = fixture(&pool);
+    let mut files = provider.files.clone();
+    files.insert("docs/overview.md".into(), "unfinished source".into());
+    let (app, provider, _) = fixture_with_files(&pool, files);
+    let (_, source) = editor_source(&app, &token, id, OLD).await;
+    *provider.revoke_editor_after_text.lock().unwrap() = Some((pool.clone(), actor));
+    let (status, error) = source_preview(
+        &pool,
+        &app,
+        actor,
+        id,
+        &source_request(OLD, &source, "still unfinished"),
+        true,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(error.get("preview").is_none());
 }
 
 #[sqlx::test(migrations = "../../migrations")]

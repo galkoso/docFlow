@@ -66,6 +66,23 @@ render events, document findings and declared removed IDs. Preview does not
 write a recovery buffer, operation journal, Git Commit or review approval.
 Repository-wide validation and Git publication remain separate requirements.
 
+`GET .../editor/source?commit=:sha` returns exact catalogued Markdown even when
+front matter is invalid, with syntax/model findings and a nullable rich model.
+Read permissions still apply. Paths are constrained to catalogued `docs/*.md`;
+a broken catalog cannot turn this into an arbitrary-file endpoint. Invalid
+documents may require one extra pinned provider read because the reader's error
+placeholder does not retain their source bytes.
+
+`POST .../editor/source-preview` accepts `commit`,
+`expected_proposal_version`, `expected_document_sha256` and complete `markdown`.
+It requires current edit assignment and CSRF validation, checks the exact pinned
+base hash, then renders/analyses unfinished or repaired source without writing
+anything. Historical/closed recovery comparisons return `can_edit: false`.
+This capability describes editing context, not Git publication readiness.
+Removed section IDs are null when either source cannot be parsed reliably.
+Document diagnostics include the full count and a truncation flag while returning
+at most 1,000 located findings. Rich previews use the same diagnostic bound.
+
 ## Browser representation
 
 The browser core uses a ProseMirror schema with CommonMark text/marks, simple GFM

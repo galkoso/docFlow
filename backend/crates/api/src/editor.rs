@@ -16,6 +16,8 @@ use specspace_git_adapter::CommitSha;
 use sqlx::FromRow;
 use uuid::Uuid;
 
+pub(crate) mod source_mode;
+
 #[derive(Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in=Query)]
 pub(crate) struct Version {
@@ -62,8 +64,11 @@ pub struct EditorPreview {
     pub markdown: String,
     pub sha256: String,
     pub changed: bool,
-    pub removed_section_ids: Vec<String>,
+    /// Null when an invalid base/new source prevents a reliable comparison.
+    pub removed_section_ids: Option<Vec<String>>,
     pub findings: Vec<EditorFinding>,
+    pub findings_total: usize,
+    pub findings_truncated: bool,
     pub render_events: Vec<render::RenderEvent>,
     pub render_error: Option<String>,
 }
@@ -228,6 +233,7 @@ async fn current(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .merge(source_mode::routes())
         .route(
             "/api/v1/proposals/{proposal}/documents/{document}/editor",
             get(model),
@@ -369,6 +375,7 @@ pub(crate) async fn preview(
                 Ok(events) => (events, None),
                 Err(code) => (vec![], Some(code.to_owned())),
             };
+            let findings_total = parsed.findings.len();
             Ok::<_, EditorError>(EditorPreview {
                 proposal_id: proposal,
                 proposal_version: version,
@@ -378,16 +385,19 @@ pub(crate) async fn preview(
                 markdown: edited.source,
                 sha256: edited.sha256,
                 changed: edited.changed,
-                removed_section_ids: edited.removed_section_ids,
+                removed_section_ids: Some(edited.removed_section_ids),
                 findings: parsed
                     .findings
                     .into_iter()
+                    .take(1000)
                     .map(|finding| EditorFinding {
                         code: finding.code.into(),
                         source_start_byte: finding.source_start,
                         source_end_byte: finding.source_end,
                     })
                     .collect(),
+                findings_total,
+                findings_truncated: findings_total > 1000,
                 render_events,
                 render_error,
             })

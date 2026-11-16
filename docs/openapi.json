@@ -1397,6 +1397,254 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/documents/{document}/editor/source": {
+      "get": {
+        "tags": [
+          "crate::editor::source_mode"
+        ],
+        "operationId": "proposalEditorSource",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditorSource"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/documents/{document}/editor/source-preview": {
+      "post": {
+        "tags": [
+          "crate::editor::source_mode"
+        ],
+        "operationId": "previewProposalSource",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourcePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourcePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/documents/{document}/highlights": {
       "get": {
         "tags": [
@@ -3396,8 +3644,9 @@
           "markdown",
           "sha256",
           "changed",
-          "removed_section_ids",
           "findings",
+          "findings_total",
+          "findings_truncated",
           "render_events"
         ],
         "properties": {
@@ -3419,6 +3668,13 @@
               "$ref": "#/components/schemas/EditorFinding"
             }
           },
+          "findings_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "findings_truncated": {
+            "type": "boolean"
+          },
           "markdown": {
             "type": "string"
           },
@@ -3431,10 +3687,14 @@
             "format": "int64"
           },
           "removed_section_ids": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Null when an invalid base/new source prevents a reliable comparison."
           },
           "render_error": {
             "type": [
@@ -3517,6 +3777,107 @@
           "repository_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "snapshot_sha": {
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "EditorSource": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "repository_id",
+          "number",
+          "title",
+          "branch",
+          "target_branch",
+          "proposal_version",
+          "recorded_head_sha",
+          "snapshot_sha",
+          "document_id",
+          "can_edit",
+          "markdown",
+          "sha256",
+          "findings",
+          "findings_total",
+          "findings_truncated"
+        ],
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "can_edit": {
+            "type": "boolean"
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EditorFinding"
+            }
+          },
+          "findings_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "findings_truncated": {
+            "type": "boolean"
+          },
+          "markdown": {
+            "type": "string"
+          },
+          "model": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EditorDocument"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "parse_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recorded_head_sha": {
+            "type": "string"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sha256": {
+            "type": "string"
           },
           "snapshot_sha": {
             "type": "string"
@@ -4489,6 +4850,75 @@
             "type": "string"
           }
         }
+      },
+      "SourcePreview": {
+        "type": "object",
+        "required": [
+          "preview",
+          "can_edit"
+        ],
+        "properties": {
+          "base_parse_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "can_edit": {
+            "type": "boolean",
+            "description": "This preview can also compare recovery against a historical/closed base.\nActual writes must independently enforce current Git/state/version gates."
+          },
+          "model": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EditorDocument"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parse_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preview": {
+            "$ref": "#/components/schemas/EditorPreview"
+          }
+        }
+      },
+      "SourcePreviewRequest": {
+        "type": "object",
+        "required": [
+          "commit",
+          "expected_proposal_version",
+          "expected_document_sha256",
+          "markdown"
+        ],
+        "properties": {
+          "commit": {
+            "type": "string"
+          },
+          "expected_document_sha256": {
+            "type": "string"
+          },
+          "expected_proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "markdown": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "Specification": {
         "type": "object",

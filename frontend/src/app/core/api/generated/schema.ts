@@ -264,6 +264,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/documents/{document}/editor/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalEditorSource"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}/documents/{document}/editor/source-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewProposalSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/documents/{document}/highlights": {
         parameters: {
             query?: never;
@@ -596,12 +628,15 @@ export interface components {
             changed: boolean;
             document_id: string;
             findings: components["schemas"]["EditorFinding"][];
+            findings_total: number;
+            findings_truncated: boolean;
             markdown: string;
             /** Format: uuid */
             proposal_id: string;
             /** Format: int64 */
             proposal_version: number;
-            removed_section_ids: string[];
+            /** @description Null when an invalid base/new source prevents a reliable comparison. */
+            removed_section_ids?: string[] | null;
             render_error?: string | null;
             render_events: components["schemas"]["RenderEvent"][];
             sha256: string;
@@ -625,6 +660,31 @@ export interface components {
             recorded_head_sha: string;
             /** Format: uuid */
             repository_id: string;
+            snapshot_sha: string;
+            target_branch: string;
+            title: string;
+        };
+        EditorSource: {
+            branch: string;
+            can_edit: boolean;
+            document_id: string;
+            findings: components["schemas"]["EditorFinding"][];
+            findings_total: number;
+            findings_truncated: boolean;
+            markdown: string;
+            model?: components["schemas"]["EditorDocument"] | null;
+            model_error?: string | null;
+            /** Format: int64 */
+            number: number;
+            parse_error?: string | null;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: int64 */
+            proposal_version: number;
+            recorded_head_sha: string;
+            /** Format: uuid */
+            repository_id: string;
+            sha256: string;
             snapshot_sha: string;
             target_branch: string;
             title: string;
@@ -874,6 +934,25 @@ export interface components {
             level: number;
             section_id: string;
             title: string;
+        };
+        SourcePreview: {
+            base_parse_error?: string | null;
+            /**
+             * @description This preview can also compare recovery against a historical/closed base.
+             *     Actual writes must independently enforce current Git/state/version gates.
+             */
+            can_edit: boolean;
+            model?: components["schemas"]["EditorDocument"] | null;
+            model_error?: string | null;
+            parse_error?: string | null;
+            preview: components["schemas"]["EditorPreview"];
+        };
+        SourcePreviewRequest: {
+            commit: string;
+            expected_document_sha256: string;
+            /** Format: int64 */
+            expected_proposal_version: number;
+            markdown: string;
         };
         Specification: {
             branch: string;
@@ -1884,6 +1963,184 @@ export interface operations {
                 };
             };
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalEditorSource: {
+        parameters: {
+            query: {
+                commit: string;
+            };
+            header?: never;
+            path: {
+                proposal: string;
+                document: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditorSource"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    previewProposalSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal: string;
+                document: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourcePreviewRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourcePreview"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };

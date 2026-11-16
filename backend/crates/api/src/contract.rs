@@ -10,7 +10,8 @@ use utoipa::{
         crate::specification::repositories, crate::specification::specification, crate::specification::document, crate::specification::find, crate::specification::asset,
         crate::specification::highlights, crate::proposals::create, crate::proposals::job_status, crate::proposal_reads::list, crate::proposal_reads::detail, crate::proposal_reads::options, crate::creation_context::prepare,
         crate::proposal_content::specification, crate::proposal_content::document, crate::proposal_content::find, crate::proposal_content::highlights, crate::proposal_content::asset,
-        crate::drafts::read, crate::drafts::save, crate::drafts::discard, crate::editor::model, crate::editor::preview),
+        crate::drafts::read, crate::drafts::save, crate::drafts::discard, crate::editor::model, crate::editor::preview,
+        crate::editor::source_mode::read, crate::editor::source_mode::preview),
     components(schemas(crate::Health, crate::ErrorBody, crate::ApiError, crate::auth::Profile, crate::auth::Membership, crate::auth::ProfileCapabilities,
         crate::auth::AuthAvailability, specspace_document_engine::find::MatchWindow)),
     modifiers(&SessionSecurity)

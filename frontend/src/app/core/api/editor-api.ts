@@ -7,6 +7,8 @@ export type EditorBlock = components['schemas']['EditorBlock'];
 export type EditorEdit = components['schemas']['EditorEdit'];
 export type EditorResponse = components['schemas']['EditorResponse'];
 export type EditorPreview = components['schemas']['EditorPreview'];
+export type EditorSource = components['schemas']['EditorSource'];
+export type SourcePreview = components['schemas']['SourcePreview'];
 export type DraftSnapshot = components['schemas']['DraftSnapshot'];
 export type DraftSaved = components['schemas']['DraftSaved'];
 export type SaveDraft = components['schemas']['SaveDraft'];
@@ -20,6 +22,14 @@ export class EditorApi {
   }
   preview(proposal: string, document: string, commit: string, version: number, edit: EditorEdit) {
     return this.http.post<EditorPreview>(`${this.document(proposal, document)}/preview`, { commit, expected_proposal_version: version, edit });
+  }
+  source(proposal: string, document: string, commit: string) {
+    return this.http.get<EditorSource>(`${this.document(proposal, document)}/source`, { params: { commit } });
+  }
+  sourcePreview(proposal: string, document: string, commit: string, version: number, sha256: string, markdown: string) {
+    return this.http.post<SourcePreview>(`${this.document(proposal, document)}/source-preview`, {
+      commit, expected_proposal_version: version, expected_document_sha256: sha256, markdown,
+    });
   }
   recovery(proposal: string, document?: string) {
     return this.http.get<DraftSnapshot>(this.draft(proposal), { params: document ? { document_id: document } : {} });

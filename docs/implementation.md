@@ -773,3 +773,22 @@ Checkboxes represent verified work only.
   RTL/IME or accessibility acceptance. Production build and all 61 frontend tests
   pass. This reusable component is not yet connected to a proposal route;
   page/session/recovery integration, source repair and Git save remain required.
+
+- Authorized source/recovery preview: source GET returns exact pinned bytes and
+  syntax/model diagnostics even for invalid front matter or mismatched catalog
+  identity. It permits repair while restricting paths to catalogued docs/*.md;
+  broken catalog entries cannot expose other repository files. Source POST binds
+  complete user-entered Markdown to its original SHA-256 and proposal version,
+  returning inert rendering, findings and an optional rich model. Unfinished
+  recovery source remains intact. Assigned editors can compare closed/historical
+  bases with editing disabled; no Git, buffer or review write occurs. Access is
+  rechecked after provider/CPU waits. Both preview paths bound returned findings
+  at 1,000 with truthful totals/truncation, and removed-ID comparisons are nullable
+  when parsing fails. Four additional HTTP/PostgreSQL scenarios cover repair,
+  unfinished/mismatched input, historical/closed comparison, roles/CSRF/stale
+  versions, foreign scope, provider-wait revocation, diagnostic bounds and an
+  attempted catalog escape. Full backend checks passed before the nullable-ID
+  refinement; the final API regression suite and workspace Clippy pass afterward.
+  OpenAPI and typed source client methods are updated. Page/recovery integration
+  and actual Git saves remain required subsequent work.
+  The regenerated client builds and all 61 frontend tests pass.

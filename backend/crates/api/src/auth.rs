@@ -142,6 +142,7 @@ pub(crate) enum AuthFailure {
     Expired,
     Unavailable,
     Csrf,
+    IdentityChanged,
 }
 
 impl IntoResponse for AuthFailure {
@@ -163,6 +164,11 @@ impl IntoResponse for AuthFailure {
                 "CSRF_FAILED",
                 "אימות הבקשה נכשל. יש לרענן את העמוד.",
             ),
+            Self::IdentityChanged => error(
+                StatusCode::CONFLICT,
+                "SESSION_IDENTITY_CHANGED",
+                "זהות ההתחברות השתנתה. יש לבדוק אותה לפני המשך העבודה.",
+            ),
         }
     }
 }
@@ -176,10 +182,32 @@ pub(crate) async fn authenticate(
         .authenticate(&token)
         .await
     {
-        Ok(Some(identity)) => Ok(identity),
+        Ok(Some(identity)) => {
+            if headers.contains_key("X-Expected-Actor") {
+                verify_actor(headers, &identity)?;
+            }
+            Ok(identity)
+        }
         Ok(None) => Err(AuthFailure::Expired),
         Err(_) => Err(AuthFailure::Unavailable),
     }
+}
+
+/// A captured editor intent must not follow a shared cookie into another login.
+/// This header only rejects a mismatch; the server session remains authoritative.
+pub(crate) fn verify_actor(
+    headers: &HeaderMap,
+    identity: &SessionIdentity,
+) -> Result<(), AuthFailure> {
+    let mut values = headers.get_all("X-Expected-Actor").iter();
+    let expected = values
+        .next()
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| Uuid::parse_str(value).ok());
+    if expected != Some(identity.user_id) || values.next().is_some() {
+        return Err(AuthFailure::IdentityChanged);
+    }
+    Ok(())
 }
 
 pub(crate) fn verify_write(

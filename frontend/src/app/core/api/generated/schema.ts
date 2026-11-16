@@ -2265,7 +2265,10 @@ export interface operations {
                  */
                 document_id?: string;
             };
-            header?: never;
+            header: {
+                /** @description Current user whose private recovery is requested */
+                "X-Expected-Actor": string;
+            };
             path: {
                 proposal: string;
             };
@@ -2305,6 +2308,14 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -2326,7 +2337,10 @@ export interface operations {
     saveProposalDraft: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Captured owner of this exact save intent */
+                "X-Expected-Actor": string;
+            };
             path: {
                 proposal: string;
             };
@@ -2410,7 +2424,10 @@ export interface operations {
                 document_id: string;
                 expected_draft_version: number;
             };
-            header?: never;
+            header: {
+                /** @description Captured owner of the recovery intent; must match the server session */
+                "X-Expected-Actor": string;
+            };
             path: {
                 proposal: string;
             };

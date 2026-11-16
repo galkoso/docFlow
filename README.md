@@ -107,3 +107,10 @@ An authenticated, CSRF-protected `DELETE` with document ID and expected draft
 version discards only that user's selected buffer. Recreated buffers receive new
 versions, protecting them from delayed requests. The editor UI and Git saves
 remain separate implementation stages.
+
+All recovery requests require `X-Expected-Actor` with the UUID captured when the
+user began the intent. The server rejects a missing, malformed, duplicate or
+different actor with `409 SESSION_IDENTITY_CHANGED`. This protects frozen retries
+when another tab changes the shared login cookie. The header grants no access;
+the server session and current permissions remain authoritative. Other
+authenticated endpoints also reject this header when it is supplied incorrectly.

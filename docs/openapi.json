@@ -1808,6 +1808,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "description": "Current user whose private recovery is requested",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -1839,6 +1849,15 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -1881,6 +1900,16 @@
           {
             "name": "proposal",
             "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "description": "Captured owner of this exact save intent",
             "required": true,
             "schema": {
               "type": "string",
@@ -2008,6 +2037,16 @@
             "schema": {
               "type": "integer",
               "format": "int64"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "description": "Captured owner of the recovery intent; must match the server session",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],

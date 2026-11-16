@@ -99,7 +99,8 @@ async fn request(
     let mut builder = Request::builder()
         .method(if body.is_some() { "PUT" } else { "GET" })
         .uri(uri)
-        .header("Cookie", format!("specspace-session={}", actor.token));
+        .header("Cookie", format!("specspace-session={}", actor.token))
+        .header("X-Expected-Actor", actor.id.to_string());
     if csrf {
         builder = builder
             .header("Origin", "http://localhost:4200")
@@ -531,7 +532,8 @@ async fn discard(
 ) -> StatusCode {
     let mut builder=Request::builder().method("DELETE")
         .uri(format!("/api/v1/proposals/{proposal}/draft?document_id=DOC-MEDIA&expected_draft_version={version}"))
-        .header("Cookie",format!("specspace-session={}",actor.token));
+        .header("Cookie",format!("specspace-session={}",actor.token))
+        .header("X-Expected-Actor",actor.id.to_string());
     if csrf {
         builder = builder
             .header("Origin", "http://localhost:4200")
@@ -542,6 +544,74 @@ async fn discard(
         .await
         .unwrap()
         .status()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn recovery_rejects_intents_from_a_different_login_before_read_or_write(pool: PgPool) {
+    let f = fixture(&pool).await;
+    let other = actor(&pool, f.organization, "ADMIN").await;
+    let app = app(&pool, Some(30));
+    let body = input(
+        "DOC-MEDIA",
+        0,
+        "private source captured by the original account",
+    );
+    for method in ["GET", "PUT", "DELETE"] {
+        for expected in [
+            vec![],
+            vec![f.actor.id.to_string()],
+            vec!["invalid".into()],
+            vec![other.id.to_string(), other.id.to_string()],
+        ] {
+            let mut builder = Request::builder()
+                .method(method)
+                .uri(format!(
+                    "/api/v1/proposals/{}/draft?document_id=DOC-MEDIA&expected_draft_version=1",
+                    f.proposal
+                ))
+                .header("Cookie", format!("specspace-session={}", other.token))
+                .header("Origin", "http://localhost:4200")
+                .header("X-XSRF-TOKEN", &other.csrf)
+                .header("Content-Type", "application/json");
+            for value in expected {
+                builder = builder.header("X-Expected-Actor", value);
+            }
+            let response = app
+                .clone()
+                .oneshot(
+                    builder
+                        .body(if method == "PUT" {
+                            Body::from(serde_json::to_vec(&body).unwrap())
+                        } else {
+                            Body::empty()
+                        })
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::CONFLICT, "{method}");
+            let bytes = response.into_body().collect().await.unwrap().to_bytes();
+            let error: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(error["error"]["code"], "SESSION_IDENTITY_CHANGED");
+            assert!(!String::from_utf8_lossy(&bytes).contains(&other.id.to_string()));
+        }
+    }
+    let (buffers, audits): (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM draft_buffers),(SELECT count(*) FROM audit_events)",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!((buffers, audits), (0, 0));
+    let (status, empty) = request(&app, &other, f.proposal, None, false, Some("DOC-MEDIA")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(empty["buffers"], json!([]));
+    assert_eq!(
+        request(&app, &other, f.proposal, Some(&body), true, None)
+            .await
+            .0,
+        StatusCode::OK
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

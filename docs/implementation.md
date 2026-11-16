@@ -792,3 +792,16 @@ Checkboxes represent verified work only.
   OpenAPI and typed source client methods are updated. Page/recovery integration
   and actual Git saves remain required subsequent work.
   The regenerated client builds and all 61 frontend tests pass.
+
+- Recovery request identity: every private draft read/save/discard now requires
+  the UUID captured with the editor intent in `X-Expected-Actor`. Authentication
+  rejects malformed, duplicate or mismatched supplied headers across endpoints;
+  cookies and current permissions remain the sole authority. Editor API methods
+  take the captured actor explicitly, so a frozen retry cannot silently adopt a
+  new account from shared cookies or refreshed profile state. A PostgreSQL HTTP
+  scenario exercises all three recovery verbs with missing/invalid/duplicate/
+  foreign actor bindings, checks no buffer or audit write, and confirms correctly
+  bound requests work. All nine recovery scenarios, workspace Clippy, and all
+  62 frontend tests pass. OpenAPI and generated client document the required
+  recovery header. Editor page/autosave integration remains subsequent work.
+  The full backend workspace regression suite and Angular production build pass.

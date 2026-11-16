@@ -27,7 +27,7 @@ pub(crate) struct DiscardQuery {
     expected_draft_version: i64,
 }
 
-#[utoipa::path(delete,path="/api/v1/proposals/{proposal}/draft",operation_id="discardProposalDraft",security(("sessionCookie"=[])),params(("proposal"=Uuid,Path),DiscardQuery),
+#[utoipa::path(delete,path="/api/v1/proposals/{proposal}/draft",operation_id="discardProposalDraft",security(("sessionCookie"=[])),params(("proposal"=Uuid,Path),DiscardQuery,("X-Expected-Actor"=Uuid,Header,description="Captured owner of the recovery intent; must match the server session")),
     responses((status=204),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=403,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=503,body=ErrorBody)))]
 pub(crate) async fn discard(
     State(state): State<AppState>,
@@ -39,6 +39,9 @@ pub(crate) async fn discard(
         Ok(actor) => actor,
         Err(error) => return error.into_response(),
     };
+    if let Err(error) = auth::verify_actor(&headers, &actor) {
+        return error.into_response();
+    }
     if let Err(error) = auth::verify_write(&state, &headers, &actor) {
         return error.into_response();
     }
@@ -156,8 +159,8 @@ fn failure(error: DraftError) -> Response {
         .into_response()
 }
 
-#[utoipa::path(get,path="/api/v1/proposals/{proposal}/draft",operation_id="readProposalDraft",security(("sessionCookie"=[])),params(("proposal"=Uuid,Path),DraftQuery),
-    responses((status=200,body=DraftSnapshot),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=404,body=ErrorBody),(status=413,body=ErrorBody),(status=503,body=ErrorBody)))]
+#[utoipa::path(get,path="/api/v1/proposals/{proposal}/draft",operation_id="readProposalDraft",security(("sessionCookie"=[])),params(("proposal"=Uuid,Path),DraftQuery,("X-Expected-Actor"=Uuid,Header,description="Current user whose private recovery is requested")),
+    responses((status=200,body=DraftSnapshot),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=413,body=ErrorBody),(status=503,body=ErrorBody)))]
 pub(crate) async fn read(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -168,6 +171,9 @@ pub(crate) async fn read(
         Ok(actor) => actor,
         Err(error) => return error.into_response(),
     };
+    if let Err(error) = auth::verify_actor(&headers, &actor) {
+        return error.into_response();
+    }
     let (Ok(Path(proposal)), Ok(Query(query))) = (path, query) else {
         return failure(DraftError::Invalid("INVALID_QUERY"));
     };
@@ -188,7 +194,7 @@ pub(crate) async fn read(
     }
 }
 
-#[utoipa::path(put,path="/api/v1/proposals/{proposal}/draft",operation_id="saveProposalDraft",security(("sessionCookie"=[])),params(("proposal"=Uuid,Path)),request_body=SaveDraft,
+#[utoipa::path(put,path="/api/v1/proposals/{proposal}/draft",operation_id="saveProposalDraft",security(("sessionCookie"=[])),params(("proposal"=Uuid,Path),("X-Expected-Actor"=Uuid,Header,description="Captured owner of this exact save intent")),request_body=SaveDraft,
     responses((status=200,body=DraftSaved),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=403,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=413,body=ErrorBody),(status=503,body=ErrorBody)))]
 pub(crate) async fn save(
     State(state): State<AppState>,
@@ -200,6 +206,9 @@ pub(crate) async fn save(
         Ok(actor) => actor,
         Err(error) => return error.into_response(),
     };
+    if let Err(error) = auth::verify_actor(&headers, &actor) {
+        return error.into_response();
+    }
     if let Err(error) = auth::verify_write(&state, &headers, &actor) {
         return error.into_response();
     }

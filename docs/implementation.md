@@ -877,3 +877,20 @@ Checkboxes represent verified work only.
   publication remain separate required work.
   Full backend workspace regression checks pass; the editor contract fixture
   regenerates without drift.
+
+- Existing-document save plans: an encapsulated intent binds actor/proposal/repo,
+  expected head/version, message, exact base hashes and raw Markdown. Fingerprint
+  hashing streams through a 64KiB buffer instead of allocating escaped payloads.
+  Preparation resolves only catalogued docs, verifies original hashes, applies
+  all changes together and validates the complete candidate book. Only changed
+  files normalize to LF/NFC; unknown source/YAML remains intact, and raw or
+  canonical no-ops produce no mutations. Input and normalized output both obey
+  50-file/10MiB and 2MiB-file limits. Plans retain read-only scope/fingerprint,
+  canonical source/hashes, normalization flags and nullable removed-ID evidence.
+  Eleven new application scenarios cover atomic cross-document repair, no-ops,
+  stale scope/hash checks, malformed/oversized input, normalization expansion,
+  raw repair and exact hash bytes across buffered Unicode/escaping boundaries.
+  Full backend tests passed before the plan accessor refinement; final application
+  tests and workspace Clippy pass afterward. Worker authorization/provenance,
+  referenced media verification, journal/reconciliation, API and editor Git-save
+  integration remain required. These plans do not execute or claim Git saves.

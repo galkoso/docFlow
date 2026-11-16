@@ -65,13 +65,41 @@ multiline titles and quoted definitions; duplicate-definition rescanning is
 bounded. Exceeding a budget yields an incomplete blocking report, never a
 truncated valid result. These limits do not change source bytes.
 
+## Implemented: existing-document save planning
+
+`ValidatedSave` captures actor/proposal/repository UUIDs, expected commit and
+proposal version, message, and up to 50 documents with exact base SHA-256 hashes.
+The complete raw intent is fingerprinted with the `specspace-save-v1` protocol.
+A 64KiB buffered hash writer avoids allocating another fully JSON-escaped copy.
+Nil scope IDs, malformed hashes/IDs, duplicate document IDs, NUL content, invalid
+messages and input beyond 2MiB per file / 10MiB per request fail validation.
+
+`prepare` accepts only the matching pinned repository/commit, resolves file paths
+through a valid catalog, checks exact original hashes and applies all candidate
+changes together. It normalizes changed files to LF/NFC without reserializing
+Markdown or unknown YAML fields. Unchanged files retain their original bytes.
+Raw no-ops and edits normalizing back to Git produce an empty mutation list;
+normalized output is checked against the atomic byte limit again. The complete
+candidate then passes through book validation, so a section deletion cannot
+leave an incoming link in an untouched chapter. Repairs of invalid old source
+report unknown removed identities rather than claiming none were removed.
+
+The resulting plan exposes read-only access to its original scope, fingerprint,
+head/version, canonical changed source, hashes and removed identities. Per-file
+flags identify normalization and normalization-only byte changes; they do not
+claim a complete semantic/formatting diff. `file_changes` produces one bounded
+batch of puts for the provider. This existing-document path cannot add arbitrary
+files, edit the catalog, or remove a source file. File creation/import workflows
+remain separate work. A plan is not authorization and does not call Git or the
+database; assets and current context still require worker verification.
+
 ## Required next implementation
 
-The save application/journal/worker must bind the entire immutable request to
-actor, proposal, repository configuration, expected head and metadata version.
-It must validate the complete candidate book, stable identities, incoming links,
-catalog, permitted assets and normalized changed Markdown before mutation. A
-no-op must not create a commit. All changed files must be one atomic mutation.
+The save journal/worker must bind the planned intent to current authorization,
+immutable repository configuration, expected head and current metadata version.
+It must load the complete pinned snapshot itself, verify referenced media bytes,
+and persist the canonical plan before mutation. A no-op must not create a commit.
+All changed files must be one atomic mutation.
 
 The mutation boundary must be durable and lease-fenced, with current eligibility
 checked before Git I/O. After an uncertain write, recovery may only observe and

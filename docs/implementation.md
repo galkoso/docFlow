@@ -965,3 +965,18 @@ Checkboxes represent verified work only.
   workflow; this does not complete DIFF-01–08 or any review acceptance scenario.
   Full backend workspace tests and Clippy pass after these changes. OpenAPI and
   the cross-language editor fixture regenerate without drift.
+
+- Comparison inventory preparation: immutable complete tree/source snapshots
+  verify Git-framed blob identity, declared/actual bounds and path uniqueness.
+  Unique actual document IDs pair rename-plus-edit; exact-path and unique-blob
+  fallbacks record their evidence method. Metadata distinguishes content, mode
+  and absolute catalog-position changes; all assets/other files remain visible.
+  Malformed, orphaned and ambiguous source/catalogs retain raw changes plus
+  bounded full-count diagnostics. Eight application scenarios cover these
+  boundaries, determinism, quotas and mixed repositories. The blob helper is now
+  shared with save verification. This pure planner grants no authority and does
+  not fetch or serve content: authorization, merge-base/target capture, bounded
+  loading, API/UI and semantic/review anchors remain required next work.
+  Full backend workspace regressions passed before the final diagnostic/quota
+  refinements; final application tests (32) and workspace Clippy pass afterward.
+  OpenAPI and the cross-language editor fixture regenerate without drift.

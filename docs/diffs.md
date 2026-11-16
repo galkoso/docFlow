@@ -53,6 +53,43 @@ exact graph identity, relationship consistency, malformed responses and backoff.
 These tests do not prove proposal scope, semantic diff, browser rendering or
 review/merge acceptance.
 
+## Implemented: complete inventory preparation
+
+The pure application comparison planner prepares immutable before/after
+snapshots from complete provider trees and all pinned document/catalog source.
+It verifies each supplied text's declared size and framed Git blob object ID,
+rejects missing/extra/duplicate sources and case-folded paths, and bounds trees
+at 20,000 files and source books at 1,000 documents / 20MiB (2MiB per text).
+The framed SHA-1/SHA-256 blob identity helper is shared with save verification;
+existing save proof behavior and its golden object hashes remain covered.
+
+Inventories include every changed path, including uncatalogued documents,
+assets, policy/configuration and other files. Unique actual source document IDs
+pair rename-plus-edit across paths; matching paths and conservative unique exact
+blobs provide fallbacks. Each pairing records its evidence method. Ambiguous
+identical blobs remain additions/deletions. Before/after identities, paths, sizes,
+modes, digests and catalog positions stay distinct; content, mode and catalog
+position changes have separate flags. Absolute position differences are reported
+as position changes, without claiming to know which move the author intended.
+
+Malformed source, invalid/missing catalogs, identity mismatches, missing catalog
+files, duplicate IDs and documents without positions remain visible with bounded
+diagnostics and complete finding counts. No parse error can silently erase a raw
+file change. Metadata-only image inventory is not MIME/pixel verification. Stable
+inventory/file IDs bind repository and both immutable commits; they are inputs
+for later review anchors, not approvals. Deterministic ordering and mixed-repo
+rejection are covered alongside renames/reordering, ambiguous duplicates, raw
+repairs, changed identity, file modes, forged text evidence and quota/path checks
+in eight application scenarios.
+
+This preparation performs no I/O or authorization. The serving workflow still
+must prove the selected merge base/head, capture current target and proposal
+context, fetch complete trees and source, bound CPU work and recheck permissions.
+No comparison route or UI is claimed by the pure planner. The serving snapshot
+must additionally bind organization/proposal, current target, metadata version
+and provider configuration; planner IDs alone cannot authorize a resource or
+count as review evidence. Large inventory responses still need pagination.
+
 ## Remaining workflow
 
 The application must capture authorized proposal head and current target,

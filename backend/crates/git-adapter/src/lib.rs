@@ -1,5 +1,6 @@
 //! Server-owned Git provider configuration. No client-supplied provider URLs.
 pub mod app_auth;
+pub mod blob;
 pub mod github;
 pub mod receipt;
 pub use receipt::CommitReceipt;

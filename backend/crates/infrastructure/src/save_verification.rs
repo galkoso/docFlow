@@ -129,23 +129,8 @@ pub(crate) fn git_blob_hash(
     bytes: &[u8],
     oid_length: usize,
 ) -> Result<CommitSha, VerificationError> {
-    let prefix = format!("blob {}\0", bytes.len());
-    let hash = match oid_length {
-        40 => {
-            let mut hash = sha1::Sha1::new();
-            hash.update(prefix.as_bytes());
-            hash.update(bytes);
-            format!("{:x}", hash.finalize())
-        }
-        64 => {
-            let mut hash = Sha256::new();
-            hash.update(prefix.as_bytes());
-            hash.update(bytes);
-            format!("{:x}", hash.finalize())
-        }
-        _ => return Err(VerificationError::UnexpectedTree),
-    };
-    CommitSha::parse(hash).map_err(|_| VerificationError::UnexpectedTree)
+    specspace_git_adapter::blob::oid(bytes, oid_length)
+        .map_err(|_| VerificationError::UnexpectedTree)
 }
 
 #[cfg(test)]

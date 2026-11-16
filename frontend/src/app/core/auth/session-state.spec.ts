@@ -59,6 +59,16 @@ describe('Session state', () => {
     expect(session.status()).toBe('authenticated');
     expect(session.logoutStatus()).toBe('error');
     expect(session.logoutError()).toBe('השירות אינו זמין כרגע');
+    expect(session.logoutEpoch()).toBe(0);
+  });
+
+  it('honors active editor logout guards and emits a purge epoch only after successful logout', () => {
+    signedIn();
+    const release = session.guardLogout(() => false);
+    session.logout(); http.expectNone('/api/v1/auth/logout');
+    expect(session.profile()?.user_id).toBe(profile.user_id); expect(session.logoutEpoch()).toBe(0);
+    release(); session.logout(); http.expectOne('/api/v1/auth/logout').flush(null);
+    expect(session.profile()).toBeNull(); expect(session.logoutEpoch()).toBe(1);
   });
 
   it('cancels stale identity requests when logout completes', () => {

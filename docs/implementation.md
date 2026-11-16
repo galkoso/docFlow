@@ -820,3 +820,24 @@ Checkboxes represent verified work only.
   recovery remain explicit. Twelve HTTP-controller scenarios pass; the frontend
   suite passed all 74 tests before page integration. This controller does not
   create Git commits; editor route integration follows as a separate stage.
+
+- Proposal editor route: chapter/section links open an actor/document/SHA-scoped
+  rich or full-source editor, diagnostics and inert server previews. The page
+  connects the two-second autosave controller, explicit recovery comparisons,
+  different-base adoption, manual exact-intent retries and local recovery files.
+  It truthfully distinguishes uncommitted source from server recovery and Git.
+  Reads/previews validate identity/base/version and discard stale results.
+  Session refresh hides private content, retains the same user's rich history
+  and unfinished link/image fields, then rechecks current source and permissions.
+  Fresh view/permission closures replace old ones on reattachment. Account
+  changes and successful logout clear all private state. Logout guards and
+  document/base navigation guards protect unsaved work, including when Angular
+  reuses the route; section-only navigation retains the same buffer. Rich
+  serialization failures hold Markdown autosave; download includes actual node
+  state, protected source model, selection and unfinished fields as explicitly
+  uncommitted JSON. Thirteen recovery-controller, eight page/router and session
+  guard scenarios are covered; production build and all 84 frontend tests pass.
+  Tests use jsdom with mocked text geometry. Browser discovery still returns no
+  connected browser, so layout/RTL/IME/accessibility acceptance is not claimed.
+  Atomic Git saving, incoming-reference blockers, review submission and the
+  remaining full-specification workflow are still required.

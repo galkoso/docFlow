@@ -97,8 +97,14 @@ fresh IDs to copied/new headings, including copies inserted before originals.
 Unchanged nodes yield `keep` operations and exact original bytes. Changed nodes
 serialize individually; omitted original nodes generate explicit block/section
 deletions. Undo/redo returns to original source when the document tree returns to
-its baseline. Buffer instances belong to one document/version and remain local;
-page/session recovery integration and Git saving are subsequent work.
+its baseline. Buffer instances belong to one document/version and remain local.
+The proposal editor route connects rich/source modes, validated preview, private
+recovery autosave and explicit restore/adoption choices. A temporary same-user
+session refresh retains the in-memory rich state/history and unfinished fields;
+fresh permission/view plugins replace old closures. Different users and explicit
+logout purge local state. Unserializable rich changes hold Markdown autosave and
+can be exported with the full source model as uncommitted editor JSON. Git saving,
+review submission and real-browser RTL/IME acceptance remain subsequent work.
 
 `cargo run -p specspace-document-engine --example editor_contract` generates
 `fixtures/editor-contract.json`. Backend CI checks drift. Browser tests consume

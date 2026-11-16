@@ -15,6 +15,9 @@ import { RichDocument } from './rich-document';
 import { safeLink } from './markdown-schema';
 
 export interface RichChange { edit: EditorEdit; markdown: string; changed: boolean; }
+export interface RichEditorSnapshot {
+  state: EditorState; linkOpen: boolean; linkUrl: string; linkError: string; imageOpen: boolean; imageAlt: string; error: string;
+}
 interface SelectionInfo { bold: boolean; italic: boolean; strike: boolean; inlineCode: boolean; quote: boolean; list: string; block: string; table: boolean; header: boolean; image: boolean; }
 const emptySelection: SelectionInfo = { bold: false, italic: false, strike: false, inlineCode: false, quote: false, list: '', block: 'paragraph', table: false, header: false, image: false };
 
@@ -24,6 +27,7 @@ const emptySelection: SelectionInfo = { bold: false, italic: false, strike: fals
 })
 export class RichEditor {
   readonly document = input.required<RichDocument>();
+  readonly restored = input<RichEditorSnapshot | null>(null);
   readonly editable = input(true);
   readonly changed = output<RichChange>();
   readonly serializationFailed = output<void>();
@@ -45,6 +49,7 @@ export class RichEditor {
       const rich = this.document();
       const host = this.mount().nativeElement;
       const schema = rich.format.schema;
+      const restored = this.restored();
       this.notice.set(''); this.error.set(''); this.linkOpen.set(false); this.imageOpen.set(false);
       this.linkUrl.set(''); this.imageAlt.set(''); this.linkError.set('');
       const mark = (name: string) => toggleMark(schema.marks[name]);
@@ -66,10 +71,19 @@ export class RichEditor {
           return true;
         },
       };
-      const view = new EditorView(host, {
-        state: EditorState.create({ doc: rich.doc, plugins: [new Plugin({ filterTransaction: transaction => !transaction.docChanged || untracked(() => this.editable()) }),
+      const plugins = [new Plugin({ filterTransaction: transaction => !transaction.docChanged || untracked(() => this.editable()) }),
           history(), rich.identityPlugin(() => this.notice.set('רכיב מקור מוגן נשמר ללא שינוי. אפשר לערוך את הטקסט שלצדו.')),
-          keymap(keys), keymap(baseKeymap), gapCursor(), dropCursor(), tableEditing()] }),
+          keymap(keys), keymap(baseKeymap), gapCursor(), dropCursor(), tableEditing()];
+      // Reconfigure with fresh view/permission closures while preserving plugin
+      // state (including history) for the same in-memory document/schema only.
+      const state = restored?.state.schema === schema ? restored.state.reconfigure({ plugins })
+        : EditorState.create({ doc: rich.doc, plugins });
+      if (restored?.state.schema === schema) {
+        this.linkOpen.set(restored.linkOpen); this.linkUrl.set(restored.linkUrl); this.linkError.set(restored.linkError);
+        this.imageOpen.set(restored.imageOpen); this.imageAlt.set(restored.imageAlt); this.error.set(restored.error);
+      }
+      const view = new EditorView(host, {
+        state,
         editable: () => untracked(() => this.editable()),
         attributes: () => ({ role: 'textbox', 'aria-label': 'עריכת תוכן המסמך', 'aria-multiline': 'true',
           'aria-readonly': String(!untracked(() => this.editable())), tabindex: '0', dir: 'auto', spellcheck: 'true' }),
@@ -143,6 +157,10 @@ export class RichEditor {
     if (pos !== undefined) { view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(pos))).scrollIntoView()); view.focus(); }
   }
   hasPendingFields(): boolean { return this.linkOpen() || this.imageOpen(); }
+  snapshot(): RichEditorSnapshot | null {
+    return this.instance ? { state: this.instance.state, linkOpen: this.linkOpen(), linkUrl: this.linkUrl(), linkError: this.linkError(),
+      imageOpen: this.imageOpen(), imageAlt: this.imageAlt(), error: this.error() } : null;
+  }
   flushFields(): boolean {
     if (this.hasPendingFields() && !this.editable()) return false;
     if (this.linkOpen()) this.applyLink();

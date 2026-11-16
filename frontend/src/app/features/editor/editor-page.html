@@ -1,0 +1,87 @@
+@if (!visible()) {
+  <section class="notice"><h1>עריכת הצעה</h1>
+    <p>העריכה זמינה רק לחשבון שפתח אותה. עריכה מקומית ממתינה לבדיקת התחברות.</p>
+    @if (session.status() === 'loading') {<p role="status">בודקים התחברות…</p>}
+    @else {<button (click)="session.refresh()">בדיקת התחברות מחדש</button> <a href="/api/v1/auth/login">התחברות ארגונית</a>}
+    @if (error()) {<p role="alert">{{ error() }}</p>}
+  </section>
+} @else {
+  @if (source(); as source) {
+    <header><p>עריכת הצעה #{{ source.number }}</p><h1>{{ source.title }}</h1>
+      <div class="version"><span>ענף: <bdi>{{ source.branch }}</bdi></span><span>יעד: <bdi>{{ source.target_branch }}</bdi></span>
+        <span>מסמך: <bdi>{{ source.document_id }}</bdi></span><span>מקור: <code>{{ source.snapshot_sha.slice(0, 12) }}</code></span></div>
+      <a [routerLink]="['/changes', source.proposal_id, 'book']" [queryParams]="{ commit: source.snapshot_sha, doc: source.document_id }">לספר ההצעה</a>
+    </header>
+    <p class="notice">עריכות כאן טרם נשמרו בענף Git ואינן זמינות לאישור. עותק התאוששות בשרת נשמר בנפרד.</p>
+    @if (!editable()) {<p class="notice" role="status">העריכה מושהית או מוצגת לקריאה בלבד. הטקסט המקומי נשמר להשוואה ולהתאוששות.</p>}
+  }
+  @if (loading()) {<p role="status">טוענים מקור ובודקים את הגרסה וההרשאות…</p>}
+  @if (error()) {<p class="notice" role="alert">{{ error() }} <button (click)="refresh()">בדיקה מחדש</button></p>}
+  @if (source()) {
+    <section class="recovery" aria-label="מצב התאוששות">
+      @if (brokenRich()) {<p role="alert">השינוי האחרון בעורך אינו מיוצג ב־Markdown ואינו כלול בגיבוי. יש לתקן, לבטל או להוריד עותק של מצב העורך.</p>}
+      <p role="status" aria-live="polite">
+        @switch (recovery.status()) {
+          @case ('loading') {בודקים עותק התאוששות פרטי…}
+          @case ('waiting') {שינוי מקומי; ממתינים לסיום ההקלדה לפני גיבוי.}
+          @case ('saving') {שומרים עותק התאוששות בשרת…}
+          @case ('saved') {עותק התאוששות אושר בשרת. הוא אינו שמירה ב־Git.}
+          @case ('uncertain') {תוצאת הגיבוי אינה ידועה. ייתכן שהבקשה התקבלה; אין שליחה חוזרת אוטומטית.}
+          @case ('conflict') {עותק ההתאוששות השתנה בלשונית אחרת. נדרשת השוואה ובחירה מפורשת.}
+          @case ('disabled') {שמירת התאוששות אינה זמינה לפי המדיניות או ההרשאות הנוכחיות. השינויים מקומיים בלבד.}
+          @case ('suspended') {הגיבוי מושהה עד בדיקת ההתחברות.}
+          @case ('error') {עותק ההתאוששות לא אושר. הטקסט המקומי לא הוחלף.}
+          @default {אין שינוי מקומי שממתין לגיבוי.}
+        }
+      </p>
+      @if (recovery.savedBuffer(); as buffer) {<p>גיבוי אחרון: {{ buffer.updated_at | date:'dd/MM/yyyy HH:mm:ss' }} · תוקף: {{ buffer.expires_at | date:'dd/MM/yyyy HH:mm' }}</p>}
+      @if (recovery.error()) {<p role="alert">{{ recovery.error() }}</p>}
+      <div class="actions">
+        <button (click)="backup()" [disabled]="loading() || recovery.pending() || recovery.choiceRequired()">שמירת עותק התאוששות כעת</button>
+        @if (recovery.canRetry()) {<button (click)="recovery.retry()">ניסיון חוזר של אותה בקשה</button>}
+        <button (click)="recovery.inspect()" [disabled]="recovery.status() === 'saving' || recovery.status() === 'loading'">בדיקת העותק בשרת</button>
+        <button (click)="download()">הורדת עותק מקומי שטרם נשמר</button>
+        <button (click)="refresh()" [disabled]="loading()">בדיקת גרסה והרשאות</button>
+      </div>
+      @if (recovery.remote(); as remote) {
+        @if (recovery.choiceRequired() || recovery.pending()) {
+          <details open class="comparison"><summary>השוואת התאוששות · מקור <code>{{ remote.base_head_sha.slice(0, 12) }}</code></summary>
+            <p>בחירה תחליף את אחד העותקים. המקור ב־Git אינו משתנה.</p>
+            <div class="columns"><div><h3>העותק שנבדק בשרת</h3><pre dir="auto">{{ remote.content_utf8 }}</pre></div>
+              <div><h3>הטקסט המקומי</h3><pre dir="auto">{{ recovery.content() }}</pre></div></div>
+            <button (click)="restore()" [disabled]="recovery.status() === 'saving' || recovery.status() === 'loading'">שחזור העותק מהשרת</button>
+            <button (click)="keepLocal()" [disabled]="recovery.status() === 'saving' || recovery.status() === 'loading'">המשך עם הטקסט המקומי</button>
+          </details>
+        }
+      }
+    </section>
+    <div class="actions" aria-label="מצב העורך">
+      <button (click)="richMode()" [attr.aria-pressed]="mode() === 'rich'" [disabled]="previewing() || loading()">עריכה עשירה</button>
+      <button (click)="sourceMode()" [attr.aria-pressed]="mode() === 'source'" [disabled]="loading()">עריכת מקור</button>
+      <button (click)="validate()" [disabled]="previewing() || loading()">בדיקה ותצוגה מקדימה</button>
+    </div>
+    @if (mode() === 'rich' && rich(); as rich) {
+      <app-rich-editor [document]="rich" [restored]="richSnapshot()" [editable]="editable()"
+        (changed)="richChanged($event)" (serializationFailed)="invalidRich()" />
+    } @else {
+      <label class="source-label" for="editor-source">מקור Markdown מלא, כולל מזהים ונתוני המסמך</label>
+      <textarea id="editor-source" #input dir="auto" spellcheck="false" [value]="recovery.content()" [readOnly]="!editable()"
+        (input)="sourceChanged(input.value)" aria-describedby="source-help"></textarea>
+      <p id="source-help">המקור נשמר כפי שהוקלד, גם כשאינו תקין. לפני שמירה בענף יש לבדוק מזהים, קישורים ותוכן מוגן.</p>
+    }
+    @if (previewing()) {<p role="status">בודקים את המקור המקומי…</p>}
+    @if (previewError()) {<p class="notice" role="alert">{{ previewError() }}</p>}
+    @if (preview(); as result) {
+      <section aria-label="תוצאת בדיקה" class="preview"><h2>תצוגה מקדימה של עריכה מקומית</h2>
+        @if (result.parse_error || result.model_error || result.preview.render_error) {<p role="alert">המקור כולל בעיה: <code>{{ result.parse_error || result.model_error || result.preview.render_error }}</code></p>}
+        @if (result.preview.findings_total) {
+          <details><summary>{{ result.preview.findings_total }} ממצאים @if (result.preview.findings_truncated) {(מוצגים 1,000 הראשונים)}</summary>
+            <ul>@for (finding of result.preview.findings; track $index) {<li><code>{{ finding.code }}</code> · מיקום במקור: {{ finding.source_start_byte }}</li>}</ul>
+          </details>
+        }
+        @if (result.preview.removed_section_ids?.length) {<p>מזהי סעיפים שהוסרו: {{ result.preview.removed_section_ids!.join(', ') }}. יש לבדוק הפניות נכנסות לפני שמירה.</p>}
+        <app-document-renderer [events]="result.preview.render_events" [assetContext]="assets()" />
+      </section>
+    }
+  }
+}

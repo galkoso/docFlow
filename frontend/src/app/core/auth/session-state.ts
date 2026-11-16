@@ -14,11 +14,19 @@ export class SessionState {
   private readonly currentLogoutError = signal<string | null>(null);
   private activeRefresh?: Subscription;
   private generation = 0;
+  private readonly logoutGuards = new Set<() => boolean>();
+  private readonly completedLogouts = signal(0);
 
   readonly status = this.currentStatus.asReadonly();
   readonly profile = this.currentProfile.asReadonly();
   readonly logoutStatus = this.currentLogoutStatus.asReadonly();
   readonly logoutError = this.currentLogoutError.asReadonly();
+  readonly logoutEpoch = this.completedLogouts.asReadonly();
+
+  guardLogout(guard: () => boolean): () => void {
+    this.logoutGuards.add(guard);
+    return () => this.logoutGuards.delete(guard);
+  }
 
   refresh(): void {
     const generation = ++this.generation;
@@ -44,6 +52,7 @@ export class SessionState {
 
   logout(): void {
     if (!this.profile() || this.logoutStatus() === 'loading') return;
+    if ([...this.logoutGuards].some(guard => !guard())) return;
     this.currentLogoutStatus.set('loading');
     this.currentLogoutError.set(null);
     this.api.logout().subscribe({
@@ -53,6 +62,7 @@ export class SessionState {
         this.currentProfile.set(null);
         this.currentStatus.set('anonymous');
         this.currentLogoutStatus.set('idle');
+        this.completedLogouts.update(epoch => epoch + 1);
       },
       error: (error: HttpErrorResponse) => {
         this.currentLogoutStatus.set('error');

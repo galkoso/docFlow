@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { creationExit } from './features/proposals/creation-exit';
+import { editorExit } from './features/editor/editor-exit';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'specification' },
@@ -8,6 +9,8 @@ export const routes: Routes = [
   { path: 'changes/new', title: 'פתיחת הצעה | SpecSpace', canDeactivate: [creationExit], loadComponent: () => import('./features/proposals/proposal-create').then(m => m.ProposalCreate) },
   { path: 'changes/:id', title: 'פרטי הצעה | SpecSpace', loadComponent: () => import('./features/proposals/proposal-detail').then(m => m.ProposalDetailPage) },
   { path: 'changes/:id/book', title: 'תוכן ההצעה | SpecSpace', loadComponent: () => import('./features/specification/specification').then(m => m.Specification) },
+  { path: 'changes/:id/edit/:document', title: 'עריכת הצעה | SpecSpace', canDeactivate: [editorExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange',
+    loadComponent: () => import('./features/editor/editor-page').then(m => m.EditorPage) },
   { path: 'history', title: 'היסטוריית האפיון | SpecSpace', loadComponent: () => import('./features/history/history').then(m => m.History) },
   { path: 'settings', title: 'ניהול סביבת העבודה | SpecSpace', loadComponent: () => import('./features/settings/settings').then(m => m.Settings) },
   { path: '**', redirectTo: 'specification' },

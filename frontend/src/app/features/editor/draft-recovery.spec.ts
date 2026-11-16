@@ -147,4 +147,13 @@ describe('Private draft recovery autosave', () => {
     expect(recovery.authRequired()).toBe(true); expect(recovery.status()).toBe('suspended');
     expect(recovery.content()).toBe('valid unfinished **');
   });
+
+  it('holds stale Markdown when a newer rich document cannot be serialized and resumes after correction', () => {
+    open(); recovery.update('last good source'); vi.advanceTimersByTime(1000); recovery.holdInput();
+    vi.advanceTimersByTime(5000); recovery.flush(); http.expectNone(request => request.method === 'PUT');
+    expect(recovery.status()).toBe('error'); expect(recovery.content()).toBe('last good source');
+    recovery.update('corrected document'); recovery.flush(); const request = write();
+    expect(request.request.body.content_utf8).toBe('corrected document'); acknowledge(request);
+    expect(recovery.status()).toBe('saved');
+  });
 });

@@ -27,6 +27,7 @@ export class DraftRecovery {
   private attempt: Attempt | null = null;
   private busy = false;
   private blocked = false;
+  private inputReady = true;
   readonly owner = signal<string | null>(null);
   readonly content = signal('');
   readonly status = signal<RecoveryStatus>('idle');
@@ -65,12 +66,20 @@ export class DraftRecovery {
 
   update(content: string): void {
     if (!this.scope) return;
+    this.inputReady = true;
     this.content.set(content); this.dirty.set(content !== this.original);
     this.stopTimer();
     if (!this.validContent(content)) {
       this.status.set('error'); this.error.set('טיוטת ההתאוששות מוגבלת ל־2MiB ואינה יכולה לכלול תו אפס.'); return;
     }
     this.queue();
+  }
+
+  /** Preserve the last serializable Markdown but never call it a backup of a
+   * newer rich document that cannot currently be represented. */
+  holdInput(): void {
+    this.inputReady = false; this.stopTimer();
+    if (!this.busy && !this.attempt && this.active) this.inputFailure();
   }
 
   /** GET is safe to repeat, including while a previous write is uncertain.
@@ -138,6 +147,7 @@ export class DraftRecovery {
 
   private queue(): void {
     if (!this.active || !this.loaded || this.choiceRequired() || this.busy || this.attempt || this.blocked) return;
+    if (!this.inputReady) { this.inputFailure(); return; }
     if (!this.context()?.can_store_recovery || !this.context()?.retention_days) { this.status.set('disabled'); return; }
     if (!this.needsSave()) { this.status.set(this.version ? 'saved' : 'idle'); return; }
     if (!this.validContent(this.content())) return;
@@ -147,7 +157,7 @@ export class DraftRecovery {
 
   private save(): void {
     const scope = this.scope;
-    if (!scope || !this.active || !this.loaded || this.choiceRequired() || this.busy || this.attempt || this.blocked
+    if (!scope || !this.active || !this.loaded || !this.inputReady || this.choiceRequired() || this.busy || this.attempt || this.blocked
       || !this.context()?.can_store_recovery || !this.context()?.retention_days || !this.needsSave() || !this.validContent(this.content())) return;
     const attempt: Attempt = { scope: { ...scope }, uncertain: false, body: Object.freeze({ save_id: crypto.randomUUID(),
       document_id: scope.document, base_head_sha: scope.base, expected_draft_version: this.version, content_utf8: this.content() }) };
@@ -220,12 +230,15 @@ export class DraftRecovery {
     }
   }
   private failure(message: string): void { this.blocked = true; this.error.set(message); this.status.set('error'); }
+  private inputFailure(): void {
+    this.status.set('error'); this.error.set('יש בעורך שינוי שאינו מיוצג ב־Markdown ולכן עדיין אינו כלול בגיבוי. יש לתקן, לבטל או להוריד עותק של מצב העורך.');
+  }
   private stopTimer(): void { if (this.timer !== undefined) clearTimeout(this.timer); this.timer = undefined; }
   private releaseAttempt(): void { this.attempt = null; this.pending.set(false); this.uncertain.set(false); }
   clear(): void {
     ++this.generation; this.stopTimer(); this.reading?.unsubscribe(); this.writing?.unsubscribe();
     this.scope = null; this.original = ''; this.acknowledged = null; this.version = 0; this.loaded = false;
-    this.active = false; this.busy = false; this.blocked = false; this.releaseAttempt();
+    this.active = false; this.busy = false; this.blocked = false; this.inputReady = true; this.releaseAttempt();
     this.owner.set(null); this.content.set(''); this.status.set('idle'); this.context.set(null); this.remote.set(null);
     this.choiceRequired.set(false); this.error.set(''); this.authRequired.set(false); this.savedBuffer.set(null); this.dirty.set(false);
   }

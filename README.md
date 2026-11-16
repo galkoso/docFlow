@@ -105,8 +105,8 @@ for comparison and works without Git. It creates no Commit or review approval.
 Each user has up to 1,000 buffers / 20MiB per proposal, with 2MiB per document.
 An authenticated, CSRF-protected `DELETE` with document ID and expected draft
 version discards only that user's selected buffer. Recreated buffers receive new
-versions, protecting them from delayed requests. The editor UI and Git saves
-remain separate implementation stages.
+versions, protecting them from delayed requests. Git saves remain a separate
+implementation stage.
 
 All recovery requests require `X-Expected-Actor` with the UUID captured when the
 user began the intent. The server rejects a missing, malformed, duplicate or
@@ -114,3 +114,17 @@ different actor with `409 SESSION_IDENTITY_CHANGED`. This protects frozen retrie
 when another tab changes the shared login cookie. The header grants no access;
 the server session and current permissions remain authoritative. Other
 authenticated endpoints also reject this header when it is supplied incorrectly.
+
+Proposal chapter/section links open `/changes/:id/edit/:document?commit=<sha>`.
+The editor offers rich controls, complete source repair, server validation and
+an inert preview. Recovery autosaves after two idle seconds with one request at
+a time. An existing recovery copy requires an explicit choice; a different base
+requires an explicit adoption decision. Unknown results retain the exact intent
+for manual retry. No retry automatically follows login. Temporary same-user
+session refresh preserves local rich history and unfinished link/image fields;
+a different login or successful logout purges private memory. Navigation, unload
+and logout warn about uncommitted work. A permitted local download is labelled
+uncommitted; unrepresentable rich edits export the actual editor state, protected
+source model and unfinished fields as JSON instead of stale Markdown. No editor
+action currently creates a Git commit or submits a review. Browser layout,
+RTL/IME and accessibility acceptance remain open.

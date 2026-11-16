@@ -841,3 +841,18 @@ Checkboxes represent verified work only.
   connected browser, so layout/RTL/IME/accessibility acceptance is not claimed.
   Atomic Git saving, incoming-reference blockers, review submission and the
   remaining full-specification workflow are still required.
+
+- Git save recovery evidence: the provider can now read exact commit parents,
+  tree, bounded message and timestamp, checking all returned object identities
+  and rejecting malformed/oversized evidence. An operation matcher requires the
+  exact single parent and one final server-owned actor/operation trailer block;
+  ambiguous/forged fields, extra lines and nil identities fail. The adapter
+  rejects reserved fields in user messages before any write. Existing metadata
+  reads retain their smaller contract. Three additional scenarios cover trailer
+  framing, malformed provider objects and injection rejection; all 14 adapter
+  tests and workspace Clippy pass. Other test providers explicitly reject the
+  new capability instead of fabricating evidence. `docs/commit-saves.md` records
+  the boundary: identity matching alone cannot verify planned file contents,
+  reachability or authorization. The actual save planner, durable journal/worker,
+  authenticated API and editor Git-save interaction remain required next work.
+  The full backend workspace regression suite also passes after this change.

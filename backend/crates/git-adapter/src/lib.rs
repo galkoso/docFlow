@@ -1,6 +1,8 @@
 //! Server-owned Git provider configuration. No client-supplied provider URLs.
 pub mod app_auth;
 pub mod github;
+pub mod receipt;
+pub use receipt::CommitReceipt;
 
 use async_trait::async_trait;
 use specspace_domain::{BranchName, RepositoryPath};
@@ -128,6 +130,9 @@ pub trait GitProvider: Send + Sync {
     ) -> Result<Vec<u8>, GitError>;
     async fn list_files(&self, commit: &CommitSha) -> Result<Vec<FileEntry>, GitError>;
     async fn commit_metadata(&self, commit: &CommitSha) -> Result<CommitMetadata, GitError>;
+    /// Immutable commit evidence for reconciliation. Matching trailers alone
+    /// never prove intended file contents, branch reachability or authorization.
+    async fn commit_receipt(&self, commit: &CommitSha) -> Result<CommitReceipt, GitError>;
     async fn is_ancestor(
         &self,
         ancestor: &CommitSha,

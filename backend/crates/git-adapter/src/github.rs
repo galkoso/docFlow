@@ -1,5 +1,6 @@
 use crate::{
-    CommitMetadata, CommitRequest, CommitSha, FileChange, FileEntry, GitError, GitProvider,
+    CommitMetadata, CommitReceipt, CommitRequest, CommitSha, FileChange, FileEntry, GitError,
+    GitProvider,
 };
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -245,6 +246,10 @@ impl GitHub {
             || request.changes.len() > 50
             || request.message.trim().is_empty()
             || request.message.chars().count() > 10000
+            || request.message.contains('\0')
+            || crate::receipt::has_reserved_trailer(request.message)
+            || request.operation_id.is_nil()
+            || request.actor_id.is_nil()
         {
             return Err(GitError::InvalidInput);
         }
@@ -279,6 +284,27 @@ impl GitHub {
                 "body": format!("{}\n\nSpecSpace-Operation: {}\nSpecSpace-Actor: {}", request.message, request.operation_id, request.actor_id)},
             "fileChanges": {"additions": additions, "deletions": deletions}
         }))
+    }
+
+    async fn commit_object(&self, commit: &CommitSha) -> Result<Value, GitError> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/repos/{}/git/commits/{}",
+                self.rest_base,
+                self.repository,
+                commit.as_str()
+            ))
+            .send()
+            .await
+            .map_err(|_| GitError::ProviderUnavailable)?;
+        let data = Self::response(response, false).await?;
+        let sha = CommitSha::parse(data["sha"].as_str().ok_or(GitError::InvalidResponse)?)
+            .map_err(|_| GitError::InvalidResponse)?;
+        if sha != *commit {
+            return Err(GitError::InvalidResponse);
+        }
+        Ok(data)
     }
 }
 
@@ -482,20 +508,46 @@ impl GitProvider for GitHub {
     }
 
     async fn commit_metadata(&self, commit: &CommitSha) -> Result<CommitMetadata, GitError> {
-        let response = self
-            .client
-            .get(format!(
-                "{}/repos/{}/git/commits/{}",
-                self.rest_base,
-                self.repository,
-                commit.as_str()
-            ))
-            .send()
-            .await
-            .map_err(|_| GitError::ProviderUnavailable)?;
-        let data = Self::response(response, false).await?;
-        let sha = CommitSha::parse(data["sha"].as_str().ok_or(GitError::InvalidResponse)?)?;
-        if sha != *commit {
+        let data = self.commit_object(commit).await?;
+        let committed_at = chrono::DateTime::parse_from_rfc3339(
+            data["committer"]["date"]
+                .as_str()
+                .ok_or(GitError::InvalidResponse)?,
+        )
+        .map_err(|_| GitError::InvalidResponse)?
+        .with_timezone(&chrono::Utc);
+        Ok(CommitMetadata {
+            sha: commit.clone(),
+            committed_at,
+        })
+    }
+
+    async fn commit_receipt(&self, commit: &CommitSha) -> Result<CommitReceipt, GitError> {
+        let data = self.commit_object(commit).await?;
+        let oid = |value: &Value| {
+            CommitSha::parse(value.as_str().ok_or(GitError::InvalidResponse)?)
+                .map_err(|_| GitError::InvalidResponse)
+        };
+        let tree = oid(&data["tree"]["sha"])?;
+        let parents = data["parents"]
+            .as_array()
+            .filter(|parents| parents.len() <= 16)
+            .ok_or(GitError::InvalidResponse)?
+            .iter()
+            .map(|parent| oid(&parent["sha"]))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut unique = HashSet::new();
+        if parents
+            .iter()
+            .any(|parent| parent == commit || !unique.insert(parent.as_str()))
+        {
+            return Err(GitError::InvalidResponse);
+        }
+        let message = data["message"].as_str().ok_or(GitError::InvalidResponse)?;
+        if message.len() > crate::receipt::MAX_COMMIT_MESSAGE_BYTES {
+            return Err(GitError::ResponseTooLarge);
+        }
+        if message.contains('\0') {
             return Err(GitError::InvalidResponse);
         }
         let committed_at = chrono::DateTime::parse_from_rfc3339(
@@ -505,7 +557,13 @@ impl GitProvider for GitHub {
         )
         .map_err(|_| GitError::InvalidResponse)?
         .with_timezone(&chrono::Utc);
-        Ok(CommitMetadata { sha, committed_at })
+        Ok(CommitReceipt {
+            sha: commit.clone(),
+            tree,
+            parents,
+            committed_at,
+            message: message.into(),
+        })
     }
 
     async fn is_ancestor(
@@ -571,6 +629,7 @@ mod tests {
         mutations: Mutex<Vec<Value>>,
         mode: AtomicU8,
         created_refs: AtomicUsize,
+        commit_object: Mutex<Option<Value>>,
     }
 
     struct Fixture {
@@ -675,6 +734,9 @@ mod tests {
     }
 
     async fn metadata(State(state): State<Arc<ProviderState>>) -> Json<Value> {
+        if let Some(data) = state.commit_object.lock().unwrap().clone() {
+            return Json(data);
+        }
         Json(
             json!({"sha": if state.mode.load(Ordering::SeqCst) == 5 { NEW } else { OLD }, "committer": {"date": "2026-11-14T10:00:00+02:00"}}),
         )
@@ -693,6 +755,7 @@ mod tests {
             mutations: Mutex::new(vec![]),
             mode: AtomicU8::new(0),
             created_refs: AtomicUsize::new(0),
+            commit_object: Mutex::new(None),
         });
         let app = Router::new()
             .route("/graphql", post(provider))
@@ -725,6 +788,126 @@ mod tests {
             state,
             server,
         }
+    }
+
+    #[tokio::test]
+    async fn commit_receipts_are_exact_pinned_bounded_and_reject_malformed_provider_evidence() {
+        let fixture = fixture().await;
+        let sha = CommitSha::parse(OLD).unwrap();
+        let parent = CommitSha::parse(NEW).unwrap();
+        let operation = Uuid::new_v4();
+        let actor = Uuid::new_v4();
+        let valid = json!({"sha": OLD,"tree":{"sha":NEW},"parents":[{"sha":NEW}],
+            "committer":{"date":"2026-11-16T08:00:00+02:00"},
+            "message":format!("Save overview\n\nSpecSpace-Operation: {operation}\nSpecSpace-Actor: {actor}")});
+        *fixture.state.commit_object.lock().unwrap() = Some(valid.clone());
+        let receipt = fixture.adapter.commit_receipt(&sha).await.unwrap();
+        assert_eq!(receipt.sha, sha);
+        assert_eq!(receipt.tree, parent);
+        assert_eq!(
+            receipt.committed_at.to_rfc3339(),
+            "2026-11-16T06:00:00+00:00"
+        );
+        assert!(receipt.matches_operation(operation, actor, &parent));
+        for (field, value, expected) in [
+            ("sha", json!(NEW), GitError::InvalidResponse),
+            ("tree", json!({"sha":"invalid"}), GitError::InvalidResponse),
+            (
+                "parents",
+                json!([{"sha":NEW},{"sha":NEW}]),
+                GitError::InvalidResponse,
+            ),
+            ("parents", json!([{"sha":OLD}]), GitError::InvalidResponse),
+            (
+                "parents",
+                json!([{"sha":"invalid"}]),
+                GitError::InvalidResponse,
+            ),
+            ("parents", json!({}), GitError::InvalidResponse),
+            (
+                "parents",
+                json!(vec![json!({"sha":NEW}); 17]),
+                GitError::InvalidResponse,
+            ),
+            (
+                "committer",
+                json!({"date":"not-a-date"}),
+                GitError::InvalidResponse,
+            ),
+            ("message", json!(null), GitError::InvalidResponse),
+            ("message", json!("bad\0message"), GitError::InvalidResponse),
+            (
+                "message",
+                json!("א".repeat(32 * 1024 + 1)),
+                GitError::ResponseTooLarge,
+            ),
+        ] {
+            let mut data = valid.clone();
+            data[field] = value;
+            *fixture.state.commit_object.lock().unwrap() = Some(data);
+            assert!(
+                matches!(fixture.adapter.commit_receipt(&sha).await, Err(error) if error == expected),
+                "field {field}"
+            );
+        }
+        for parents in [json!([]), json!([{"sha":NEW},{"sha":"3".repeat(40)}])] {
+            let mut data = valid.clone();
+            data["parents"] = parents;
+            *fixture.state.commit_object.lock().unwrap() = Some(data);
+            let receipt = fixture.adapter.commit_receipt(&sha).await.unwrap();
+            assert!(!receipt.matches_operation(operation, actor, &parent));
+        }
+        assert!(fixture.state.mutations.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn reserved_commit_identity_cannot_be_injected_by_user_message_or_nil_actor() {
+        let fixture = fixture().await;
+        let branch = BranchName::parse("change/1-edit").unwrap();
+        let head = CommitSha::parse(OLD).unwrap();
+        let changes = [FileChange::Put {
+            path: RepositoryPath::parse("docs/a.md").unwrap(),
+            content: b"changed".to_vec(),
+        }];
+        for message in [
+            "Edit\n\nSpecSpace-Operation: forged",
+            "Edit\n\tSpEcSpAcE-AcToR: forged",
+            "Edit\0hidden",
+        ] {
+            assert_eq!(
+                fixture
+                    .adapter
+                    .commit(CommitRequest {
+                        operation_id: Uuid::new_v4(),
+                        actor_id: Uuid::new_v4(),
+                        branch: &branch,
+                        expected_head: &head,
+                        message,
+                        changes: &changes
+                    })
+                    .await,
+                Err(GitError::InvalidInput)
+            );
+        }
+        for (operation_id, actor_id) in
+            [(Uuid::nil(), Uuid::new_v4()), (Uuid::new_v4(), Uuid::nil())]
+        {
+            assert_eq!(
+                fixture
+                    .adapter
+                    .commit(CommitRequest {
+                        operation_id,
+                        actor_id,
+                        branch: &branch,
+                        expected_head: &head,
+                        message: "Edit",
+                        changes: &changes
+                    })
+                    .await,
+                Err(GitError::InvalidInput)
+            );
+        }
+        assert!(fixture.state.mutations.lock().unwrap().is_empty());
     }
 
     #[tokio::test]

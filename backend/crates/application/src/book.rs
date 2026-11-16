@@ -383,6 +383,12 @@ mod tests {
         ) -> Result<Vec<u8>, GitError> {
             Err(GitError::ProviderRejected)
         }
+        async fn commit_receipt(
+            &self,
+            _: &specspace_git_adapter::CommitSha,
+        ) -> Result<specspace_git_adapter::CommitReceipt, specspace_git_adapter::GitError> {
+            Err(specspace_git_adapter::GitError::ProviderRejected)
+        }
         async fn commit_metadata(
             &self,
             commit: &CommitSha,

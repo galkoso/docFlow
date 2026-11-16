@@ -150,6 +150,12 @@ impl GitProvider for Provider {
     async fn list_files(&self, _: &CommitSha) -> Result<Vec<FileEntry>, GitError> {
         panic!("creation must not load the tree")
     }
+    async fn commit_receipt(
+        &self,
+        _: &specspace_git_adapter::CommitSha,
+    ) -> Result<specspace_git_adapter::CommitReceipt, specspace_git_adapter::GitError> {
+        Err(specspace_git_adapter::GitError::ProviderRejected)
+    }
     async fn commit_metadata(&self, _: &CommitSha) -> Result<CommitMetadata, GitError> {
         panic!("creation must not load metadata")
     }

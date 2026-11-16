@@ -660,6 +660,12 @@ impl specspace_git_adapter::GitProvider for WriteProvider {
     ) -> Result<Vec<specspace_git_adapter::FileEntry>, specspace_git_adapter::GitError> {
         panic!("provisioning must not read trees")
     }
+    async fn commit_receipt(
+        &self,
+        _: &specspace_git_adapter::CommitSha,
+    ) -> Result<specspace_git_adapter::CommitReceipt, specspace_git_adapter::GitError> {
+        Err(specspace_git_adapter::GitError::ProviderRejected)
+    }
     async fn commit_metadata(
         &self,
         _: &specspace_git_adapter::CommitSha,

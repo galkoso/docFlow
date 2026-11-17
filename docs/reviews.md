@@ -91,8 +91,46 @@ bump `MEDIA_VALIDATION_VERSION` and therefore change review identity. Content
 findings, including missing alt text, remain attached to the candidate for later
 review/merge gates; decoding an image does not satisfy those gates.
 
-There is no public submission endpoint or published shared snapshot yet. The
-current scope resolver is for pre-reservation work; the durable worker still
-needs authority tied to its own fenced submission lease and an atomic publication
-transaction. Fresh provider observations cannot lock Git against later external
-changes, so approval and merge gates must recheck their own exact refs.
+## Durable submission journal
+
+Migration 010 stores immutable submission expectations, the actor/proposal/repo
+binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks
+current edit authority, then replays an identical actor-bound idempotency key or
+reserves one `SUBMIT` operation and `SUBMIT_REVIEW` job in a transaction with its
+audit event. The request hash binds organization, actor, proposal, exact head/
+target and all three expected versions. Hashes normalize SHA case. Job payloads
+contain only the operation ID; proposal text, media and authority data are not
+copied into jobs or status responses.
+
+Replay still requires current edit authority but remains observable after later
+head/version changes or closure. A reused key with different expectations fails.
+New requests require current saved head/versions and no pending mutation.
+Database triggers freeze request, operation and job identity, reject orphan jobs,
+and preserve history against updates/deletion/truncation. The existing one-active-
+mutation index serializes submission with saves, imports and merges.
+
+Claims and heartbeats bind worker, job, operation and attempt number to an
+unexpired lease. Expired read-only work can be reclaimed; an old attempt is
+rejected even when the same worker ID claims it again. `authorization(lease)`
+returns a resolver which excludes only that exact validated pending operation
+from the busy check, loads current actor/reviewer metadata, compares the frozen
+authority digest, and rechecks the lease clock after authorization. A blocked
+membership read cannot return authority after its lease expires. Scope/job lock
+order is consistent, and provider calls never hold these transactions.
+
+`ReviewPreparer::with_authorization` installs that resolver while sharing the
+root preparer's IO/CPU limit and provider factory. Revocation and metadata changes
+stop preparation/heartbeats. A still-owned read-only lease can record a definite
+failure and release its reservation after revocation. Transient failures retain
+bounded retry delays. Exhausted read-only work fails once and releases its
+mutation slot. Once an operation is provider-started or unknown, this journal
+neither reclaims it nor marks it failed; status requires reconciliation. Generic
+job helpers cannot lease or complete submission jobs.
+
+Status is private to the original actor with current edit access. It returns only
+validated state/phase/error fields and rejects inconsistent or unbacked success.
+This journal does not yet publish snapshots or complete submissions. The shared
+snapshot store, publication transaction, worker loop, public submit/status API,
+and PR/check orchestration remain open. Fresh provider observations cannot lock
+Git against later external changes, so approval and merge gates must also recheck
+their own exact refs.

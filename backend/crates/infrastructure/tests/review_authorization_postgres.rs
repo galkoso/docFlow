@@ -13,6 +13,8 @@ use specspace_infrastructure::{
 };
 use sqlx::PgPool;
 use uuid::Uuid;
+#[path = "review_authorization_postgres/submissions.rs"]
+mod submissions;
 
 struct Fixture {
     org: Uuid,

@@ -54,6 +54,17 @@ pub struct ReviewPreparer {
     timeout: Duration,
 }
 impl ReviewPreparer {
+    /// Bind a worker's lease-specific authority while retaining process-wide
+    /// IO/CPU capacity and the same frozen provider factory.
+    pub fn with_authorization(&self, authorization: Arc<dyn ReviewAuthorization>) -> Self {
+        Self {
+            authorization,
+            reader: self.reader.clone(),
+            source: self.source.clone(),
+            loads: self.loads.clone(),
+            timeout: self.timeout,
+        }
+    }
     pub fn new(
         authorization: Arc<dyn ReviewAuthorization>,
         reader: Arc<ComparisonReader>,

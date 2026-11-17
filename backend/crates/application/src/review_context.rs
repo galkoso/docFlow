@@ -33,6 +33,7 @@ pub enum ReviewContextError {
     InvalidConfiguration,
     OwnerNotEligible,
     Unavailable,
+    LeaseLost,
 }
 #[async_trait]
 pub trait ReviewAuthorization: Send + Sync {

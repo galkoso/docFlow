@@ -14,10 +14,23 @@ use uuid::Uuid;
 
 pub struct PgReviewAuthorization {
     pool: PgPool,
+    submission: Option<crate::review_submissions::SubmissionLease>,
 }
 impl PgReviewAuthorization {
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            submission: None,
+        }
+    }
+    pub(crate) fn for_submission(
+        pool: PgPool,
+        submission: crate::review_submissions::SubmissionLease,
+    ) -> Self {
+        Self {
+            pool,
+            submission: Some(submission),
+        }
     }
 }
 fn unavailable(_: sqlx::Error) -> ReviewContextError {
@@ -76,7 +89,17 @@ impl ReviewAuthorization for PgReviewAuthorization {
             .execute(&mut *tx)
             .await
             .map_err(unavailable)?;
-        let scope = context_in(&mut tx, actor, proposal, expectation).await?;
+        let scope = if let Some(lease) = &self.submission {
+            if actor != lease.actor()
+                || proposal != lease.proposal()
+                || expectation != lease.expectation()
+            {
+                return Err(ReviewContextError::LeaseLost);
+            }
+            lease_context_in(&mut tx, lease, false).await?
+        } else {
+            context_in(&mut tx, actor, proposal, expectation).await?
+        };
         tx.commit().await.map_err(unavailable)?;
         Ok(scope)
     }
@@ -86,6 +109,47 @@ pub(crate) async fn context_in(
     actor: Uuid,
     proposal: Uuid,
     expectation: &ReviewExpectation,
+) -> Result<ReviewScope, ReviewContextError> {
+    context_excluding(connection, actor, proposal, expectation, None).await
+}
+pub(crate) async fn lease_context_in(
+    connection: &mut PgConnection,
+    lease: &crate::review_submissions::SubmissionLease,
+    write: bool,
+) -> Result<ReviewScope, ReviewContextError> {
+    let failure = |error: crate::review_submissions::SubmissionError| match error {
+        crate::review_submissions::SubmissionError::LeaseLost => ReviewContextError::LeaseLost,
+        _ => ReviewContextError::Unavailable,
+    };
+    crate::review_submissions::lock_proposal(connection, lease)
+        .await
+        .map_err(failure)?;
+    crate::review_submissions::lock_lease(connection, lease, write)
+        .await
+        .map_err(failure)?;
+    let scope = context_excluding(
+        connection,
+        lease.actor(),
+        lease.proposal(),
+        lease.expectation(),
+        Some(lease.operation_id()),
+    )
+    .await?;
+    if !lease.matches_scope(&scope) {
+        return Err(ReviewContextError::Stale);
+    }
+    // A slow authorization read must not extend or return an expired fence.
+    crate::review_submissions::lock_lease(connection, lease, write)
+        .await
+        .map_err(failure)?;
+    Ok(scope)
+}
+async fn context_excluding(
+    connection: &mut PgConnection,
+    actor: Uuid,
+    proposal: Uuid,
+    expectation: &ReviewExpectation,
+    own_operation: Option<Uuid>,
 ) -> Result<ReviewScope, ReviewContextError> {
     let comparison = crate::comparison_authorization::context_in(connection, actor, proposal, true)
         .await
@@ -128,8 +192,8 @@ pub(crate) async fn context_in(
     {
         return Err(ReviewContextError::Stale);
     }
-    let busy: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM git_operations WHERE organization_id=$1 AND proposal_id=$2 AND kind IN ('COMMIT','SUBMIT','IMPORT_APPLY','REFRESH_BASE','MERGE','REVERT') AND state IN ('PENDING','RUNNING','UNKNOWN'))")
-        .bind(comparison.organization).bind(proposal).fetch_one(&mut *connection).await.map_err(unavailable)?;
+    let busy: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM git_operations WHERE organization_id=$1 AND proposal_id=$2 AND kind IN ('COMMIT','SUBMIT','IMPORT_APPLY','REFRESH_BASE','MERGE','REVERT') AND state IN ('PENDING','RUNNING','UNKNOWN') AND ($3::uuid IS NULL OR id<>$3))")
+        .bind(comparison.organization).bind(proposal).bind(own_operation).fetch_one(&mut *connection).await.map_err(unavailable)?;
     if busy {
         return Err(ReviewContextError::Busy);
     }

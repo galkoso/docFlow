@@ -158,3 +158,9 @@ for the contract and invalidation behavior. `/changes/:id/review` provides named
 reviewer selection and UI-impact editing, with exact retries for uncertain saves
 and guards for unsaved changes. Formal submission, decisions, discussions and
 PR/check orchestration remain in progress.
+
+Internal review-submission work uses migration 010 for immutable request metadata,
+private replay/status and attempt-fenced leases. Lease-specific authorization
+rechecks current roles and the frozen scope before provider work. See
+[formal review preparation](docs/reviews.md). The submission worker and shared
+snapshot publication/API are still being implemented.

@@ -74,6 +74,30 @@ fn prepared_fixture(f: &Fixture) -> (Arc<ReviewAuth>, Arc<ReviewPreparer>, Revie
     (auth, preparer, expectation)
 }
 
+#[test]
+fn authority_digest_is_canonical_but_detects_actor_metadata_and_qualification_changes() {
+    let f = fixture();
+    let (auth, _, _) = prepared_fixture(&f);
+    let original = auth.scope.lock().unwrap().clone();
+    let hash = original.authority_digest();
+    let mut ordered = original.clone();
+    ordered.review.assignments.reverse();
+    ordered.review.reviewer_memberships.reverse();
+    assert_eq!(hash, ordered.authority_digest());
+    for field in 0..6 {
+        let mut changed = original.clone();
+        match field {
+            0 => changed.review.actor.role = Role::Admin,
+            1 => changed.review.description.push_str(" updated"),
+            2 => changed.review.reviewer_memberships[0].active = false,
+            3 => changed.comparison.connection.installation_id += 1,
+            4 => changed.review.configuration_version += 1,
+            _ => changed.comparison.state = "IN_REVIEW".into(),
+        }
+        assert_ne!(hash, changed.authority_digest());
+    }
+}
+
 #[tokio::test]
 async fn orchestration_prepares_only_verified_saved_content_and_rechecks_without_writing() {
     let f = fixture();
@@ -247,6 +271,16 @@ async fn bounded_capacity_cancellation_and_retry_never_repeat_git_mutations() {
         .unwrap();
     assert!(matches!(
         preparer.prepare(actor, proposal, expectation.clone()).await,
+        Err(ReviewPreparationError::Busy)
+    ));
+    let scoped = preparer.with_authorization(auth.clone());
+    assert!(matches!(
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            scoped.prepare(actor, proposal, expectation.clone())
+        )
+        .await
+        .unwrap(),
         Err(ReviewPreparationError::Busy)
     ));
     first.abort();

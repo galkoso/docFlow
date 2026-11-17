@@ -1439,3 +1439,23 @@ Checkboxes represent verified work only.
   preparation commit passed. Durable submission leases, checkpointing, shared
   snapshots, their HTTP/UI flow and all remaining review/merge/bundle/production
   requirements remain open. This step exposes no new API route or approval.
+
+- Durable review submission journal: migration 010 freezes small normalized
+  expectations and the server authority digest, with scoped actor-bound request
+  replay, private status and atomic operation/job/request/audit reservation.
+  New work uses the existing per-proposal mutation gate; identical retries can
+  observe their original ticket after later changes while requiring current edit
+  authority. Worker leases are bound to attempt as well as owner and expiry,
+  including same-worker reclaim. A leased resolver validates that fence before
+  excluding exactly its own pending operation, then rechecks current metadata
+  and the lease clock. Authority/heartbeat fail if roles change or a blocked read
+  outlives its lease. Scoped preparers retain the shared IO/CPU limit. Read-only
+  backoff/exhaustion and definite failure are journaled; provider-started/unknown
+  work is never retried or unlocked by these paths. Database guards freeze all
+  identity rows and prevent orphan jobs; generic helpers cannot claim/complete
+  submissions. Eleven new PostgreSQL scenarios bring the context/journal suite
+  to 18 passing cases; two new fingerprint cases bring application tests to 98.
+  The full backend suite and workspace Clippy pass. Both CI workflows for the
+  preceding media-evidence commit passed. No submission endpoint, published
+  snapshot or approval is claimed yet. Snapshot publication, worker/API/UI and
+  PR/check integration plus all remaining full-spec requirements remain open.

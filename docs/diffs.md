@@ -415,9 +415,53 @@ determinism, unique rows and visible reordering. Pair objects remain private
 processing models rather than serializable whole-file responses. Authenticated
 bounded readable serving and UI remain required.
 
+## Implemented: bounded readable row and event windows
+
+Readable pairs expose metadata pages of 1–100 rows, with complete side state,
+source hashes, unit totals and explicit raw-required errors. Rows include bounded
+unit summaries and their before/after matching evidence. Each row is capped at
+4KiB encoded JSON and a complete page at 512KiB. Large nested section/code lists
+are represented by complete counts, rather than copying them into every row.
+These are pure DTO builders; authenticated serving remains required.
+
+A readable unit can materialize a stream of inert event fragments, capped at
+128 fragments and 1–64KiB decoded text per window. The complete encoded JSON
+response is capped at 384KiB, including escaping and container metadata. A
+counting serializer enforces encoded bounds without first allocating a giant
+JSON string. Text fragments end on UTF-8 scalar boundaries and retain exact
+decoded-event byte coordinates plus adjusted UTF-16 text offsets. Source ranges
+remain the original parser ranges, so entities/escapes are never presented as
+one-to-one source byte mappings. Raw source/hash identity remains separate.
+
+Each window carries its initial and final stack of known Open events, outermost
+first. Consumers can reopen initial containers, render only known inert events
+and close the final stack in reverse for a standalone virtual page. Concatenating
+fragments reconstructs the canonical event stream without reopening duplicates.
+Nested lists, tables, quotes and long code lines remain accessible. Ordered lists
+include current/next item numbers for reopened containers, preserving numbering
+inside items and between sibling items, including nested ordered lists. Apply
+`start_ordered_lists` by stack depth when reopening; stack events retain their
+original AST attributes. `end_ordered_lists` reports the resulting context. Code-language
+metadata accompanies code opens and resumed code context. Stack and code metadata
+have bounded budgets in addition to the overall JSON limit.
+
+Protected metadata/source explicitly requires raw view. Indivisible oversized
+attributes (such as a large link title/destination or image alt) also require raw
+fallback; they are never silently shortened or split into duplicate elements.
+Unavailable/absent projections and invalid coordinates retain explicit errors.
+No window grants access or review approval. Future HTTP responses must bind the
+file/snapshot and recheck current scope after materialization.
+
+Seven scenarios reconstruct GFM, decoded entities, Unicode and container state;
+check giant code lines/control-character escaping, complete row paging and raw
+fallback; validate code-language resumption, terminal/malformed cursors, metadata
+bounds and damaged evidence. The existing projection/pair tests continue to
+cover source preservation and matching semantics. Application integration,
+authenticated routes, typed client and browser rendering remain required.
+
 ## Remaining workflow
 
-Readable AST comparisons still need bounded serving and application integration;
+Readable AST comparisons still need authenticated serving and application integration;
 media views still need verified pinned materialization. Both require access
 rechecks after rendering. Retention/operational
 pruning and cold-load performance still need hardening. Raw windows reuse their

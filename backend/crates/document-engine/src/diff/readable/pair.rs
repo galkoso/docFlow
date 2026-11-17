@@ -61,7 +61,7 @@ pub enum UnitStatus {
     Added,
     Deleted,
 }
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UnitChange {
     /// Versioned derived identity binds both complete source hashes and units.

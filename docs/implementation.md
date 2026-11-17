@@ -1122,3 +1122,22 @@ Checkboxes represent verified work only.
   Both CI workflows for the preceding readable-projection commit completed
   successfully.
   OpenAPI and editor fixtures regenerate without drift.
+
+
+- Bounded readable DTOs: metadata pages expose 1–100 rows with explicit ready,
+  absent and raw-required side states; per-row and full-page encoded limits
+  prevent unbounded metadata responses. Event windows retain decoded UTF-8/UTF-16
+  coordinates, original source ranges, raw/render hashes, code info and initial/
+  final inert container stacks. Text/event/JSON budgets preserve huge code lines
+  and control-character text without truncation. A counting serializer rejects
+  oversized encoded output without allocating a giant JSON string. Protected
+  source and oversized indivisible attributes require explicit raw fallback.
+  Seven scenarios reconstruct event streams and stack context, complete row pages,
+  Unicode/entities, code-language continuation and adversarial bounds/errors.
+  Ordered-list restart context preserves current/next and nested item numbers.
+  DTO builders perform no I/O or authorization. Application/HTTP integration,
+  client/UI, media, review anchors and remaining lifecycle remain required.
+  Full backend workspace tests pass, including all 81 engine tests. Clippy and
+  formatting pass; OpenAPI and editor fixtures regenerate without drift. The
+  previously network-blocked pairing commit was pushed successfully and both
+  CI workflows completed successfully.

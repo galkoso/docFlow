@@ -2,6 +2,7 @@
 //! definitions, HTML or unsupported syntax cannot be rendered as ordinary GFM.
 //! This is derived content, not authorization or a review approval.
 pub mod pair;
+pub mod window;
 
 use crate::{
     editing::{self, EditorKind},

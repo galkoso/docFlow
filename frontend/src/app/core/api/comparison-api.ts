@@ -7,6 +7,10 @@ export type DiffFiles = components['schemas']['DiffFiles'];
 export type ComparisonSummary = components['schemas']['ComparisonSummary'];
 export type ComparisonChange = components['schemas']['Change'];
 export type ComparisonJob = components['schemas']['JobStatus'];
+export type RawFileResponse = components['schemas']['RawFileResponse'];
+export type RawCursor = components['schemas']['RawCursor'];
+export type RawWindow = components['schemas']['RawWindow'];
+export type RawSegment = components['schemas']['RawSegment'];
 export interface ComparisonRequest { readonly request_id: string; readonly head?: string; readonly target?: string; }
 
 @Injectable({ providedIn: 'root' })
@@ -19,6 +23,11 @@ export class ComparisonApi {
   page(actor: string, proposal: string, snapshot: string, offset = 0, limit = 50) {
     return this.http.get<DiffResponse>(this.path(proposal), {
       params: { snapshot, offset, limit }, headers: this.actor(actor),
+    });
+  }
+  raw(actor: string, proposal: string, snapshot: string, file: string, cursor: RawCursor = { chunk: 0, offset: 0 }, maxBytes = 32768) {
+    return this.http.get<RawFileResponse>(`${this.path(proposal)}/files/${encodeURIComponent(file)}`, {
+      params: { snapshot, chunk: cursor.chunk, offset: cursor.offset, max_bytes: maxBytes }, headers: this.actor(actor),
     });
   }
   job(actor: string, job: string) {

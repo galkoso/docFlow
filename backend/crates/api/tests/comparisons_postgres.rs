@@ -45,7 +45,7 @@ struct Provider {
 impl Provider {
     fn text(&self, commit: &CommitSha, path: &str) -> String {
         let text = self.files[path].clone();
-        if commit.as_str() == HEAD && path.ends_with(".md") {
+        if commit.as_str() == HEAD && (path.ends_with(".md") || path == "assets/change.png") {
             text.replace("before", "edited")
         } else {
             text
@@ -81,6 +81,16 @@ impl GitProvider for Provider {
         path: &RepositoryPath,
     ) -> Result<String, GitError> {
         self.reads.fetch_add(1, Ordering::SeqCst);
+        match self.backoff.load(Ordering::SeqCst) {
+            2 => {
+                return Err(GitError::RateLimited {
+                    retry_after_seconds: Some(13),
+                });
+            }
+            3 => return Ok("forged source".into()),
+            4 => return Err(GitError::FileMissing),
+            _ => {}
+        }
         let hook = self.hook.lock().unwrap().take();
         if let Some((pool, actor)) = hook {
             sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
@@ -176,6 +186,9 @@ async fn user(pool: &PgPool, organization: Uuid, role: &str) -> User {
     User { id, token }
 }
 async fn fixture(pool: &PgPool, configured: bool) -> Fixture {
+    fixture_source(pool, configured, "PRIVATE SOURCE SENTINEL before", false).await
+}
+async fn fixture_source(pool: &PgPool, configured: bool, body: &str, asset: bool) -> Fixture {
     let organization = Uuid::new_v4();
     let repository = Uuid::new_v4();
     let proposal = Uuid::new_v4();
@@ -198,12 +211,18 @@ async fn fixture(pool: &PgPool, configured: bool) -> Fixture {
         .bind(proposal).bind(organization).bind(repository).bind(owner.id).bind(team).bind(OLD).bind(HEAD).execute(pool).await.unwrap();
     let mut files = BTreeMap::new();
     let entries:Vec<_>=(0..3).map(|n| {
-        let path=format!("docs/{n}.md");let id=format!("DOC-{n}");files.insert(path.clone(),format!("---\ndocument_id: {id}\ntitle: Synthetic\nowner_team: fixture\nschema_version: 1\n---\nPRIVATE SOURCE SENTINEL before\n"));json!({"document_id":id,"path":path})
+        let path=format!("docs/{n}.md");let id=format!("DOC-{n}");files.insert(path.clone(),format!("---\ndocument_id: {id}\ntitle: Synthetic\nowner_team: fixture\nschema_version: 1\n---\n{body}\n"));json!({"document_id":id,"path":path})
     }).collect();
     files.insert(
         ".specspace/catalog.json".into(),
         json!({"schema_version":1,"documents":entries}).to_string(),
     );
+    if asset {
+        files.insert(
+            "assets/change.png".into(),
+            "opaque fixture bytes before".into(),
+        );
+    }
     let provider = Arc::new(Provider {
         files,
         reads: AtomicUsize::new(0),
@@ -526,4 +545,222 @@ async fn missing_setup_and_worker_failures_are_terminal_statuses_without_fake_re
     assert_eq!(failed["state"], "FAILED");
     assert_eq!(failed["error_code"], "COMPARISON_SETUP_REQUIRED");
     assert!(failed["summary"].is_null() && failed["page"].is_null());
+}
+
+async fn ready_file(f: &Fixture) -> (Value, Value) {
+    let (_, ticket, location, _) = get(&f.app, &f.actor, &prepare(f, Uuid::new_v4()), true).await;
+    f.worker.run_once().await.unwrap();
+    let (status, ready, _, _) = get(&f.app, &f.actor, &location.unwrap(), true).await;
+    assert_eq!(status, StatusCode::OK, "{ready}");
+    let file = ready["page"]["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["kind"] == "document")
+        .unwrap()
+        .clone();
+    (ticket, file)
+}
+fn raw_path(f: &Fixture, ticket: &Value, file: &Value) -> String {
+    format!(
+        "/api/v1/proposals/{}/diff/files/{}?snapshot={}",
+        f.proposal,
+        file["id"].as_str().unwrap(),
+        ticket["snapshot_id"].as_str().unwrap()
+    )
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn raw_http_windows_reconstruct_exact_pinned_source_after_later_head_and_closure(
+    pool: PgPool,
+) {
+    let body = format!(
+        "{}\r\n<script>before</script>\r\nlast",
+        "שָׁלוֹם 👩🏽‍💻 before\t".repeat(200)
+    );
+    let f = fixture_source(&pool, true, &body, false).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = raw_path(&f, &ticket, &file);
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let (mut before, mut after) = (String::new(), String::new());
+    let mut cursor = json!({"chunk":0,"offset":0});
+    let mut pages = 0;
+    loop {
+        let url = format!(
+            "{path}&chunk={}&offset={}&max_bytes=1025",
+            cursor["chunk"], cursor["offset"]
+        );
+        let (status, window, _, retry) = get(&f.app, &f.actor, &url, true).await;
+        assert_eq!(status, StatusCode::OK, "{window}");
+        assert!(retry.is_none());
+        assert_eq!(window["snapshot_id"], ticket["snapshot_id"]);
+        assert_eq!(window["file"], file);
+        assert_eq!(window["head_sha"], HEAD);
+        assert_eq!(window["merge_base_sha"], OLD);
+        assert_eq!(window["raw"]["old_sha256"], file["before"]["sha256"]);
+        assert_eq!(window["raw"]["new_sha256"], file["after"]["sha256"]);
+        assert_eq!(window["raw"]["cursor"], cursor);
+        let mut size = 0;
+        for segment in window["raw"]["segments"].as_array().unwrap() {
+            assert_eq!(segment["old_start_byte"], before.len());
+            assert_eq!(segment["new_start_byte"], after.len());
+            let a = segment["old_text"].as_str().unwrap();
+            let b = segment["new_text"].as_str().unwrap();
+            size += a.len() + b.len();
+            before.push_str(a);
+            after.push_str(b);
+        }
+        assert!(size <= 1025);
+        assert_eq!(window["raw"]["returned_text_bytes"], size);
+        pages += 1;
+        if pages == 1 {
+            // Keep this accepted snapshot while the proposal becomes historical.
+            sqlx::query(
+                "UPDATE proposals SET head_sha=$2,version=version+1,state='CLOSED' WHERE id=$1",
+            )
+            .bind(f.proposal)
+            .bind("4".repeat(40))
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        if window["raw"]["next"].is_null() {
+            break;
+        }
+        assert!(size > 0 && pages < 100);
+        cursor = window["raw"]["next"].clone();
+    }
+    assert!(pages > 1);
+    assert_eq!(
+        before,
+        f.provider
+            .text(&sha(OLD), file["before"]["path"].as_str().unwrap())
+    );
+    assert_eq!(
+        after,
+        f.provider
+            .text(&sha(HEAD), file["after"]["path"].as_str().unwrap())
+    );
+    // Each window fetches only its verified pair; body caching remains subsequent work.
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + pages * 2);
+    let first = get(&f.app, &f.actor, &format!("{path}&max_bytes=1025"), true)
+        .await
+        .1;
+    let replay = get(&f.app, &f.actor, &format!("{path}&max_bytes=1025"), true)
+        .await
+        .1;
+    assert_eq!(first, replay);
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn raw_file_queries_require_private_actor_scope_and_bounded_unambiguous_coordinates(
+    pool: PgPool,
+) {
+    let f = fixture(&pool, true).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = raw_path(&f, &ticket, &file);
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    for query in [
+        "&max_bytes=0",
+        "&max_bytes=65537",
+        "&chunk=1025",
+        "&offset=2097153",
+        "&offset=-1",
+        "&chunk=0&chunk=1",
+        "&head=other",
+        "&snapshot=duplicate",
+    ] {
+        assert_eq!(
+            get(&f.app, &f.actor, &format!("{path}{query}"), true)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST,
+            "{query}"
+        );
+    }
+    assert_eq!(
+        get(&f.app, &f.actor, path.split('?').next().unwrap(), true)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(&f.app, &f.actor, &path, false).await.0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        get(&f.app, &f.owner, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let unknown = path.replace(file["id"].as_str().unwrap(), &"0".repeat(64));
+    assert_eq!(
+        get(&f.app, &f.actor, &unknown, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let foreign = path.replace(
+        ticket["snapshot_id"].as_str().unwrap(),
+        &Uuid::new_v4().to_string(),
+    );
+    assert_eq!(
+        get(&f.app, &f.actor, &foreign, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+    // A syntactically bounded but nonexistent alignment coordinate fails explicitly.
+    let invalid = get(&f.app, &f.actor, &format!("{path}&chunk=1024"), true).await;
+    assert_eq!(invalid.0, StatusCode::BAD_REQUEST);
+    assert_eq!(invalid.1["error"]["code"], "INVALID_COMPARISON_WINDOW");
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn raw_files_never_serialize_unverified_or_revoked_source_and_preserve_backoff(pool: PgPool) {
+    let f = fixture(&pool, true).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = raw_path(&f, &ticket, &file);
+    for (mode, code, delay) in [
+        (2, "COMPARISON_SOURCE_BACKOFF", Some("13")),
+        (3, "COMPARISON_EVIDENCE_INVALID", None),
+        (4, "COMPARISON_SOURCE_MISSING", None),
+    ] {
+        f.provider.backoff.store(mode, Ordering::SeqCst);
+        let (status, response, _, retry) = get(&f.app, &f.actor, &path, true).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response["error"]["code"], code);
+        assert_eq!(retry.as_deref(), delay);
+        assert!(!response.to_string().contains("PRIVATE SOURCE SENTINEL"));
+        assert!(response.get("raw").is_none());
+    }
+    f.provider.backoff.store(0, Ordering::SeqCst);
+    *f.provider.hook.lock().unwrap() = Some((pool.clone(), f.actor.id));
+    let (status, response, _, _) = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{response}");
+    assert!(response.get("raw").is_none());
+    assert!(!response.to_string().contains("PRIVATE SOURCE SENTINEL"));
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn raw_reads_keep_pending_states_and_nontext_assets_explicit_without_fetching_media(
+    pool: PgPool,
+) {
+    let f = fixture_source(&pool, true, "before", true).await;
+    let (_, ticket, location, _) = get(&f.app, &f.actor, &prepare(&f, Uuid::new_v4()), true).await;
+    let pending = format!(
+        "/api/v1/proposals/{}/diff/files/{}?snapshot={}",
+        f.proposal,
+        "0".repeat(64),
+        ticket["snapshot_id"].as_str().unwrap()
+    );
+    let response = get(&f.app, &f.actor, &pending, true).await;
+    assert_eq!(response.0, StatusCode::CONFLICT);
+    assert_eq!(response.1["error"]["code"], "COMPARISON_NOT_READY");
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), 0);
+    f.worker.run_once().await.unwrap();
+    let ready = get(&f.app, &f.actor, &location.unwrap(), true).await.1;
+    let asset = ready["page"]["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["kind"] == "asset")
+        .unwrap();
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let (status, response, _, _) = get(&f.app, &f.actor, &raw_path(&f, &ticket, asset), true).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(response["error"]["code"], "COMPARISON_FILE_NOT_TEXT");
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
 }

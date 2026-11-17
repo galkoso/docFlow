@@ -1,3 +1,5 @@
+pub(crate) mod raw;
+
 use crate::{
     AppState, ErrorBody, auth,
     proposals::{self, JobStatus},
@@ -23,7 +25,9 @@ use specspace_infrastructure::{
 };
 use uuid::Uuid;
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/api/v1/proposals/{proposal}/diff", get(read))
+    Router::new()
+        .route("/api/v1/proposals/{proposal}/diff", get(read))
+        .merge(raw::routes())
 }
 #[derive(Deserialize, utoipa::IntoParams)]
 #[serde(deny_unknown_fields)]

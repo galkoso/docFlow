@@ -1,5 +1,7 @@
 //! Exact byte-preserving line alignment. Resource fallback is explicit and never
 //! omits source: coarse replacements retain ranges covering both complete files.
+pub mod window;
+
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -267,6 +269,12 @@ fn align(old: &str, new: &str) -> (Builder, bool) {
         }
     }
     out.push(Kind::Equal, old.len(), new.len(), suffix, suffix);
+    if out.chunks.len() > MAX_CHUNKS {
+        return (
+            coarse(old, new, old_prefix, new_prefix, old_tail, new_tail),
+            false,
+        );
+    }
     (out, true)
 }
 

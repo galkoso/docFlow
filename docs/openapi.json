@@ -1377,6 +1377,162 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/diff/files/{file}": {
+      "get": {
+        "tags": [
+          "crate::comparisons::raw"
+        ],
+        "operationId": "proposalRawDiffFile",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "description": "Immutable file identity from the inventory",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "description": "Captured owner of the comparison",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "chunk",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Byte offset within the selected alignment chunk, from the previous window.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "max_bytes",
+            "in": "query",
+            "description": "Source text budget across both sides, before JSON escaping (1024–65536).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified bounded raw source window, with immutable snapshot and file identities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RawFileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/documents/{document}": {
       "get": {
         "tags": [
@@ -4829,10 +4985,9 @@
       "Kind": {
         "type": "string",
         "enum": [
-          "document",
-          "asset",
-          "catalog",
-          "other"
+          "equal",
+          "delete",
+          "insert"
         ]
       },
       "LinkKind": {
@@ -5314,6 +5469,202 @@
           },
           "state": {
             "$ref": "#/components/schemas/SyncState"
+          }
+        }
+      },
+      "RawCursor": {
+        "type": "object",
+        "required": [
+          "chunk",
+          "offset"
+        ],
+        "properties": {
+          "chunk": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "description": "UTF-8 byte offset in this chunk's nonempty text (old text for equal).",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RawFileResponse": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "snapshot_id",
+          "content_id",
+          "merge_base_sha",
+          "head_sha",
+          "file",
+          "raw"
+        ],
+        "properties": {
+          "content_id": {
+            "type": "string"
+          },
+          "file": {
+            "$ref": "#/components/schemas/Change"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "merge_base_sha": {
+            "type": "string"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "raw": {
+            "$ref": "#/components/schemas/RawWindow"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "RawSegment": {
+        "type": "object",
+        "required": [
+          "chunk_index",
+          "kind",
+          "old_start_byte",
+          "old_end_byte",
+          "new_start_byte",
+          "new_end_byte",
+          "old_start_line",
+          "new_start_line",
+          "old_start_column_bytes",
+          "new_start_column_bytes",
+          "continues_chunk",
+          "old_text",
+          "new_text"
+        ],
+        "properties": {
+          "chunk_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "continues_chunk": {
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind"
+          },
+          "new_end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "new_start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "new_start_column_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "new_start_line": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "new_text": {
+            "type": "string"
+          },
+          "old_end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "old_start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "old_start_column_bytes": {
+            "type": "integer",
+            "description": "Byte columns, not grapheme, display or UTF-16 columns. A nonzero column\nsignals a window continuing inside a line; UTF-8 scalars are never split.",
+            "minimum": 0
+          },
+          "old_start_line": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "old_text": {
+            "type": "string"
+          }
+        }
+      },
+      "RawWindow": {
+        "type": "object",
+        "required": [
+          "old_sha256",
+          "new_sha256",
+          "old_bytes",
+          "new_bytes",
+          "old_lines",
+          "new_lines",
+          "detailed",
+          "total_chunks",
+          "cursor",
+          "returned_text_bytes",
+          "segments"
+        ],
+        "properties": {
+          "cursor": {
+            "$ref": "#/components/schemas/RawCursor"
+          },
+          "detailed": {
+            "type": "boolean"
+          },
+          "new_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "new_lines": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "new_sha256": {
+            "type": "string"
+          },
+          "next": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RawCursor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "old_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "old_lines": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "old_sha256": {
+            "type": "string"
+          },
+          "returned_text_bytes": {
+            "type": "integer",
+            "description": "Sum of both source-text fields, before JSON escaping. Equal text counts twice.",
+            "minimum": 0
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RawSegment"
+            }
+          },
+          "total_chunks": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       },

@@ -46,4 +46,33 @@ describe('Pinned comparison requests', () => {
     }
     http.verify();
   });
+
+  it('freezes a raw window cursor and snapshot across deferred subscriptions and identity changes', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ComparisonApi);
+    const http = TestBed.inject(HttpTestingController);
+    const cursor = { chunk: 2, offset: 1024 };
+    const window = api.raw('captured', 'proposal', 'snapshot', 'file', cursor, 4096);
+    cursor.offset = 9999;
+    window.subscribe({ error: () => {} });
+    const first = http.expectOne(request => request.url === '/api/v1/proposals/proposal/diff/files/file');
+    expect(first.request.headers.get('X-Expected-Actor')).toBe('captured');
+    expect(first.request.params.keys().sort()).toEqual(['chunk', 'max_bytes', 'offset', 'snapshot']);
+    expect(first.request.params.get('snapshot')).toBe('snapshot');
+    expect(first.request.params.get('offset')).toBe('1024');
+    expect(first.request.params.get('max_bytes')).toBe('4096');
+    first.error(new ProgressEvent('error'));
+    http.expectNone(request => request.url.includes('/diff'));
+    api.job('another', 'job').subscribe();
+    const other = http.expectOne('/api/v1/jobs/job');
+    expect(other.request.headers.get('X-Expected-Actor')).toBe('another');
+    other.flush({});
+    window.subscribe();
+    const retry = http.expectOne(request => request.url === '/api/v1/proposals/proposal/diff/files/file');
+    expect(retry.request.params.toString()).toBe(first.request.params.toString());
+    expect(retry.request.headers.get('X-Expected-Actor')).toBe('captured');
+    retry.flush({});
+    http.verify();
+  });
+
 });

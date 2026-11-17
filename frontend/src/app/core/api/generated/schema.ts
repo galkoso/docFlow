@@ -248,6 +248,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/diff/files/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalRawDiffFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/documents/{document}": {
         parameters: {
             query?: never;
@@ -848,7 +864,7 @@ export interface components {
             state: string;
         };
         /** @enum {string} */
-        Kind: "document" | "asset" | "catalog" | "other";
+        Kind: "equal" | "delete" | "insert";
         /** @enum {string} */
         LinkKind: "figma" | "ticket" | "development_pr";
         /** @enum {string} */
@@ -978,6 +994,56 @@ export interface components {
             /** Format: int64 */
             retry_after_seconds?: number | null;
             state: components["schemas"]["SyncState"];
+        };
+        RawCursor: {
+            chunk: number;
+            /** @description UTF-8 byte offset in this chunk's nonempty text (old text for equal). */
+            offset: number;
+        };
+        RawFileResponse: {
+            content_id: string;
+            file: components["schemas"]["Change"];
+            head_sha: string;
+            merge_base_sha: string;
+            /** Format: uuid */
+            proposal_id: string;
+            raw: components["schemas"]["RawWindow"];
+            /** Format: uuid */
+            snapshot_id: string;
+        };
+        RawSegment: {
+            chunk_index: number;
+            continues_chunk: boolean;
+            kind: components["schemas"]["Kind"];
+            new_end_byte: number;
+            new_start_byte: number;
+            new_start_column_bytes: number;
+            new_start_line: number;
+            new_text: string;
+            old_end_byte: number;
+            old_start_byte: number;
+            /**
+             * @description Byte columns, not grapheme, display or UTF-16 columns. A nonzero column
+             *     signals a window continuing inside a line; UTF-8 scalars are never split.
+             */
+            old_start_column_bytes: number;
+            old_start_line: number;
+            old_text: string;
+        };
+        RawWindow: {
+            cursor: components["schemas"]["RawCursor"];
+            detailed: boolean;
+            new_bytes: number;
+            new_lines: number;
+            new_sha256: string;
+            next?: components["schemas"]["RawCursor"] | null;
+            old_bytes: number;
+            old_lines: number;
+            old_sha256: string;
+            /** @description Sum of both source-text fields, before JSON escaping. Equal text counts twice. */
+            returned_text_bytes: number;
+            segments: components["schemas"]["RawSegment"][];
+            total_chunks: number;
         };
         ReadFinding: {
             code: string;
@@ -2094,6 +2160,96 @@ export interface operations {
                 };
             };
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalRawDiffFile: {
+        parameters: {
+            query: {
+                snapshot: string;
+                chunk?: number;
+                /** @description Byte offset within the selected alignment chunk, from the previous window. */
+                offset?: number;
+                /** @description Source text budget across both sides, before JSON escaping (1024–65536). */
+                max_bytes?: number;
+            };
+            header: {
+                /** @description Captured owner of the comparison */
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                /** @description Immutable file identity from the inventory */
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified bounded raw source window, with immutable snapshot and file identities */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RawFileResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1046,3 +1046,22 @@ Checkboxes represent verified work only.
   review/merge workflows remain required.
   Full backend workspace tests and Clippy pass after this stage. Both CI
   workflows for the preceding HTTP contract commit also completed successfully.
+
+
+- Bounded raw comparison windows: authenticated file routes use only private
+  published file identities and verified pinned sources, rechecking access after
+  off-executor materialization. Windows carry both digests, snapshot/content/file
+  identities and full coordinates; 1–64KiB text and 128 segments bound responses.
+  UTF-8-safe continuation keeps huge lines, empty files and coarse replacements
+  fully reconstructable. A final common suffix can no longer overflow the
+  alignment chunk cap. Six engine scenarios and four PostgreSQL HTTP scenarios
+  cover exact reconstruction, invalid/ambiguous cursors, later head/closure,
+  source corruption/revocation, pending/non-text states and provider backoff.
+  OpenAPI and the typed Angular client expose the raw contract, with a frozen
+  cursor/actor replay test. Source HTML remains JSON text, never rendered markup.
+  Body caching, readable/media views, UI, anchors and remaining review/merge
+  lifecycle are still required.
+  Full backend workspace tests and Clippy pass, as do the frontend production
+  build and all 116 tests. The editor fixture has no drift. The restarted API
+  reports ready and the new route requires authentication. Both CI workflows
+  for the preceding file-reader commit completed successfully.

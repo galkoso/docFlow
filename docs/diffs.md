@@ -2,7 +2,8 @@
 
 The raw engine, complete inventory preparation and authorized comparison loader
 and durable metadata jobs/pages are implemented, with authenticated HTTP progress
-and paged inventories. The UI, file-level views and review anchors remain required work.
+and paged inventories, plus bounded raw text-file windows. The UI, readable/media
+views and review anchors remain required work.
 
 ## Provider graph boundary
 
@@ -251,16 +252,62 @@ at async boundaries, backoff, capacity/cancellation and timeout recovery. Two
 PostgreSQL scenarios prove READY/private scope, exact pinned bodies, later closure
 and configuration changes, plus access revocation during a provider fetch. The
 runtime source configuration wires this capability alongside the inventory
-worker. File HTTP endpoints, bounded response windows, body caching and readable
-AST views remain subsequent work; this loader alone completes no diff UI or
+worker. The raw HTTP/window contract is described below; body caching and readable
+AST views remain subsequent work. This loader alone completes no diff UI or
 review acceptance requirement.
+
+## Implemented: bounded raw-file HTTP windows
+
+`GET /api/v1/proposals/:id/diff/files/:file?snapshot=<uuid>` returns verified
+raw Markdown/catalog source for one file from the published inventory. The file
+identity comes from that inventory, rather than a browser path. Current private
+scope and `X-Expected-Actor` are required. Rendering runs on bounded blocking CPU;
+a further authorization/evidence check occurs after window construction.
+
+The response retains proposal/snapshot/content/file identities, exact merge-base
+and head, the complete file change descriptor, both source digests and original
+byte/line totals. Source bodies are represented by raw segments with equal,
+delete or insert kind and half-open byte coordinates. HTML remains JSON text;
+consumers must render it as source, never executable markup. No source
+normalization or Markdown reserialization occurs.
+
+`chunk` and `offset` identify a UTF-8 byte position in one alignment chunk. Use
+`raw.next` for the next request against the same snapshot/file. Initial values
+are zero. Every window defaults to 32KiB of source text across both sides;
+`max_bytes` accepts 1–64KiB. Equal text counts twice. At most 128 segments are
+materialized. JSON escaping/metadata add bounded overhead beyond the text budget.
+Windows can end inside a long line and resume at the exact next UTF-8 scalar;
+line and byte-column coordinates make continuation explicit. A grapheme cluster
+can span windows and byte columns are not display/UTF-16 columns. CRLF, combining
+marks, emoji and missing final newlines remain reconstructable without loss.
+
+Empty files and absent sides remain distinct in the file descriptor. An empty or
+terminal window has no next cursor. Large/coarse replacements retain every byte
+and keep `detailed=false` explicit. Invalid/duplicate/unknown query parameters or
+nonexistent chunk/byte positions return 400; pending comparison rows return 409.
+Assets/other non-text kinds return 422 without attempting a text/media fetch.
+Provider backoff returns 503 and preserves `Retry-After` when supplied; missing
+or forged source and revoked access never expose a raw response. Reads do not
+retry automatically and all responses are `no-store`.
+
+Six engine scenarios verify exact multi-window reconstruction, 2MiB lines,
+coarse fallback, Unicode/CRLF/YAML/HTML, segment budgets, malformed evidence/cursors
+and line continuation. A boundary regression also ensures a final common suffix
+cannot overflow the alignment chunk cap. Four PostgreSQL HTTP scenarios cover
+pinned multi-window reconstruction after later head/closure, private scope and
+query bounds, explicit pending/media states, forged/missing source, revocation
+and provider backoff. The Angular typed client captures window coordinates and
+actor/snapshot identity before subscription; a client scenario covers exact
+manual replay after another actor polls. These checks do not establish browser
+rendering, readable AST views or review anchors.
 
 ## Remaining workflow
 
-File-level raw and readable views still need pinned body reads/verification, bounded windows
-and rechecks after rendering work. They must use stored paths/ref identities
-rather than reloading the whole book for each page. Runtime body caching,
-retention/operational pruning and cold-load performance still need hardening.
+Readable AST and media views still need verified pinned materialization and
+bounded responses, with access rechecks after rendering. Raw windows currently
+fetch only the selected text pair on each request; runtime body caching is still
+needed to avoid repeated provider reads across windows. Retention/operational
+pruning and cold-load performance also need hardening.
 Creation/deletion/renames, catalog moves and image changes need explicit evidence.
 Raw and AST-readable file views must page large content without hiding changes,
 preserve complete pinned identities, and bind hunks to file/section/content hashes

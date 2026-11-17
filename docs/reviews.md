@@ -1,9 +1,10 @@
 # Formal review preparation
 
 Review configuration is editable at `/changes/:id/review`; its contract is in
-[`review-configuration.md`](review-configuration.md). Formal submission, shared
-snapshot publication, decisions, discussions, and provider PR/check orchestration
-are still being implemented.
+[`review-configuration.md`](review-configuration.md). Server-side preparation,
+the submission journal and atomic shared snapshot persistence are implemented.
+The submission worker, public submit/status/snapshot API, decisions, discussions,
+and provider PR/check orchestration remain open.
 
 ## Current server context
 
@@ -129,8 +130,58 @@ job helpers cannot lease or complete submission jobs.
 
 Status is private to the original actor with current edit access. It returns only
 validated state/phase/error fields and rejects inconsistent or unbacked success.
-This journal does not yet publish snapshots or complete submissions. The shared
-snapshot store, publication transaction, worker loop, public submit/status API,
-and PR/check orchestration remain open. Fresh provider observations cannot lock
+Success requires a persisted publication receipt and matching snapshot/job/
+operation outcome. Its phase is `SNAPSHOT_READY`; it does not imply a PR exists,
+checks passed, or any reviewer approved. Fresh provider observations cannot lock
 Git against later external changes, so approval and merge gates must also recheck
 their own exact refs.
+
+## Atomic shared snapshot publication
+
+Migration 011 and `PgReviewSnapshots` persist only sealed `VerifiedReview`
+evidence. A candidate must match the submission's frozen authority digest.
+Publication renews the read-only lease, rechecks current edit/reviewer authority
+and the exact provider refs through a lease-bound preparer, then opens a short
+transaction. Provider calls never hold that transaction. It locks the proposal
+before the job/operation, resolves full authority again, and requires the same
+scope as the verified candidate. A final worker/attempt/clock fence protects
+completion after the evidence and outbox writes.
+
+Snapshots contain frozen proposal/repository metadata, the full comparison file
+manifest, reviewer assignments, validation findings and media receipts. They do
+not contain raw Markdown or source/display image bytes. File descriptors retain
+their original IDs and optional hashes; separate media receipts record the
+verified image hashes and dimensions. Files and receipts are inserted in bounded
+batches with contiguous ordinals. A one-time seal compares both complete ordered
+manifests. Deferred constraints reject unsealed, incomplete or orphan publication
+transactions. Published headers, children and submission receipts are immutable,
+including against deletion, late insertion and truncation.
+
+An unchanged **active** snapshot can be reused in review/approved/changes-requested
+states. Reuse preserves proposal version and state, including `APPROVED`; it
+keeps the original immutable evidence digest. Otherwise a new snapshot becomes
+active, the selected target is recorded, proposal version increments and state
+becomes `IN_REVIEW`. A historical fingerprint is never globally reused. Changing
+head, target, base, review configuration or proposal review metadata clears the
+active pointer; retained `APPROVED` state is demoted. A provider-binding change
+also clears pointers, increments affected proposal versions and demotes approval.
+Restoring an old head or binding therefore cannot reactivate historical approval.
+Policy versions cannot move backward; current metadata checks compare policy.
+
+The snapshot, immutable submission result, active proposal pointer, successful
+job/operation, audit event and `REVIEW_SNAPSHOT_PUBLISHED` outbox event commit
+together. The event explicitly requires PR synchronization and grants no
+approvals. PR synchronization is still pending implementation. A lost reply or
+concurrent publication can replay the same durable outcome with current original-
+actor edit access, without a live lease or new Git reads, even after later head/
+version changes or closure. A rolled-back attempt leaves no partial evidence.
+
+Organization members, including Readers, can read shared snapshot metadata and
+complete file descriptors in pages of 1–100. Every read checks current membership,
+active user status and proposal/repository scope. History remains readable after
+closure, content changes and provider reconfiguration, without provider calls.
+`current_metadata` compares the active pointer and current database refs, versions
+and binding; it is neither a fresh Git observation nor approval/merge readiness.
+Job status remains private to the original actor with current edit access. These
+store methods are not yet exposed through public HTTP endpoints; shared raw/
+readable/image body reads and snapshot history navigation remain open.

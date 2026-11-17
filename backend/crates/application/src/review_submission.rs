@@ -96,6 +96,21 @@ pub struct ReviewSubmissionStatus {
     pub attempts: i32,
     pub phase: String,
     pub error_code: Option<String>,
+    pub publication: Option<ReviewPublication>,
+}
+/// Durable snapshot outcome; PR synchronization and approvals are separate.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ReviewPublication {
+    pub proposal_id: Uuid,
+    pub operation_id: Uuid,
+    pub job_id: Uuid,
+    pub snapshot_id: Uuid,
+    pub fingerprint: String,
+    pub evidence_digest: String,
+    pub proposal_version: i64,
+    pub activated: bool,
+    pub replayed: bool,
 }
 impl ReviewScope {
     /// Captures authority and metadata, rather than shared content identity.

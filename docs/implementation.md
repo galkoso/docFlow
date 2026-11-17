@@ -1459,3 +1459,27 @@ Checkboxes represent verified work only.
   preceding media-evidence commit passed. No submission endpoint, published
   snapshot or approval is claimed yet. Snapshot publication, worker/API/UI and
   PR/check integration plus all remaining full-spec requirements remain open.
+
+- Atomic shared review snapshots: migration 011 and `PgReviewSnapshots` publish
+  sealed evidence only after a lease-bound authority/ref recheck and a second
+  transactional authority check. One commit includes the complete immutable
+  file/media manifests, frozen review metadata, submission receipt, active
+  proposal pointer/version/state, job/operation success, audit and PR-sync outbox
+  event. A one-time seal and deferred guards reject incomplete/orphan evidence;
+  a final attempt/owner/clock fence rolls back late publication. Only the active
+  identical fingerprint can be reused, preserving approved state/version. Head,
+  target, base, review metadata and provider-binding changes invalidate that
+  pointer; restoring old inputs never reactivates historical approval. Policy
+  versions cannot regress. Lost replies and concurrent callers replay the same
+  result with current edit authority and no repeated Git work. Organization
+  Readers can page through shared metadata/files with current membership checks,
+  independently of provider availability; job status remains actor-private.
+  Nine new PostgreSQL tests cover real verified text/image pipelines, exact
+  manifests and receipts, pagination, active reuse/history, private/shared
+  access and revocation, stale scope/refs/attempts, concurrent replay, injected
+  outbox failure, expiry after writes, incomplete sealing, null media receipts,
+  missing publication outcomes, immutable rows and truncation. The review suite
+  now passes 27 tests; the full backend suite and workspace Clippy pass. Both
+  workflows for the preceding submission-journal commit passed. Public HTTP and
+  worker wiring, shared diff/image bodies, PR/check processing, decisions,
+  discussions, approvals, merge, bundles and production acceptance remain open.

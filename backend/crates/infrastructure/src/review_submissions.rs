@@ -143,6 +143,9 @@ impl SubmissionLease {
     pub fn attempts(&self) -> i32 {
         self.attempts
     }
+    pub(crate) fn worker(&self) -> Uuid {
+        self.worker
+    }
     pub(crate) fn matches_scope(&self, scope: &ReviewScope) -> bool {
         let binding = &scope.comparison.connection;
         scope.comparison.organization == self.organization()
@@ -368,16 +371,26 @@ impl PgReviewSubmissions {
             },
             "FAILED" => matches!(state.as_str(), "FAILED" | "CANCELLED") && phase == "FAILED",
             "RUNNING" | "UNKNOWN" => state != "SUCCEEDED",
-            // Success requires durable snapshot publication, added separately.
+            "SUCCEEDED" => state == "SUCCEEDED" && phase == "SNAPSHOT_READY" && code.is_none(),
             _ => false,
         };
         if !consistent
             || !matches!(
                 phase.as_str(),
-                "QUEUED" | "PREPARING" | "RETRY_WAIT" | "FAILED" | "RECONCILIATION_REQUIRED"
+                "QUEUED"
+                    | "PREPARING"
+                    | "RETRY_WAIT"
+                    | "FAILED"
+                    | "RECONCILIATION_REQUIRED"
+                    | "SNAPSHOT_READY"
             )
             || code.as_deref().is_some_and(|code| !error_code(code))
         {
+            return Err(SubmissionError::InvalidIntent);
+        }
+        let publication =
+            crate::review_snapshots::publication_in(&mut tx, row.operation_id).await?;
+        if (operation == "SUCCEEDED") != publication.is_some() {
             return Err(SubmissionError::InvalidIntent);
         }
         let result = ReviewSubmissionStatus {
@@ -388,6 +401,7 @@ impl PgReviewSubmissions {
             attempts,
             phase,
             error_code: code,
+            publication,
         };
         tx.commit().await?;
         Ok(result)
@@ -425,7 +439,7 @@ pub(crate) async fn lock_lease(
     }
     Ok(())
 }
-async fn access(
+pub(crate) async fn access(
     connection: &mut PgConnection,
     actor: Uuid,
     proposal: Uuid,

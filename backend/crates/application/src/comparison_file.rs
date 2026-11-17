@@ -1,5 +1,7 @@
 //! Private, source-verified file reads from a published comparison. Browser paths
 //! and refs never enter provider calls; only server-resolved immutable evidence.
+mod cache;
+
 use crate::{
     comparison::{Change, Kind, Side},
     comparison_reader::{BoundProviderFactory, ComparisonReadError, ReadContext},
@@ -9,7 +11,10 @@ use sha2::{Digest, Sha256};
 use specspace_document_engine::diff::{self, TextDiff};
 use specspace_domain::RepositoryPath;
 use specspace_git_adapter::{CommitSha, GitError, GitProvider, blob};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use uuid::Uuid;
 
@@ -50,6 +55,9 @@ pub trait ComparisonFileAuthorization: Send + Sync {
 /// response. An absent side and a present empty file are intentionally distinct.
 pub struct LoadedFile {
     context: FileReadContext,
+    text: Arc<PreparedText>,
+}
+struct PreparedText {
     before: Option<String>,
     after: Option<String>,
     diff: TextDiff,
@@ -71,19 +79,20 @@ impl LoadedFile {
         &self.context.head
     }
     pub fn before(&self) -> Option<&str> {
-        self.before.as_deref()
+        self.text.before.as_deref()
     }
     pub fn after(&self) -> Option<&str> {
-        self.after.as_deref()
+        self.text.after.as_deref()
     }
     pub fn diff(&self) -> &TextDiff {
-        &self.diff
+        &self.text.diff
     }
 }
 pub struct ComparisonFileReader {
     authorization: Arc<dyn ComparisonFileAuthorization>,
     source: Arc<dyn BoundProviderFactory>,
     loads: Arc<Semaphore>,
+    cache: Mutex<cache::FileCache>,
     timeout: Duration,
 }
 impl ComparisonFileReader {
@@ -99,6 +108,7 @@ impl ComparisonFileReader {
             authorization,
             source,
             loads: Arc::new(Semaphore::new(2)),
+            cache: Mutex::new(cache::FileCache::default()),
             timeout,
         })
     }
@@ -165,6 +175,16 @@ impl ComparisonFileReader {
             return Err(FileReadError::NotFound);
         }
         validate(&context)?;
+        let cached = self
+            .cache
+            .lock()
+            .map_err(|_| FileReadError::Unavailable)?
+            .get(&context, Instant::now());
+        if let Some(text) = cached {
+            let loaded = LoadedFile { context, text };
+            self.recheck(actor, &loaded).await?;
+            return Ok(loaded);
+        }
         let provider = self
             .source
             .provider_bound(&context.scope.connection)
@@ -187,8 +207,8 @@ impl ComparisonFileReader {
         self.check(actor, &context).await?;
         // Verification and bounded alignment run off the async executor. The CPU
         // closure owns the permit even if its awaiting request is cancelled.
-        let loaded = tokio::task::spawn_blocking(move || {
-            let _permit = permit;
+        let (loaded, _permit) = tokio::task::spawn_blocking(move || {
+            let held_permit = permit;
             verify(context.change.before.as_ref(), before.as_deref())?;
             verify(context.change.after.as_ref(), after.as_deref())?;
             let diff = diff::compare(
@@ -196,16 +216,25 @@ impl ComparisonFileReader {
                 after.as_deref().unwrap_or(""),
             )
             .map_err(|_| FileReadError::TooLarge)?;
-            Ok::<_, FileReadError>(LoadedFile {
-                context,
-                before,
-                after,
-                diff,
-            })
+            Ok::<_, FileReadError>((
+                LoadedFile {
+                    context,
+                    text: Arc::new(PreparedText {
+                        before,
+                        after,
+                        diff,
+                    }),
+                },
+                held_permit,
+            ))
         })
         .await
         .map_err(|_| FileReadError::Unavailable)??;
         self.recheck(actor, &loaded).await?;
+        self.cache
+            .lock()
+            .map_err(|_| FileReadError::Unavailable)?
+            .insert(&loaded.context, loaded.text.clone(), Instant::now());
         Ok(loaded)
     }
 }

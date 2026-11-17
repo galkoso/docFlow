@@ -147,4 +147,5 @@ Durable comparison preparation uses migration 008 and one read-only worker.
 pages survive restart and recheck current access without reloading Git source;
 Markdown and binaries stay in Git. Authenticated diff preparation/progress and
 snapshot-pinned metadata pages and bounded raw text-file windows are available;
-readable/media views and the comparison UI remain in progress. See [comparison boundaries and evidence](docs/diffs.md).
+a bounded private memory cache avoids repeated file fetches across windows.
+Readable/media views and the comparison UI remain in progress. See [comparison boundaries and evidence](docs/diffs.md).

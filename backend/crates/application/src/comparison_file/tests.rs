@@ -241,7 +241,7 @@ async fn renamed_historical_file_reads_only_the_published_pair_and_preserves_exa
     assert_eq!(loaded.merge_base(), &sha('1'));
     assert_eq!(loaded.head(), &sha('2'));
     assert_eq!(
-        loaded.diff.old_sha256,
+        loaded.diff().old_sha256,
         loaded
             .change()
             .before
@@ -280,7 +280,7 @@ async fn additions_deletions_and_present_empty_files_remain_distinct() {
         let loaded = f.load().await.unwrap();
         assert_eq!(loaded.before(), before.then_some(""));
         assert_eq!(loaded.after(), after.then_some(""));
-        assert!(loaded.diff.chunks.is_empty());
+        assert!(loaded.diff().chunks.is_empty());
         assert_eq!(
             f.factory.provider.reads.load(Ordering::SeqCst),
             usize::from(before) + usize::from(after)
@@ -443,4 +443,252 @@ async fn timeout_drops_unfinished_io_and_later_reads_start_with_fresh_authorizat
             .is_ok()
     );
     assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 3);
+}
+
+#[tokio::test]
+async fn warm_files_share_verified_bytes_but_bind_each_result_to_current_historical_scope() {
+    let f = Fixture::new("before", "after");
+    let first = f.load().await.unwrap();
+    let second = f.load().await.unwrap();
+    assert!(Arc::ptr_eq(&first.text, &second.text));
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 2);
+    assert_eq!(f.factory.connects.load(Ordering::SeqCst), 1);
+    {
+        let mut current = f.authority.context.lock().unwrap();
+        current.scope.recorded_head = sha('5');
+        current.scope.recorded_base = sha('6');
+        current.scope.version += 1;
+        current.scope.state = "MERGED".into();
+    }
+    let historical = f.load().await.unwrap();
+    assert!(Arc::ptr_eq(&first.text, &historical.text));
+    assert_eq!(historical.head(), first.head());
+    assert_eq!(historical.context.scope.recorded_head, sha('5'));
+    assert_eq!(historical.context.scope.state, "MERGED");
+    assert!(matches!(
+        f.reader.recheck(first.context.scope.actor, &first).await,
+        Err(FileReadError::Access(ComparisonReadError::ContextChanged))
+    ));
+    assert!(
+        f.reader
+            .recheck(historical.context.scope.actor, &historical)
+            .await
+            .is_ok()
+    );
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 2);
+}
+#[tokio::test]
+async fn warm_reads_recheck_access_before_and_after_cache_lookup_without_provider_io() {
+    for boundary in [1, 2] {
+        let f = Fixture::new("before", "after");
+        f.load().await.unwrap();
+        f.authority.fail_at.store(
+            f.authority.calls.load(Ordering::SeqCst) + boundary,
+            Ordering::SeqCst,
+        );
+        assert!(matches!(f.load().await, Err(FileReadError::NotFound)));
+        assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 2);
+        assert_eq!(f.factory.connects.load(Ordering::SeqCst), 1);
+    }
+    let f = Fixture::new("before", "after");
+    f.load().await.unwrap();
+    f.authority.change_at.store(
+        f.authority.calls.load(Ordering::SeqCst) + 2,
+        Ordering::SeqCst,
+    );
+    assert!(matches!(
+        f.load().await,
+        Err(FileReadError::Access(ComparisonReadError::ContextChanged))
+    ));
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 2);
+}
+#[tokio::test]
+async fn cache_evidence_cannot_cross_private_scope_connection_snapshot_or_file_boundaries() {
+    let f = Fixture::new("before", "after");
+    let loaded = f.load().await.unwrap();
+    for field in 0..12 {
+        let mut changed = loaded.context.clone();
+        match field {
+            0 => changed.scope.actor = Uuid::new_v4(),
+            1 => changed.scope.organization = Uuid::new_v4(),
+            2 => changed.scope.proposal = Uuid::new_v4(),
+            3 => changed.scope.connection.repository = Uuid::new_v4(),
+            4 => changed.scope.connection.remote_id += 1,
+            5 => changed.scope.connection.installation_id += 1,
+            6 => changed.scope.branch = BranchName::parse("change/other".to_owned()).unwrap(),
+            7 => changed.snapshot = Uuid::new_v4(),
+            8 => changed.content_id = "c".repeat(64),
+            9 => changed.merge_base = sha('7'),
+            10 => changed.head = sha('8'),
+            _ => changed.change.before.as_mut().unwrap().path = "docs/another.md".into(),
+        }
+        assert!(
+            f.reader
+                .cache
+                .lock()
+                .unwrap()
+                .get(&changed, Instant::now())
+                .is_none(),
+            "scope field {field}"
+        );
+    }
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&loaded.context, Instant::now())
+            .is_some()
+    );
+}
+#[tokio::test]
+async fn entry_pressure_evicts_least_recently_used_files_without_invalidating_live_readers() {
+    let f = Fixture::new("before", "after");
+    *f.reader.cache.lock().unwrap() =
+        cache::FileCache::new(1024 * 1024, 2, Duration::from_secs(300));
+    let a = f.load().await.unwrap();
+    let b_id = Uuid::new_v4();
+    f.authority.context.lock().unwrap().snapshot = b_id;
+    let b = f.load().await.unwrap();
+    f.authority.context.lock().unwrap().snapshot = a.snapshot();
+    assert!(Arc::ptr_eq(&a.text, &f.load().await.unwrap().text)); // Touch A, leaving B oldest.
+    f.authority.context.lock().unwrap().snapshot = Uuid::new_v4();
+    let c = f.load().await.unwrap();
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 6);
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&b.context, Instant::now())
+            .is_none()
+    );
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&a.context, Instant::now())
+            .is_some()
+    );
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&c.context, Instant::now())
+            .is_some()
+    );
+    assert_eq!(b.before(), Some("before")); // An in-flight reader retains its immutable payload.
+    f.authority.context.lock().unwrap().snapshot = b_id;
+    let reloaded = f.load().await.unwrap();
+    assert!(!Arc::ptr_eq(&b.text, &reloaded.text));
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 8);
+}
+#[tokio::test]
+async fn absolute_expiry_reclaims_payloads_and_warm_reads_do_not_extend_it() {
+    let f = Fixture::new("before", "after");
+    let loaded = f.load().await.unwrap();
+    let now = Instant::now();
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&loaded.context, now + Duration::from_secs(299))
+            .is_some()
+    );
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&loaded.context, now + Duration::from_secs(301))
+            .is_none()
+    );
+    let reloaded = f.load().await.unwrap();
+    assert!(!Arc::ptr_eq(&loaded.text, &reloaded.text));
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 4);
+}
+#[tokio::test]
+async fn oversized_cache_entries_are_served_verified_without_being_retained() {
+    let f = Fixture::new(&"a".repeat(16 * 1024), &"b".repeat(16 * 1024));
+    *f.reader.cache.lock().unwrap() = cache::FileCache::new(4096, 32, Duration::from_secs(300));
+    let a = f.load().await.unwrap();
+    let b = f.load().await.unwrap();
+    assert_eq!(a.before(), b.before());
+    assert!(!Arc::ptr_eq(&a.text, &b.text));
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&a.context, Instant::now())
+            .is_none()
+    );
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 4);
+}
+#[tokio::test]
+async fn failed_fetches_never_poison_the_cache_and_later_verified_reads_can_be_reused() {
+    let f = Fixture::new("before", "after");
+    *f.factory.provider.failure.lock().unwrap() = Some(GitError::ProviderUnavailable);
+    assert!(matches!(
+        f.load().await,
+        Err(FileReadError::Provider(GitError::ProviderUnavailable))
+    ));
+    *f.factory.provider.failure.lock().unwrap() = None;
+    let verified = f.load().await.unwrap();
+    *f.factory.provider.failure.lock().unwrap() = Some(GitError::ProviderUnavailable);
+    let cached = f.load().await.unwrap();
+    assert!(Arc::ptr_eq(&verified.text, &cached.text));
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 3);
+}
+
+#[tokio::test]
+async fn byte_pressure_evicts_payloads_even_below_the_entry_count_limit() {
+    let f = Fixture::new(&"a".repeat(5000), &"b".repeat(5000));
+    *f.reader.cache.lock().unwrap() = cache::FileCache::new(18_000, 32, Duration::from_secs(300));
+    let a = f.load().await.unwrap();
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&a.context, Instant::now())
+            .is_some()
+    );
+    f.authority.context.lock().unwrap().snapshot = Uuid::new_v4();
+    let b = f.load().await.unwrap();
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&a.context, Instant::now())
+            .is_none()
+    );
+    assert!(
+        f.reader
+            .cache
+            .lock()
+            .unwrap()
+            .get(&b.context, Instant::now())
+            .is_some()
+    );
+    f.authority.context.lock().unwrap().snapshot = a.snapshot();
+    let reloaded = f.load().await.unwrap();
+    assert!(!Arc::ptr_eq(&a.text, &reloaded.text));
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 6);
+}
+#[tokio::test]
+async fn a_failed_final_authorization_never_admits_verified_source_to_the_cache() {
+    let f = Fixture::new("before", "after");
+    f.authority.fail_at.store(5, Ordering::SeqCst);
+    assert!(matches!(f.load().await, Err(FileReadError::NotFound)));
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 2);
+    f.authority.fail_at.store(0, Ordering::SeqCst);
+    f.load().await.unwrap();
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 4);
+    f.load().await.unwrap();
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 4);
 }

@@ -640,8 +640,8 @@ async fn raw_http_windows_reconstruct_exact_pinned_source_after_later_head_and_c
         f.provider
             .text(&sha(HEAD), file["after"]["path"].as_str().unwrap())
     );
-    // Each window fetches only its verified pair; body caching remains subsequent work.
-    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + pages * 2);
+    // Later windows and historical reads reuse the same private verified pair.
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 2);
     let first = get(&f.app, &f.actor, &format!("{path}&max_bytes=1025"), true)
         .await
         .1;
@@ -763,4 +763,48 @@ async fn raw_reads_keep_pending_states_and_nontext_assets_explicit_without_fetch
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(response["error"]["code"], "COMPARISON_FILE_NOT_TEXT");
     assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn warm_raw_windows_never_bypass_current_actor_membership_or_repository_binding(
+    pool: PgPool,
+) {
+    let f = fixture(&pool, true).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = raw_path(&f, &ticket, &file);
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let (status, original, _, _) = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 2);
+    // Verified immutable bodies can be served without another provider request.
+    f.provider.backoff.store(4, Ordering::SeqCst);
+    assert_eq!(get(&f.app, &f.actor, &path, true).await.1, original);
+    assert_eq!(
+        get(&f.app, &f.owner, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    sqlx::query("UPDATE repositories SET installation_id='8' WHERE id=(SELECT repository_id FROM proposals WHERE id=$1)")
+        .bind(f.proposal).execute(&pool).await.unwrap();
+    let changed = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(changed.0, StatusCode::CONFLICT);
+    assert!(changed.1.get("raw").is_none());
+    sqlx::query("UPDATE repositories SET installation_id='7' WHERE id=(SELECT repository_id FROM proposals WHERE id=$1)")
+        .bind(f.proposal).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE proposals SET head_sha=$2,version=version+1,state='CLOSED' WHERE id=$1")
+        .bind(f.proposal)
+        .bind("4".repeat(40))
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(get(&f.app, &f.actor, &path, true).await.1, original);
+    sqlx::query("DELETE FROM memberships WHERE organization_id=$1 AND user_id=$2")
+        .bind(f.organization)
+        .bind(f.actor.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let revoked = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(revoked.0, StatusCode::UNAUTHORIZED);
+    assert!(revoked.1.get("raw").is_none());
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 2);
 }

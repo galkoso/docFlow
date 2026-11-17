@@ -825,6 +825,23 @@ async fn individual_file_reads_use_only_ready_private_evidence_and_frozen_refs(p
     assert_eq!(historical.head().as_str(), HEAD);
     assert_eq!(historical.before(), loaded.before());
     assert_eq!(historical.after(), loaded.after());
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 2);
+    let restarted = ComparisonFileReader::new(
+        f.store.clone(),
+        Arc::new(Factory {
+            provider: f.provider.clone(),
+            repository: context.scope.connection.repository,
+        }),
+        Duration::from_secs(60),
+    )
+    .unwrap();
+    let after_restart = restarted
+        .load(f.actor, f.proposal, ticket.snapshot_id, file)
+        .await
+        .unwrap();
+    assert_eq!(after_restart.before(), loaded.before());
+    assert_eq!(after_restart.after(), loaded.after());
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 4);
     assert!(matches!(
         reader.recheck(f.actor, &loaded).await,
         Err(FileReadError::Access(ComparisonReadError::ContextChanged))

@@ -1065,3 +1065,24 @@ Checkboxes represent verified work only.
   build and all 116 tests. The editor fixture has no drift. The restarted API
   reports ready and the new route requires authentication. Both CI workflows
   for the preceding file-reader commit completed successfully.
+
+
+- Private comparison payload caching: verified immutable source/alignment pairs
+  share memory across windows, with 32 entries, a 32MiB accounted allocation
+  budget, absolute five-minute eligibility and LRU eviction. Current private
+  READY scope is resolved before every hit and rechecked afterward; frozen
+  evidence includes actor/org/proposal/connection/snapshot/refs/file metadata.
+  Later heads and final states reuse historical bytes with fresh current context.
+  Failed final authorization cannot admit source. Expired payloads are reclaimed
+  lazily; oversized payloads bypass retention, and process restart refetches the
+  same pinned pair. Cold capacity now covers final authorization/admission too.
+  Nine application scenarios cover isolation, races, expiry, failure admission
+  and entry/byte pressure. HTTP multi-window reconstruction fetches once; a new
+  warm-read scenario checks provider independence and revocation/reconfiguration.
+  PostgreSQL coverage includes cold-reader restart. No source is persisted or
+  exposed outside current scope. Readable/media views, UI, anchors and remaining
+  review/merge lifecycle plus operational hardening remain required.
+  Full backend workspace tests and Clippy pass, including all 57 application
+  scenarios and eleven comparison HTTP scenarios. OpenAPI and editor fixtures
+  regenerate without drift. Both CI workflows for the preceding raw-window
+  commit completed successfully.

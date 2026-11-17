@@ -252,8 +252,8 @@ at async boundaries, backoff, capacity/cancellation and timeout recovery. Two
 PostgreSQL scenarios prove READY/private scope, exact pinned bodies, later closure
 and configuration changes, plus access revocation during a provider fetch. The
 runtime source configuration wires this capability alongside the inventory
-worker. The raw HTTP/window contract is described below; body caching and readable
-AST views remain subsequent work. This loader alone completes no diff UI or
+worker. The raw HTTP/window and bounded payload cache contracts are described
+below; readable AST views remain subsequent work. This loader alone completes no diff UI or
 review acceptance requirement.
 
 ## Implemented: bounded raw-file HTTP windows
@@ -301,13 +301,54 @@ actor/snapshot identity before subscription; a client scenario covers exact
 manual replay after another actor polls. These checks do not establish browser
 rendering, readable AST views or review anchors.
 
+## Implemented: bounded private file-payload cache
+
+Each file reader keeps verified immutable source pairs and their raw alignment
+in memory. The cache admits at most 32 entries under a 32MiB accounted-allocation
+budget, including source capacities, alignment storage and evidence metadata.
+Oversized entries are still read/verified for the requesting user but are not
+retained. LRU eviction applies to both byte and entry pressure. Entries expire
+five minutes after insertion; access does not extend that lifetime. Expired
+entries are ineligible immediately and are reclaimed lazily on cache operations.
+This accounting bounds retained cache allocations, not total process RSS or
+in-flight readers. Restart loses the cache and fetches the same pinned pair again.
+
+Cache evidence binds actor, organization, proposal, branch, frozen repository
+connection, snapshot/content identity, exact base/head and the complete file
+change descriptor. It grants no access. Every warm request resolves current
+private READY scope before lookup and rechecks it afterward. API rendering also
+retains its final recheck. Current proposal metadata is attached freshly, so
+later heads or closed/merged state can reuse historical payloads without
+retargeting their base/head. Removed access or a changed repository connection
+blocks warm reads. Provider unavailability does not invalidate already verified
+immutable bytes within their cache lifetime.
+
+Only fully verified results that pass final authorization are admitted. Failed,
+uncertain or revoked reads cannot populate the cache. Payloads are shared through
+immutable references rather than cloning source for each window; an in-flight
+reader can finish after eviction, subject to its own authorization recheck.
+Cold work remains limited to two loads with no unbounded queue. Its permit now
+also covers the final authorization and cache admission, and remains owned by
+the CPU task through cancellation. Concurrent misses may repeat bounded read
+work; no unbounded per-key waiter queue is introduced. No source is written to
+disk, PostgreSQL, jobs, audit or the approved-book cache.
+
+Nine additional application scenarios cover private evidence isolation, fresh
+historical context, warm access races, absolute expiry, entry/byte eviction,
+oversized bypass and failure admission. The HTTP reconstruction scenario now
+proves many windows and historical replay fetch the pair only once. A warm HTTP
+scenario checks provider-independent reuse, actor ownership, repository changes,
+later closure and revoked membership. A PostgreSQL scenario also proves a new
+reader refetches identical frozen bodies after restart. Operational retention
+and cleanup beyond this bounded ephemeral cache remain part of hardening.
+
 ## Remaining workflow
 
 Readable AST and media views still need verified pinned materialization and
-bounded responses, with access rechecks after rendering. Raw windows currently
-fetch only the selected text pair on each request; runtime body caching is still
-needed to avoid repeated provider reads across windows. Retention/operational
-pruning and cold-load performance also need hardening.
+bounded responses, with access rechecks after rendering. Retention/operational
+pruning and cold-load performance still need hardening. Raw windows reuse their
+private bounded verified-payload cache; each window still validates and
+materializes its source coordinates on bounded CPU.
 Creation/deletion/renames, catalog moves and image changes need explicit evidence.
 Raw and AST-readable file views must page large content without hiding changes,
 preserve complete pinned identities, and bind hunks to file/section/content hashes

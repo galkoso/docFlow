@@ -4,11 +4,12 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { SessionState } from '../../core/auth/session-state';
 import { ComparisonState } from './comparison-state';
 import { digest, integer, uuid } from './comparison-evidence';
+import { ComparisonImage } from './image-view';
 import { ReadableView } from './readable-view';
 import { RawScope, RawState } from './raw-state';
 
 @Component({
-  selector: 'app-comparison-page', imports: [RouterLink, ReadableView], providers: [ComparisonState, RawState],
+  selector: 'app-comparison-page', imports: [RouterLink, ReadableView, ComparisonImage], providers: [ComparisonState, RawState],
   changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './comparison-page.html', styleUrl: './comparison-page.css',
 })
 export class ComparisonPage implements OnDestroy {
@@ -77,7 +78,7 @@ export class ComparisonPage implements OnDestroy {
     });
     effect(() => {
       const scope = this.fileScope(), mode = this.mode();
-      untracked(() => this.raw.open(mode === 'raw' ? scope : null));
+      untracked(() => this.raw.open(mode === 'raw' && scope && ['document', 'catalog'].includes(scope.file.kind) ? scope : null));
     });
   }
   fresh(): void {

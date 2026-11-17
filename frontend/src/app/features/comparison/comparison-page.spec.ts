@@ -11,12 +11,15 @@ import { rawResponse } from './raw.testing';
 import { readableResponse, readableScope, unitResponse, unitScope } from './readable.testing';
 import { ReadableView } from './readable-view';
 import { By } from '@angular/platform-browser';
+import { IMAGE_DIGEST } from './image-state';
+import { displayHash, imageResponse, imageScope } from './image.testing';
 
 describe('Routed comparison page', () => {
   async function create(initial: Record<string, string | string[]> = { snapshot }, mode: 'raw' | 'readable' = 'raw') {
     const profile = signal<{ user_id: string } | null>({ user_id: actor }), logoutEpoch = signal(0);
     const params = new BehaviorSubject(convertToParamMap({ id: proposal })), query = new BehaviorSubject(convertToParamMap(initial));
     await TestBed.configureTestingModule({ imports: [ComparisonPage], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
+      { provide: IMAGE_DIGEST, useValue: async () => displayHash },
       { provide: SessionState, useValue: { profile, logoutEpoch, status: () => profile() ? 'authenticated' : 'anonymous', refresh: vi.fn() } },
       { provide: ActivatedRoute, useValue: { paramMap: params, queryParamMap: query,
         snapshot: { paramMap: params.value, queryParamMap: query.value } } }],
@@ -122,6 +125,24 @@ describe('Routed comparison page', () => {
     const raw = c.body(); expect(raw.request.url.endsWith(response.page!.files[0].id)).toBe(true);
     c.profile.set(null); c.settle(); expect(raw.cancelled).toBe(true); expect(c.page.raw.data()).toBeNull();
     expect(c.fixture.nativeElement.querySelector('app-readable-view')).toBeNull(); c.destroy();
+  });
+
+  it('selects the dedicated image viewer and destroys the private object URL on identity loss', async () => {
+    const revoke = vi.fn<(url: string) => void>();
+    vi.stubGlobal('URL', class extends URL {
+      static override createObjectURL(_blob: Blob | MediaSource): string { return 'blob:http://localhost/image'; }
+      static override revokeObjectURL(url: string): void { revoke(url); }
+    });
+    try {
+      const c = await create(), readyImage = ready(); readyImage.page!.files[0] = imageScope().file.file;
+      c.request().flush(readyImage); c.settle(); c.page.select(readyImage.page!.files[0].id); c.settle();
+      const image = c.http.expectOne(req => req.url.endsWith('/image')); expect(image.request.params.get('side')).toBe('after');
+      const response = imageResponse(); image.flush(response.body, { headers: response.headers }); await Promise.resolve(); c.settle();
+      expect(c.fixture.nativeElement.querySelector('app-comparison-image img')).not.toBeNull();
+      expect(c.fixture.nativeElement.querySelector('app-readable-view')).toBeNull();
+      c.http.expectNone(req => req.url.endsWith('/readable')); c.profile.set(null); c.settle();
+      expect(c.fixture.nativeElement.querySelector('img')).toBeNull(); expect(revoke).toHaveBeenCalledWith('blob:http://localhost/image'); c.destroy();
+    } finally { vi.unstubAllGlobals(); }
   });
 
 });

@@ -1262,3 +1262,20 @@ Checkboxes represent verified work only.
   stripping, forged source, absence, revocation and pinned closed/history reads.
   The full backend suite and workspace Clippy pass; local API restarts ready,
   and an anonymous request to the new route returns 401.
+
+- Dedicated image comparison UI: asset entries now render explicit before/right
+  and after/left previews with missing-side states instead of a fake text diff.
+  Other opaque file kinds report unavailable preview. Each side captures its
+  actor/file/snapshot, validates the image evidence header and source descriptor,
+  checks PNG MIME/body bounds and hashes the derivative before creating a private
+  object URL. The image becomes visible only after browser dimensions match the
+  verified response. Retry preserves the exact selection; error/replace/logout/
+  navigation/destruction revoke URLs and cancel requests. Late async hashes
+  cannot install previews under a new scope. Local invalid/oversized media does
+  not trigger a provider read; error JSON returned as Blob is handled explicitly.
+  Seven state, three rendered-view, one routed-page and one typed-client scenario
+  bring the full frontend suite to 192 passing tests. Production build passes,
+  frontend serves locally on 4200, and generated API output has no drift.
+  Browser connection remains unavailable, so physical image/layout/keyboard
+  acceptance remains open. Restorable selection anchors and all remaining
+  review/merge/bundle/production requirements are still part of the active goal.

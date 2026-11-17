@@ -47,6 +47,9 @@
       }
     }
     @if (state.selected(); as file) {
+      @if (file.kind === 'asset') {<app-comparison-image [scope]="fileScope()" />}
+      @else if (file.kind === 'other') {<p>אין תצוגה מקדימה לסוג קובץ זה.</p>}
+      @else {
       <div class="actions" aria-label="תצוגת השוואה">
         <button (click)="mode.set('readable')" [attr.aria-pressed]="mode() === 'readable'">תצוגה קריאה</button>
         <button (click)="mode.set('raw')" [attr.aria-pressed]="mode() === 'raw'">מקור גולמי</button>
@@ -75,6 +78,7 @@
           }
         }
       </section>
+      }
       }
     }
   }

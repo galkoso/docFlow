@@ -1,0 +1,2715 @@
+{
+  "page": {
+    "after": {
+      "document_id": "DOC-READABLE",
+      "error_code": null,
+      "sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+      "source_bytes": 5494,
+      "state": "READY",
+      "units_total": 7
+    },
+    "before": {
+      "document_id": "DOC-READABLE",
+      "error_code": null,
+      "sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+      "source_bytes": 5478,
+      "state": "READY",
+      "units_total": 7
+    },
+    "next_offset": null,
+    "offset": 0,
+    "raw_changed": true,
+    "ready": true,
+    "rows": [
+      {
+        "after": {
+          "body_start_byte": 100,
+          "code_blocks_total": 0,
+          "events_total": 0,
+          "heading_id": null,
+          "index": 0,
+          "kind": "metadata",
+          "protected_reason": "FRONT_MATTER",
+          "raw_sha256": "df62176f8fc8318ba4abb6fc9e30ff032f74ebe84f6bf6d5ecd615c4a9f163b9",
+          "section_ids_total": 0,
+          "semantic_sha256": null,
+          "source_end_byte": 100,
+          "source_start_byte": 0
+        },
+        "before": {
+          "body_start_byte": 100,
+          "code_blocks_total": 0,
+          "events_total": 0,
+          "heading_id": null,
+          "index": 0,
+          "kind": "metadata",
+          "protected_reason": "FRONT_MATTER",
+          "raw_sha256": "df62176f8fc8318ba4abb6fc9e30ff032f74ebe84f6bf6d5ecd615c4a9f163b9",
+          "section_ids_total": 0,
+          "semantic_sha256": null,
+          "source_end_byte": 100,
+          "source_start_byte": 0
+        },
+        "change": {
+          "after_index": 0,
+          "before_index": 0,
+          "id": "41d9d88b37283914d65da927b1d437889763e2d514cfa61e3918e323a76fb3bf",
+          "matched_by": "structural",
+          "position_changed": false,
+          "raw_changed": false,
+          "render_changed": null,
+          "status": "unchanged"
+        }
+      },
+      {
+        "after": {
+          "body_start_byte": 129,
+          "code_blocks_total": 0,
+          "events_total": 3,
+          "heading_id": "SEC-ONE",
+          "index": 1,
+          "kind": "heading",
+          "protected_reason": null,
+          "raw_sha256": "7b24193b2ecce40890f0fd83a3f15ba9a5b102cc155ae383a311861763a48f2d",
+          "section_ids_total": 1,
+          "semantic_sha256": "af381ae75ad8101f0fba2d9eb7a34cf37fe014a5251c8f94af7bc366cfd3e97d",
+          "source_end_byte": 152,
+          "source_start_byte": 100
+        },
+        "before": {
+          "body_start_byte": 129,
+          "code_blocks_total": 0,
+          "events_total": 3,
+          "heading_id": "SEC-ONE",
+          "index": 1,
+          "kind": "heading",
+          "protected_reason": null,
+          "raw_sha256": "b0fafec8c56a61a287821108d0dd1a1e8aef70ea33a51c462914823d759efb91",
+          "section_ids_total": 1,
+          "semantic_sha256": "11ad5b76618c03e416cc4cc322bc6cb2b501917fead928a208cdb769d43d908b",
+          "source_end_byte": 143,
+          "source_start_byte": 100
+        },
+        "change": {
+          "after_index": 1,
+          "before_index": 1,
+          "id": "c695666cb74a914fdefe63a4d9c89657532c6f2c35bd52f19730fa5960700400",
+          "matched_by": "heading_id",
+          "position_changed": false,
+          "raw_changed": true,
+          "render_changed": true,
+          "status": "modified"
+        }
+      },
+      {
+        "after": {
+          "body_start_byte": 153,
+          "code_blocks_total": 0,
+          "events_total": 11,
+          "heading_id": null,
+          "index": 2,
+          "kind": "paragraph",
+          "protected_reason": null,
+          "raw_sha256": "816584d59cdddd444b1428920854fb262df787ec3e78305e98f50660e1bc041a",
+          "section_ids_total": 0,
+          "semantic_sha256": "27a9d5226f9831b4748b10bf69987259f7718c172e52f7c7cb7045b2810bd0c8",
+          "source_end_byte": 214,
+          "source_start_byte": 152
+        },
+        "before": {
+          "body_start_byte": 144,
+          "code_blocks_total": 0,
+          "events_total": 11,
+          "heading_id": null,
+          "index": 2,
+          "kind": "paragraph",
+          "protected_reason": null,
+          "raw_sha256": "ce54661299d5a9b77661882fd3300b49bc79fbf0cf75ce6895711780c9673c08",
+          "section_ids_total": 0,
+          "semantic_sha256": "f510d7bff84a337ba387ed479463086f3461f914d2e1117f2b2a7715cda7cee7",
+          "source_end_byte": 206,
+          "source_start_byte": 143
+        },
+        "change": {
+          "after_index": 2,
+          "before_index": 2,
+          "id": "e05be9d100576a13262ea8bbc71b82620c0a96e62382ff725041ca8022fcb3f5",
+          "matched_by": "section_position",
+          "position_changed": false,
+          "raw_changed": true,
+          "render_changed": true,
+          "status": "modified"
+        }
+      },
+      {
+        "after": {
+          "body_start_byte": 215,
+          "code_blocks_total": 0,
+          "events_total": 15,
+          "heading_id": null,
+          "index": 3,
+          "kind": "list",
+          "protected_reason": null,
+          "raw_sha256": "4b6b674ac5bacb578259f773df2e5692d0a057a1e441be37d003edb3313a90c3",
+          "section_ids_total": 0,
+          "semantic_sha256": "36d974eda895c58269ac2db6241bbab2a4ef49ef1753fcf8c45496462263b194",
+          "source_end_byte": 2982,
+          "source_start_byte": 214
+        },
+        "before": {
+          "body_start_byte": 207,
+          "code_blocks_total": 0,
+          "events_total": 15,
+          "heading_id": null,
+          "index": 3,
+          "kind": "list",
+          "protected_reason": null,
+          "raw_sha256": "50deb375de3918a6e38967fe0d69a5de0884c5cb0f3a33c39088ffb4416ceb57",
+          "section_ids_total": 0,
+          "semantic_sha256": "4bd046bfa8afe2a937fda5facb716050ec0bc03ace609b97eed73824615471c9",
+          "source_end_byte": 2966,
+          "source_start_byte": 206
+        },
+        "change": {
+          "after_index": 3,
+          "before_index": 3,
+          "id": "77cc11a1e08696387fd479c01e5ce7c69af9b94f1c24c78539696986380489b4",
+          "matched_by": "section_position",
+          "position_changed": false,
+          "raw_changed": true,
+          "render_changed": true,
+          "status": "modified"
+        }
+      },
+      {
+        "after": {
+          "body_start_byte": 2982,
+          "code_blocks_total": 1,
+          "events_total": 3,
+          "heading_id": null,
+          "index": 4,
+          "kind": "code",
+          "protected_reason": null,
+          "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+          "section_ids_total": 0,
+          "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+          "source_end_byte": 5409,
+          "source_start_byte": 2982
+        },
+        "before": {
+          "body_start_byte": 2966,
+          "code_blocks_total": 1,
+          "events_total": 3,
+          "heading_id": null,
+          "index": 4,
+          "kind": "code",
+          "protected_reason": null,
+          "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+          "section_ids_total": 0,
+          "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+          "source_end_byte": 5393,
+          "source_start_byte": 2966
+        },
+        "change": {
+          "after_index": 4,
+          "before_index": 4,
+          "id": "7f913b39472e3feabeab60078c9a321b97d4a19ed457d68ea04421791c8c1ef1",
+          "matched_by": "exact_source",
+          "position_changed": false,
+          "raw_changed": false,
+          "render_changed": false,
+          "status": "unchanged"
+        }
+      },
+      {
+        "after": {
+          "body_start_byte": 5411,
+          "code_blocks_total": 0,
+          "events_total": 20,
+          "heading_id": null,
+          "index": 5,
+          "kind": "table",
+          "protected_reason": null,
+          "raw_sha256": "53e460ead656eff1837d22cede9bd2eb3eec4bb07933cd1fc2d4267a3e0fb529",
+          "section_ids_total": 0,
+          "semantic_sha256": "e07cf8497ae97f9f99408dfe0e809a3c998f4c236d3aec9d5d8166d6b172f6d3",
+          "source_end_byte": 5461,
+          "source_start_byte": 5409
+        },
+        "before": {
+          "body_start_byte": 5395,
+          "code_blocks_total": 0,
+          "events_total": 20,
+          "heading_id": null,
+          "index": 5,
+          "kind": "table",
+          "protected_reason": null,
+          "raw_sha256": "03fa6759000783fe5e41141c879ac4e1d1e767937f5a81388fcf2d34ccb3a987",
+          "section_ids_total": 0,
+          "semantic_sha256": "dd3363c22ac8a7426cec2fde24daf9d96edf70d642f6558fac25b699c1a2436e",
+          "source_end_byte": 5445,
+          "source_start_byte": 5393
+        },
+        "change": {
+          "after_index": 5,
+          "before_index": 5,
+          "id": "3ec9a8394d75332ea08d23e20472db210b9187603f52e288a5d7ec28814d8232",
+          "matched_by": "section_position",
+          "position_changed": false,
+          "raw_changed": true,
+          "render_changed": true,
+          "status": "modified"
+        }
+      },
+      {
+        "after": {
+          "body_start_byte": 5462,
+          "code_blocks_total": 0,
+          "events_total": 1,
+          "heading_id": null,
+          "index": 6,
+          "kind": "protected",
+          "protected_reason": "UNSUPPORTED_EDITOR_BLOCK",
+          "raw_sha256": "4580a34709b890a92dd5ef2bf192400c04e3a996730eeb3a7791016d783f839e",
+          "section_ids_total": 0,
+          "semantic_sha256": null,
+          "source_end_byte": 5494,
+          "source_start_byte": 5461
+        },
+        "before": {
+          "body_start_byte": 5446,
+          "code_blocks_total": 0,
+          "events_total": 1,
+          "heading_id": null,
+          "index": 6,
+          "kind": "protected",
+          "protected_reason": "UNSUPPORTED_EDITOR_BLOCK",
+          "raw_sha256": "4580a34709b890a92dd5ef2bf192400c04e3a996730eeb3a7791016d783f839e",
+          "section_ids_total": 0,
+          "semantic_sha256": null,
+          "source_end_byte": 5478,
+          "source_start_byte": 5445
+        },
+        "change": {
+          "after_index": 6,
+          "before_index": 6,
+          "id": "fc23224fbee5e204bf6338be90a37afaeaf7b880f25c18348a1a5bfa25341300",
+          "matched_by": "exact_source",
+          "position_changed": false,
+          "raw_changed": false,
+          "render_changed": null,
+          "status": "unchanged"
+        }
+      }
+    ],
+    "total": 7
+  },
+  "units": [
+    {
+      "side": "before",
+      "unit": {
+        "body_start_byte": 100,
+        "code_blocks_total": 0,
+        "events_total": 0,
+        "heading_id": null,
+        "index": 0,
+        "kind": "metadata",
+        "protected_reason": "FRONT_MATTER",
+        "raw_sha256": "df62176f8fc8318ba4abb6fc9e30ff032f74ebe84f6bf6d5ecd615c4a9f163b9",
+        "section_ids_total": 0,
+        "semantic_sha256": null,
+        "source_end_byte": 100,
+        "source_start_byte": 0
+      },
+      "windows": []
+    },
+    {
+      "side": "before",
+      "unit": {
+        "body_start_byte": 129,
+        "code_blocks_total": 0,
+        "events_total": 3,
+        "heading_id": "SEC-ONE",
+        "index": 1,
+        "kind": "heading",
+        "protected_reason": null,
+        "raw_sha256": "b0fafec8c56a61a287821108d0dd1a1e8aef70ea33a51c462914823d759efb91",
+        "section_ids_total": 1,
+        "semantic_sha256": "11ad5b76618c03e416cc4cc322bc6cb2b501917fead928a208cdb769d43d908b",
+        "source_end_byte": 143,
+        "source_start_byte": 100
+      },
+      "windows": [
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "kind": "open",
+                "level": 2,
+                "section_id": "SEC-ONE",
+                "source_end_byte": 143,
+                "source_start_byte": 129,
+                "tag": "heading"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-0",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 142,
+                "source_start_byte": 132,
+                "text": "כותרת"
+              },
+              "event_index": 1,
+              "text_end_byte": 10,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 143,
+                "source_start_byte": 129,
+                "tag": "heading"
+              },
+              "event_index": 2,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 10,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 129,
+            "code_blocks_total": 0,
+            "events_total": 3,
+            "heading_id": "SEC-ONE",
+            "index": 1,
+            "kind": "heading",
+            "protected_reason": null,
+            "raw_sha256": "b0fafec8c56a61a287821108d0dd1a1e8aef70ea33a51c462914823d759efb91",
+            "section_ids_total": 1,
+            "semantic_sha256": "11ad5b76618c03e416cc4cc322bc6cb2b501917fead928a208cdb769d43d908b",
+            "source_end_byte": 143,
+            "source_start_byte": 100
+          }
+        }
+      ]
+    },
+    {
+      "side": "before",
+      "unit": {
+        "body_start_byte": 144,
+        "code_blocks_total": 0,
+        "events_total": 11,
+        "heading_id": null,
+        "index": 2,
+        "kind": "paragraph",
+        "protected_reason": null,
+        "raw_sha256": "ce54661299d5a9b77661882fd3300b49bc79fbf0cf75ce6895711780c9673c08",
+        "section_ids_total": 0,
+        "semantic_sha256": "f510d7bff84a337ba387ed479463086f3461f914d2e1117f2b2a7715cda7cee7",
+        "source_end_byte": 206,
+        "source_start_byte": 143
+      },
+      "windows": [
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 206,
+                "source_start_byte": 144,
+                "tag": "paragraph"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 153,
+                "source_start_byte": 144,
+                "text": "Original "
+              },
+              "event_index": 1,
+              "text_end_byte": 9,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 161,
+                "source_start_byte": 153,
+                "tag": "strong"
+              },
+              "event_index": 2,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 9,
+                "source_end_byte": 159,
+                "source_start_byte": 155,
+                "text": "bold"
+              },
+              "event_index": 3,
+              "text_end_byte": 4,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 161,
+                "source_start_byte": 153,
+                "tag": "strong"
+              },
+              "event_index": 4,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 13,
+                "source_end_byte": 166,
+                "source_start_byte": 161,
+                "text": " and "
+              },
+              "event_index": 5,
+              "text_end_byte": 5,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "destination": "https://example.test",
+                "kind": "open",
+                "source_end_byte": 194,
+                "source_start_byte": 166,
+                "tag": "link",
+                "title": ""
+              },
+              "event_index": 6,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 18,
+                "source_end_byte": 171,
+                "source_start_byte": 167,
+                "text": "safe"
+              },
+              "event_index": 7,
+              "text_end_byte": 4,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 194,
+                "source_start_byte": 166,
+                "tag": "link"
+              },
+              "event_index": 8,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 22,
+                "source_end_byte": 205,
+                "source_start_byte": 194,
+                "text": " paragraph."
+              },
+              "event_index": 9,
+              "text_end_byte": 11,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 206,
+                "source_start_byte": 144,
+                "tag": "paragraph"
+              },
+              "event_index": 10,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 33,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 144,
+            "code_blocks_total": 0,
+            "events_total": 11,
+            "heading_id": null,
+            "index": 2,
+            "kind": "paragraph",
+            "protected_reason": null,
+            "raw_sha256": "ce54661299d5a9b77661882fd3300b49bc79fbf0cf75ce6895711780c9673c08",
+            "section_ids_total": 0,
+            "semantic_sha256": "f510d7bff84a337ba387ed479463086f3461f914d2e1117f2b2a7715cda7cee7",
+            "source_end_byte": 206,
+            "source_start_byte": 143
+          }
+        }
+      ]
+    },
+    {
+      "side": "before",
+      "unit": {
+        "body_start_byte": 207,
+        "code_blocks_total": 0,
+        "events_total": 15,
+        "heading_id": null,
+        "index": 3,
+        "kind": "list",
+        "protected_reason": null,
+        "raw_sha256": "50deb375de3918a6e38967fe0d69a5de0884c5cb0f3a33c39088ffb4416ceb57",
+        "section_ids_total": 0,
+        "semantic_sha256": "4bd046bfa8afe2a937fda5facb716050ec0bc03ace609b97eed73824615471c9",
+        "source_end_byte": 2966,
+        "source_start_byte": 206
+      },
+      "windows": [
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+          "end_ordered_lists": [
+            {
+              "item_start": 3,
+              "stack_depth": 0
+            }
+          ],
+          "end_stack": [
+            {
+              "kind": "open",
+              "list_start": 3,
+              "source_end_byte": 2966,
+              "source_start_byte": 207,
+              "tag": "list"
+            },
+            {
+              "kind": "open",
+              "source_end_byte": 2917,
+              "source_start_byte": 207,
+              "tag": "item"
+            }
+          ],
+          "fragments": [
+            {
+              "event": {
+                "kind": "open",
+                "list_start": 3,
+                "source_end_byte": 2966,
+                "source_start_byte": 207,
+                "tag": "list"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 2917,
+                "source_start_byte": 207,
+                "tag": "item"
+              },
+              "event_index": 1,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-2",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 2915,
+                "source_start_byte": 210,
+                "text": "First שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום "
+              },
+              "event_index": 2,
+              "text_end_byte": 1023,
+              "text_start_byte": 0
+            }
+          ],
+          "next": {
+            "event": 2,
+            "offset": 1023
+          },
+          "returned_text_bytes": 1023,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 207,
+            "code_blocks_total": 0,
+            "events_total": 15,
+            "heading_id": null,
+            "index": 3,
+            "kind": "list",
+            "protected_reason": null,
+            "raw_sha256": "50deb375de3918a6e38967fe0d69a5de0884c5cb0f3a33c39088ffb4416ceb57",
+            "section_ids_total": 0,
+            "semantic_sha256": "4bd046bfa8afe2a937fda5facb716050ec0bc03ace609b97eed73824615471c9",
+            "source_end_byte": 2966,
+            "source_start_byte": 206
+          }
+        },
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 2,
+            "offset": 1023
+          },
+          "document_sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+          "end_ordered_lists": [
+            {
+              "item_start": 3,
+              "stack_depth": 0
+            }
+          ],
+          "end_stack": [
+            {
+              "kind": "open",
+              "list_start": 3,
+              "source_end_byte": 2966,
+              "source_start_byte": 207,
+              "tag": "list"
+            },
+            {
+              "kind": "open",
+              "source_end_byte": 2917,
+              "source_start_byte": 207,
+              "tag": "item"
+            }
+          ],
+          "fragments": [
+            {
+              "event": {
+                "block_id": "block-2",
+                "kind": "text",
+                "offset_utf16": 571,
+                "source_end_byte": 2915,
+                "source_start_byte": 210,
+                "text": "שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלו"
+              },
+              "event_index": 2,
+              "text_end_byte": 2046,
+              "text_start_byte": 1023
+            }
+          ],
+          "next": {
+            "event": 2,
+            "offset": 2046
+          },
+          "returned_text_bytes": 1023,
+          "start_ordered_lists": [
+            {
+              "item_start": 3,
+              "stack_depth": 0
+            }
+          ],
+          "start_stack": [
+            {
+              "kind": "open",
+              "list_start": 3,
+              "source_end_byte": 2966,
+              "source_start_byte": 207,
+              "tag": "list"
+            },
+            {
+              "kind": "open",
+              "source_end_byte": 2917,
+              "source_start_byte": 207,
+              "tag": "item"
+            }
+          ],
+          "unit": {
+            "body_start_byte": 207,
+            "code_blocks_total": 0,
+            "events_total": 15,
+            "heading_id": null,
+            "index": 3,
+            "kind": "list",
+            "protected_reason": null,
+            "raw_sha256": "50deb375de3918a6e38967fe0d69a5de0884c5cb0f3a33c39088ffb4416ceb57",
+            "section_ids_total": 0,
+            "semantic_sha256": "4bd046bfa8afe2a937fda5facb716050ec0bc03ace609b97eed73824615471c9",
+            "source_end_byte": 2966,
+            "source_start_byte": 206
+          }
+        },
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 2,
+            "offset": 2046
+          },
+          "document_sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "block_id": "block-2",
+                "kind": "text",
+                "offset_utf16": 1139,
+                "source_end_byte": 2915,
+                "source_start_byte": 210,
+                "text": "ם שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום"
+              },
+              "event_index": 2,
+              "text_end_byte": 2705,
+              "text_start_byte": 2046
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 2917,
+                "source_start_byte": 207,
+                "tag": "item"
+              },
+              "event_index": 3,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 2966,
+                "source_start_byte": 2917,
+                "tag": "item"
+              },
+              "event_index": 4,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 2932,
+                "source_start_byte": 2920,
+                "text": "Second with "
+              },
+              "event_index": 5,
+              "text_end_byte": 12,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 2940,
+                "source_start_byte": 2932,
+                "tag": "inline_code"
+              },
+              "event_index": 6,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "kind": "text",
+                "offset_utf16": 12,
+                "source_end_byte": 2940,
+                "source_start_byte": 2932,
+                "text": "inline"
+              },
+              "event_index": 7,
+              "text_end_byte": 6,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 2940,
+                "source_start_byte": 2932,
+                "tag": "inline_code"
+              },
+              "event_index": 8,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "hard_break": false,
+                "kind": "break",
+                "offset_utf16": 18,
+                "source_end_byte": 2941,
+                "source_start_byte": 2940,
+                "text": "\n"
+              },
+              "event_index": 9,
+              "text_end_byte": 1,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "kind": "text",
+                "offset_utf16": 19,
+                "source_end_byte": 2953,
+                "source_start_byte": 2944,
+                "text": "7. Nested"
+              },
+              "event_index": 10,
+              "text_end_byte": 9,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "hard_break": false,
+                "kind": "break",
+                "offset_utf16": 28,
+                "source_end_byte": 2954,
+                "source_start_byte": 2953,
+                "text": "\n"
+              },
+              "event_index": 11,
+              "text_end_byte": 1,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "kind": "text",
+                "offset_utf16": 29,
+                "source_end_byte": 2964,
+                "source_start_byte": 2957,
+                "text": "8. Last"
+              },
+              "event_index": 12,
+              "text_end_byte": 7,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 2966,
+                "source_start_byte": 2917,
+                "tag": "item"
+              },
+              "event_index": 13,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 2966,
+                "source_start_byte": 207,
+                "tag": "list"
+              },
+              "event_index": 14,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 695,
+          "start_ordered_lists": [
+            {
+              "item_start": 3,
+              "stack_depth": 0
+            }
+          ],
+          "start_stack": [
+            {
+              "kind": "open",
+              "list_start": 3,
+              "source_end_byte": 2966,
+              "source_start_byte": 207,
+              "tag": "list"
+            },
+            {
+              "kind": "open",
+              "source_end_byte": 2917,
+              "source_start_byte": 207,
+              "tag": "item"
+            }
+          ],
+          "unit": {
+            "body_start_byte": 207,
+            "code_blocks_total": 0,
+            "events_total": 15,
+            "heading_id": null,
+            "index": 3,
+            "kind": "list",
+            "protected_reason": null,
+            "raw_sha256": "50deb375de3918a6e38967fe0d69a5de0884c5cb0f3a33c39088ffb4416ceb57",
+            "section_ids_total": 0,
+            "semantic_sha256": "4bd046bfa8afe2a937fda5facb716050ec0bc03ace609b97eed73824615471c9",
+            "source_end_byte": 2966,
+            "source_start_byte": 206
+          }
+        }
+      ]
+    },
+    {
+      "side": "before",
+      "unit": {
+        "body_start_byte": 2966,
+        "code_blocks_total": 1,
+        "events_total": 3,
+        "heading_id": null,
+        "index": 4,
+        "kind": "code",
+        "protected_reason": null,
+        "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+        "section_ids_total": 0,
+        "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+        "source_end_byte": 5393,
+        "source_start_byte": 2966
+      },
+      "windows": [
+        {
+          "code_info": [
+            {
+              "event_index": 0,
+              "info": "rust"
+            }
+          ],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+          "end_ordered_lists": [],
+          "end_stack": [
+            {
+              "kind": "open",
+              "source_end_byte": 5393,
+              "source_start_byte": 2966,
+              "tag": "code_block"
+            }
+          ],
+          "fragments": [
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5393,
+                "source_start_byte": 2966,
+                "tag": "code_block"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-4",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5390,
+                "source_start_byte": 2974,
+                "text": "let value = \"אבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבא"
+              },
+              "event_index": 1,
+              "text_end_byte": 1023,
+              "text_start_byte": 0
+            }
+          ],
+          "next": {
+            "event": 1,
+            "offset": 1023
+          },
+          "returned_text_bytes": 1023,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 2966,
+            "code_blocks_total": 1,
+            "events_total": 3,
+            "heading_id": null,
+            "index": 4,
+            "kind": "code",
+            "protected_reason": null,
+            "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+            "section_ids_total": 0,
+            "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+            "source_end_byte": 5393,
+            "source_start_byte": 2966
+          }
+        },
+        {
+          "code_info": [
+            {
+              "event_index": 0,
+              "info": "rust"
+            }
+          ],
+          "cursor": {
+            "event": 1,
+            "offset": 1023
+          },
+          "document_sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+          "end_ordered_lists": [],
+          "end_stack": [
+            {
+              "kind": "open",
+              "source_end_byte": 5393,
+              "source_start_byte": 2966,
+              "tag": "code_block"
+            }
+          ],
+          "fragments": [
+            {
+              "event": {
+                "block_id": "block-4",
+                "kind": "text",
+                "offset_utf16": 518,
+                "source_end_byte": 5390,
+                "source_start_byte": 2974,
+                "text": "באבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבא"
+              },
+              "event_index": 1,
+              "text_end_byte": 2047,
+              "text_start_byte": 1023
+            }
+          ],
+          "next": {
+            "event": 1,
+            "offset": 2047
+          },
+          "returned_text_bytes": 1024,
+          "start_ordered_lists": [],
+          "start_stack": [
+            {
+              "kind": "open",
+              "source_end_byte": 5393,
+              "source_start_byte": 2966,
+              "tag": "code_block"
+            }
+          ],
+          "unit": {
+            "body_start_byte": 2966,
+            "code_blocks_total": 1,
+            "events_total": 3,
+            "heading_id": null,
+            "index": 4,
+            "kind": "code",
+            "protected_reason": null,
+            "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+            "section_ids_total": 0,
+            "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+            "source_end_byte": 5393,
+            "source_start_byte": 2966
+          }
+        },
+        {
+          "code_info": [
+            {
+              "event_index": 0,
+              "info": "rust"
+            }
+          ],
+          "cursor": {
+            "event": 1,
+            "offset": 2047
+          },
+          "document_sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "block_id": "block-4",
+                "kind": "text",
+                "offset_utf16": 1030,
+                "source_end_byte": 5390,
+                "source_start_byte": 2974,
+                "text": "באבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאב\";\n"
+              },
+              "event_index": 1,
+              "text_end_byte": 2416,
+              "text_start_byte": 2047
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5393,
+                "source_start_byte": 2966,
+                "tag": "code_block"
+              },
+              "event_index": 2,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 369,
+          "start_ordered_lists": [],
+          "start_stack": [
+            {
+              "kind": "open",
+              "source_end_byte": 5393,
+              "source_start_byte": 2966,
+              "tag": "code_block"
+            }
+          ],
+          "unit": {
+            "body_start_byte": 2966,
+            "code_blocks_total": 1,
+            "events_total": 3,
+            "heading_id": null,
+            "index": 4,
+            "kind": "code",
+            "protected_reason": null,
+            "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+            "section_ids_total": 0,
+            "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+            "source_end_byte": 5393,
+            "source_start_byte": 2966
+          }
+        }
+      ]
+    },
+    {
+      "side": "before",
+      "unit": {
+        "body_start_byte": 5395,
+        "code_blocks_total": 0,
+        "events_total": 20,
+        "heading_id": null,
+        "index": 5,
+        "kind": "table",
+        "protected_reason": null,
+        "raw_sha256": "03fa6759000783fe5e41141c879ac4e1d1e767937f5a81388fcf2d34ccb3a987",
+        "section_ids_total": 0,
+        "semantic_sha256": "dd3363c22ac8a7426cec2fde24daf9d96edf70d642f6558fac25b699c1a2436e",
+        "source_end_byte": 5445,
+        "source_start_byte": 5393
+      },
+      "windows": [
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "d0c9b8dc88a5a87e11f060f9bfc96687ffd0f8062151775be45a6447c9207411",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "alignments": [
+                  "left",
+                  "right"
+                ],
+                "kind": "open",
+                "source_end_byte": 5445,
+                "source_start_byte": 5395,
+                "tag": "table"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5412,
+                "source_start_byte": 5395,
+                "tag": "table_head"
+              },
+              "event_index": 1,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5402,
+                "source_start_byte": 5396,
+                "tag": "table_cell"
+              },
+              "event_index": 2,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-5",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5401,
+                "source_start_byte": 5397,
+                "text": "Left"
+              },
+              "event_index": 3,
+              "text_end_byte": 4,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5402,
+                "source_start_byte": 5396,
+                "tag": "table_cell"
+              },
+              "event_index": 4,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5410,
+                "source_start_byte": 5403,
+                "tag": "table_cell"
+              },
+              "event_index": 5,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-6",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5409,
+                "source_start_byte": 5404,
+                "text": "Right"
+              },
+              "event_index": 6,
+              "text_end_byte": 5,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5410,
+                "source_start_byte": 5403,
+                "tag": "table_cell"
+              },
+              "event_index": 7,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5412,
+                "source_start_byte": 5395,
+                "tag": "table_head"
+              },
+              "event_index": 8,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5445,
+                "source_start_byte": 5428,
+                "tag": "table_row"
+              },
+              "event_index": 9,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5432,
+                "source_start_byte": 5429,
+                "tag": "table_cell"
+              },
+              "event_index": 10,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-7",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5431,
+                "source_start_byte": 5430,
+                "text": "a"
+              },
+              "event_index": 11,
+              "text_end_byte": 1,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5432,
+                "source_start_byte": 5429,
+                "tag": "table_cell"
+              },
+              "event_index": 12,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5443,
+                "source_start_byte": 5433,
+                "tag": "table_cell"
+              },
+              "event_index": 13,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5442,
+                "source_start_byte": 5434,
+                "tag": "strong"
+              },
+              "event_index": 14,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-8",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5440,
+                "source_start_byte": 5436,
+                "text": "text"
+              },
+              "event_index": 15,
+              "text_end_byte": 4,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5442,
+                "source_start_byte": 5434,
+                "tag": "strong"
+              },
+              "event_index": 16,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5443,
+                "source_start_byte": 5433,
+                "tag": "table_cell"
+              },
+              "event_index": 17,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5445,
+                "source_start_byte": 5428,
+                "tag": "table_row"
+              },
+              "event_index": 18,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5445,
+                "source_start_byte": 5395,
+                "tag": "table"
+              },
+              "event_index": 19,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 14,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 5395,
+            "code_blocks_total": 0,
+            "events_total": 20,
+            "heading_id": null,
+            "index": 5,
+            "kind": "table",
+            "protected_reason": null,
+            "raw_sha256": "03fa6759000783fe5e41141c879ac4e1d1e767937f5a81388fcf2d34ccb3a987",
+            "section_ids_total": 0,
+            "semantic_sha256": "dd3363c22ac8a7426cec2fde24daf9d96edf70d642f6558fac25b699c1a2436e",
+            "source_end_byte": 5445,
+            "source_start_byte": 5393
+          }
+        }
+      ]
+    },
+    {
+      "side": "before",
+      "unit": {
+        "body_start_byte": 5446,
+        "code_blocks_total": 0,
+        "events_total": 1,
+        "heading_id": null,
+        "index": 6,
+        "kind": "protected",
+        "protected_reason": "UNSUPPORTED_EDITOR_BLOCK",
+        "raw_sha256": "4580a34709b890a92dd5ef2bf192400c04e3a996730eeb3a7791016d783f839e",
+        "section_ids_total": 0,
+        "semantic_sha256": null,
+        "source_end_byte": 5478,
+        "source_start_byte": 5445
+      },
+      "windows": []
+    },
+    {
+      "side": "after",
+      "unit": {
+        "body_start_byte": 100,
+        "code_blocks_total": 0,
+        "events_total": 0,
+        "heading_id": null,
+        "index": 0,
+        "kind": "metadata",
+        "protected_reason": "FRONT_MATTER",
+        "raw_sha256": "df62176f8fc8318ba4abb6fc9e30ff032f74ebe84f6bf6d5ecd615c4a9f163b9",
+        "section_ids_total": 0,
+        "semantic_sha256": null,
+        "source_end_byte": 100,
+        "source_start_byte": 0
+      },
+      "windows": []
+    },
+    {
+      "side": "after",
+      "unit": {
+        "body_start_byte": 129,
+        "code_blocks_total": 0,
+        "events_total": 3,
+        "heading_id": "SEC-ONE",
+        "index": 1,
+        "kind": "heading",
+        "protected_reason": null,
+        "raw_sha256": "7b24193b2ecce40890f0fd83a3f15ba9a5b102cc155ae383a311861763a48f2d",
+        "section_ids_total": 1,
+        "semantic_sha256": "af381ae75ad8101f0fba2d9eb7a34cf37fe014a5251c8f94af7bc366cfd3e97d",
+        "source_end_byte": 152,
+        "source_start_byte": 100
+      },
+      "windows": [
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "kind": "open",
+                "level": 2,
+                "section_id": "SEC-ONE",
+                "source_end_byte": 152,
+                "source_start_byte": 129,
+                "tag": "heading"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-0",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 151,
+                "source_start_byte": 132,
+                "text": "כותרת חדשה"
+              },
+              "event_index": 1,
+              "text_end_byte": 19,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 152,
+                "source_start_byte": 129,
+                "tag": "heading"
+              },
+              "event_index": 2,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 19,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 129,
+            "code_blocks_total": 0,
+            "events_total": 3,
+            "heading_id": "SEC-ONE",
+            "index": 1,
+            "kind": "heading",
+            "protected_reason": null,
+            "raw_sha256": "7b24193b2ecce40890f0fd83a3f15ba9a5b102cc155ae383a311861763a48f2d",
+            "section_ids_total": 1,
+            "semantic_sha256": "af381ae75ad8101f0fba2d9eb7a34cf37fe014a5251c8f94af7bc366cfd3e97d",
+            "source_end_byte": 152,
+            "source_start_byte": 100
+          }
+        }
+      ]
+    },
+    {
+      "side": "after",
+      "unit": {
+        "body_start_byte": 153,
+        "code_blocks_total": 0,
+        "events_total": 11,
+        "heading_id": null,
+        "index": 2,
+        "kind": "paragraph",
+        "protected_reason": null,
+        "raw_sha256": "816584d59cdddd444b1428920854fb262df787ec3e78305e98f50660e1bc041a",
+        "section_ids_total": 0,
+        "semantic_sha256": "27a9d5226f9831b4748b10bf69987259f7718c172e52f7c7cb7045b2810bd0c8",
+        "source_end_byte": 214,
+        "source_start_byte": 152
+      },
+      "windows": [
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 214,
+                "source_start_byte": 153,
+                "tag": "paragraph"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 161,
+                "source_start_byte": 153,
+                "text": "Changed "
+              },
+              "event_index": 1,
+              "text_end_byte": 8,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 169,
+                "source_start_byte": 161,
+                "tag": "strong"
+              },
+              "event_index": 2,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 8,
+                "source_end_byte": 167,
+                "source_start_byte": 163,
+                "text": "bold"
+              },
+              "event_index": 3,
+              "text_end_byte": 4,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 169,
+                "source_start_byte": 161,
+                "tag": "strong"
+              },
+              "event_index": 4,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 12,
+                "source_end_byte": 174,
+                "source_start_byte": 169,
+                "text": " and "
+              },
+              "event_index": 5,
+              "text_end_byte": 5,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "destination": "https://example.test",
+                "kind": "open",
+                "source_end_byte": 202,
+                "source_start_byte": 174,
+                "tag": "link",
+                "title": ""
+              },
+              "event_index": 6,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 17,
+                "source_end_byte": 179,
+                "source_start_byte": 175,
+                "text": "safe"
+              },
+              "event_index": 7,
+              "text_end_byte": 4,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 202,
+                "source_start_byte": 174,
+                "tag": "link"
+              },
+              "event_index": 8,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-1",
+                "kind": "text",
+                "offset_utf16": 21,
+                "source_end_byte": 213,
+                "source_start_byte": 202,
+                "text": " paragraph."
+              },
+              "event_index": 9,
+              "text_end_byte": 11,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 214,
+                "source_start_byte": 153,
+                "tag": "paragraph"
+              },
+              "event_index": 10,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 32,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 153,
+            "code_blocks_total": 0,
+            "events_total": 11,
+            "heading_id": null,
+            "index": 2,
+            "kind": "paragraph",
+            "protected_reason": null,
+            "raw_sha256": "816584d59cdddd444b1428920854fb262df787ec3e78305e98f50660e1bc041a",
+            "section_ids_total": 0,
+            "semantic_sha256": "27a9d5226f9831b4748b10bf69987259f7718c172e52f7c7cb7045b2810bd0c8",
+            "source_end_byte": 214,
+            "source_start_byte": 152
+          }
+        }
+      ]
+    },
+    {
+      "side": "after",
+      "unit": {
+        "body_start_byte": 215,
+        "code_blocks_total": 0,
+        "events_total": 15,
+        "heading_id": null,
+        "index": 3,
+        "kind": "list",
+        "protected_reason": null,
+        "raw_sha256": "4b6b674ac5bacb578259f773df2e5692d0a057a1e441be37d003edb3313a90c3",
+        "section_ids_total": 0,
+        "semantic_sha256": "36d974eda895c58269ac2db6241bbab2a4ef49ef1753fcf8c45496462263b194",
+        "source_end_byte": 2982,
+        "source_start_byte": 214
+      },
+      "windows": [
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+          "end_ordered_lists": [
+            {
+              "item_start": 3,
+              "stack_depth": 0
+            }
+          ],
+          "end_stack": [
+            {
+              "kind": "open",
+              "list_start": 3,
+              "source_end_byte": 2982,
+              "source_start_byte": 215,
+              "tag": "list"
+            },
+            {
+              "kind": "open",
+              "source_end_byte": 2925,
+              "source_start_byte": 215,
+              "tag": "item"
+            }
+          ],
+          "fragments": [
+            {
+              "event": {
+                "kind": "open",
+                "list_start": 3,
+                "source_end_byte": 2982,
+                "source_start_byte": 215,
+                "tag": "list"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 2925,
+                "source_start_byte": 215,
+                "tag": "item"
+              },
+              "event_index": 1,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-2",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 2923,
+                "source_start_byte": 218,
+                "text": "First שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום "
+              },
+              "event_index": 2,
+              "text_end_byte": 1023,
+              "text_start_byte": 0
+            }
+          ],
+          "next": {
+            "event": 2,
+            "offset": 1023
+          },
+          "returned_text_bytes": 1023,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 215,
+            "code_blocks_total": 0,
+            "events_total": 15,
+            "heading_id": null,
+            "index": 3,
+            "kind": "list",
+            "protected_reason": null,
+            "raw_sha256": "4b6b674ac5bacb578259f773df2e5692d0a057a1e441be37d003edb3313a90c3",
+            "section_ids_total": 0,
+            "semantic_sha256": "36d974eda895c58269ac2db6241bbab2a4ef49ef1753fcf8c45496462263b194",
+            "source_end_byte": 2982,
+            "source_start_byte": 214
+          }
+        },
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 2,
+            "offset": 1023
+          },
+          "document_sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+          "end_ordered_lists": [
+            {
+              "item_start": 3,
+              "stack_depth": 0
+            }
+          ],
+          "end_stack": [
+            {
+              "kind": "open",
+              "list_start": 3,
+              "source_end_byte": 2982,
+              "source_start_byte": 215,
+              "tag": "list"
+            },
+            {
+              "kind": "open",
+              "source_end_byte": 2925,
+              "source_start_byte": 215,
+              "tag": "item"
+            }
+          ],
+          "fragments": [
+            {
+              "event": {
+                "block_id": "block-2",
+                "kind": "text",
+                "offset_utf16": 571,
+                "source_end_byte": 2923,
+                "source_start_byte": 218,
+                "text": "שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלו"
+              },
+              "event_index": 2,
+              "text_end_byte": 2046,
+              "text_start_byte": 1023
+            }
+          ],
+          "next": {
+            "event": 2,
+            "offset": 2046
+          },
+          "returned_text_bytes": 1023,
+          "start_ordered_lists": [
+            {
+              "item_start": 3,
+              "stack_depth": 0
+            }
+          ],
+          "start_stack": [
+            {
+              "kind": "open",
+              "list_start": 3,
+              "source_end_byte": 2982,
+              "source_start_byte": 215,
+              "tag": "list"
+            },
+            {
+              "kind": "open",
+              "source_end_byte": 2925,
+              "source_start_byte": 215,
+              "tag": "item"
+            }
+          ],
+          "unit": {
+            "body_start_byte": 215,
+            "code_blocks_total": 0,
+            "events_total": 15,
+            "heading_id": null,
+            "index": 3,
+            "kind": "list",
+            "protected_reason": null,
+            "raw_sha256": "4b6b674ac5bacb578259f773df2e5692d0a057a1e441be37d003edb3313a90c3",
+            "section_ids_total": 0,
+            "semantic_sha256": "36d974eda895c58269ac2db6241bbab2a4ef49ef1753fcf8c45496462263b194",
+            "source_end_byte": 2982,
+            "source_start_byte": 214
+          }
+        },
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 2,
+            "offset": 2046
+          },
+          "document_sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "block_id": "block-2",
+                "kind": "text",
+                "offset_utf16": 1139,
+                "source_end_byte": 2923,
+                "source_start_byte": 218,
+                "text": "ם שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום שלום"
+              },
+              "event_index": 2,
+              "text_end_byte": 2705,
+              "text_start_byte": 2046
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 2925,
+                "source_start_byte": 215,
+                "tag": "item"
+              },
+              "event_index": 3,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 2982,
+                "source_start_byte": 2925,
+                "tag": "item"
+              },
+              "event_index": 4,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 2948,
+                "source_start_byte": 2928,
+                "text": "Updated second with "
+              },
+              "event_index": 5,
+              "text_end_byte": 20,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 2956,
+                "source_start_byte": 2948,
+                "tag": "inline_code"
+              },
+              "event_index": 6,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "kind": "text",
+                "offset_utf16": 20,
+                "source_end_byte": 2956,
+                "source_start_byte": 2948,
+                "text": "inline"
+              },
+              "event_index": 7,
+              "text_end_byte": 6,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 2956,
+                "source_start_byte": 2948,
+                "tag": "inline_code"
+              },
+              "event_index": 8,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "hard_break": false,
+                "kind": "break",
+                "offset_utf16": 26,
+                "source_end_byte": 2957,
+                "source_start_byte": 2956,
+                "text": "\n"
+              },
+              "event_index": 9,
+              "text_end_byte": 1,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "kind": "text",
+                "offset_utf16": 27,
+                "source_end_byte": 2969,
+                "source_start_byte": 2960,
+                "text": "7. Nested"
+              },
+              "event_index": 10,
+              "text_end_byte": 9,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "hard_break": false,
+                "kind": "break",
+                "offset_utf16": 36,
+                "source_end_byte": 2970,
+                "source_start_byte": 2969,
+                "text": "\n"
+              },
+              "event_index": 11,
+              "text_end_byte": 1,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-3",
+                "kind": "text",
+                "offset_utf16": 37,
+                "source_end_byte": 2980,
+                "source_start_byte": 2973,
+                "text": "8. Last"
+              },
+              "event_index": 12,
+              "text_end_byte": 7,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 2982,
+                "source_start_byte": 2925,
+                "tag": "item"
+              },
+              "event_index": 13,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 2982,
+                "source_start_byte": 215,
+                "tag": "list"
+              },
+              "event_index": 14,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 703,
+          "start_ordered_lists": [
+            {
+              "item_start": 3,
+              "stack_depth": 0
+            }
+          ],
+          "start_stack": [
+            {
+              "kind": "open",
+              "list_start": 3,
+              "source_end_byte": 2982,
+              "source_start_byte": 215,
+              "tag": "list"
+            },
+            {
+              "kind": "open",
+              "source_end_byte": 2925,
+              "source_start_byte": 215,
+              "tag": "item"
+            }
+          ],
+          "unit": {
+            "body_start_byte": 215,
+            "code_blocks_total": 0,
+            "events_total": 15,
+            "heading_id": null,
+            "index": 3,
+            "kind": "list",
+            "protected_reason": null,
+            "raw_sha256": "4b6b674ac5bacb578259f773df2e5692d0a057a1e441be37d003edb3313a90c3",
+            "section_ids_total": 0,
+            "semantic_sha256": "36d974eda895c58269ac2db6241bbab2a4ef49ef1753fcf8c45496462263b194",
+            "source_end_byte": 2982,
+            "source_start_byte": 214
+          }
+        }
+      ]
+    },
+    {
+      "side": "after",
+      "unit": {
+        "body_start_byte": 2982,
+        "code_blocks_total": 1,
+        "events_total": 3,
+        "heading_id": null,
+        "index": 4,
+        "kind": "code",
+        "protected_reason": null,
+        "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+        "section_ids_total": 0,
+        "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+        "source_end_byte": 5409,
+        "source_start_byte": 2982
+      },
+      "windows": [
+        {
+          "code_info": [
+            {
+              "event_index": 0,
+              "info": "rust"
+            }
+          ],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+          "end_ordered_lists": [],
+          "end_stack": [
+            {
+              "kind": "open",
+              "source_end_byte": 5409,
+              "source_start_byte": 2982,
+              "tag": "code_block"
+            }
+          ],
+          "fragments": [
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5409,
+                "source_start_byte": 2982,
+                "tag": "code_block"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-4",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5406,
+                "source_start_byte": 2990,
+                "text": "let value = \"אבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבא"
+              },
+              "event_index": 1,
+              "text_end_byte": 1023,
+              "text_start_byte": 0
+            }
+          ],
+          "next": {
+            "event": 1,
+            "offset": 1023
+          },
+          "returned_text_bytes": 1023,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 2982,
+            "code_blocks_total": 1,
+            "events_total": 3,
+            "heading_id": null,
+            "index": 4,
+            "kind": "code",
+            "protected_reason": null,
+            "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+            "section_ids_total": 0,
+            "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+            "source_end_byte": 5409,
+            "source_start_byte": 2982
+          }
+        },
+        {
+          "code_info": [
+            {
+              "event_index": 0,
+              "info": "rust"
+            }
+          ],
+          "cursor": {
+            "event": 1,
+            "offset": 1023
+          },
+          "document_sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+          "end_ordered_lists": [],
+          "end_stack": [
+            {
+              "kind": "open",
+              "source_end_byte": 5409,
+              "source_start_byte": 2982,
+              "tag": "code_block"
+            }
+          ],
+          "fragments": [
+            {
+              "event": {
+                "block_id": "block-4",
+                "kind": "text",
+                "offset_utf16": 518,
+                "source_end_byte": 5406,
+                "source_start_byte": 2990,
+                "text": "באבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבא"
+              },
+              "event_index": 1,
+              "text_end_byte": 2047,
+              "text_start_byte": 1023
+            }
+          ],
+          "next": {
+            "event": 1,
+            "offset": 2047
+          },
+          "returned_text_bytes": 1024,
+          "start_ordered_lists": [],
+          "start_stack": [
+            {
+              "kind": "open",
+              "source_end_byte": 5409,
+              "source_start_byte": 2982,
+              "tag": "code_block"
+            }
+          ],
+          "unit": {
+            "body_start_byte": 2982,
+            "code_blocks_total": 1,
+            "events_total": 3,
+            "heading_id": null,
+            "index": 4,
+            "kind": "code",
+            "protected_reason": null,
+            "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+            "section_ids_total": 0,
+            "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+            "source_end_byte": 5409,
+            "source_start_byte": 2982
+          }
+        },
+        {
+          "code_info": [
+            {
+              "event_index": 0,
+              "info": "rust"
+            }
+          ],
+          "cursor": {
+            "event": 1,
+            "offset": 2047
+          },
+          "document_sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "block_id": "block-4",
+                "kind": "text",
+                "offset_utf16": 1030,
+                "source_end_byte": 5406,
+                "source_start_byte": 2990,
+                "text": "באבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאבאב\";\n"
+              },
+              "event_index": 1,
+              "text_end_byte": 2416,
+              "text_start_byte": 2047
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5409,
+                "source_start_byte": 2982,
+                "tag": "code_block"
+              },
+              "event_index": 2,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 369,
+          "start_ordered_lists": [],
+          "start_stack": [
+            {
+              "kind": "open",
+              "source_end_byte": 5409,
+              "source_start_byte": 2982,
+              "tag": "code_block"
+            }
+          ],
+          "unit": {
+            "body_start_byte": 2982,
+            "code_blocks_total": 1,
+            "events_total": 3,
+            "heading_id": null,
+            "index": 4,
+            "kind": "code",
+            "protected_reason": null,
+            "raw_sha256": "4838a5d60383bb5d9aa8dad4ac461f81edf05ee3497ce1277b681d936eb77370",
+            "section_ids_total": 0,
+            "semantic_sha256": "c895febfd436365289213f6f5b8f429d4af1e05a83b292331a1ece7c45fa79de",
+            "source_end_byte": 5409,
+            "source_start_byte": 2982
+          }
+        }
+      ]
+    },
+    {
+      "side": "after",
+      "unit": {
+        "body_start_byte": 5411,
+        "code_blocks_total": 0,
+        "events_total": 20,
+        "heading_id": null,
+        "index": 5,
+        "kind": "table",
+        "protected_reason": null,
+        "raw_sha256": "53e460ead656eff1837d22cede9bd2eb3eec4bb07933cd1fc2d4267a3e0fb529",
+        "section_ids_total": 0,
+        "semantic_sha256": "e07cf8497ae97f9f99408dfe0e809a3c998f4c236d3aec9d5d8166d6b172f6d3",
+        "source_end_byte": 5461,
+        "source_start_byte": 5409
+      },
+      "windows": [
+        {
+          "code_info": [],
+          "cursor": {
+            "event": 0,
+            "offset": 0
+          },
+          "document_sha256": "5e99f39c92505546539e5c9c678c9dd2a9ddf9dc810522f8901736f8e40dd2d3",
+          "end_ordered_lists": [],
+          "end_stack": [],
+          "fragments": [
+            {
+              "event": {
+                "alignments": [
+                  "left",
+                  "right"
+                ],
+                "kind": "open",
+                "source_end_byte": 5461,
+                "source_start_byte": 5411,
+                "tag": "table"
+              },
+              "event_index": 0,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5428,
+                "source_start_byte": 5411,
+                "tag": "table_head"
+              },
+              "event_index": 1,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5418,
+                "source_start_byte": 5412,
+                "tag": "table_cell"
+              },
+              "event_index": 2,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-5",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5417,
+                "source_start_byte": 5413,
+                "text": "Left"
+              },
+              "event_index": 3,
+              "text_end_byte": 4,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5418,
+                "source_start_byte": 5412,
+                "tag": "table_cell"
+              },
+              "event_index": 4,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5426,
+                "source_start_byte": 5419,
+                "tag": "table_cell"
+              },
+              "event_index": 5,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-6",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5425,
+                "source_start_byte": 5420,
+                "text": "Right"
+              },
+              "event_index": 6,
+              "text_end_byte": 5,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5426,
+                "source_start_byte": 5419,
+                "tag": "table_cell"
+              },
+              "event_index": 7,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5428,
+                "source_start_byte": 5411,
+                "tag": "table_head"
+              },
+              "event_index": 8,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5461,
+                "source_start_byte": 5444,
+                "tag": "table_row"
+              },
+              "event_index": 9,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5448,
+                "source_start_byte": 5445,
+                "tag": "table_cell"
+              },
+              "event_index": 10,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-7",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5447,
+                "source_start_byte": 5446,
+                "text": "b"
+              },
+              "event_index": 11,
+              "text_end_byte": 1,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5448,
+                "source_start_byte": 5445,
+                "tag": "table_cell"
+              },
+              "event_index": 12,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5459,
+                "source_start_byte": 5449,
+                "tag": "table_cell"
+              },
+              "event_index": 13,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "open",
+                "source_end_byte": 5458,
+                "source_start_byte": 5450,
+                "tag": "strong"
+              },
+              "event_index": 14,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "block_id": "block-8",
+                "kind": "text",
+                "offset_utf16": 0,
+                "source_end_byte": 5456,
+                "source_start_byte": 5452,
+                "text": "text"
+              },
+              "event_index": 15,
+              "text_end_byte": 4,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5458,
+                "source_start_byte": 5450,
+                "tag": "strong"
+              },
+              "event_index": 16,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5459,
+                "source_start_byte": 5449,
+                "tag": "table_cell"
+              },
+              "event_index": 17,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5461,
+                "source_start_byte": 5444,
+                "tag": "table_row"
+              },
+              "event_index": 18,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            },
+            {
+              "event": {
+                "kind": "close",
+                "source_end_byte": 5461,
+                "source_start_byte": 5411,
+                "tag": "table"
+              },
+              "event_index": 19,
+              "text_end_byte": 0,
+              "text_start_byte": 0
+            }
+          ],
+          "next": null,
+          "returned_text_bytes": 14,
+          "start_ordered_lists": [],
+          "start_stack": [],
+          "unit": {
+            "body_start_byte": 5411,
+            "code_blocks_total": 0,
+            "events_total": 20,
+            "heading_id": null,
+            "index": 5,
+            "kind": "table",
+            "protected_reason": null,
+            "raw_sha256": "53e460ead656eff1837d22cede9bd2eb3eec4bb07933cd1fc2d4267a3e0fb529",
+            "section_ids_total": 0,
+            "semantic_sha256": "e07cf8497ae97f9f99408dfe0e809a3c998f4c236d3aec9d5d8166d6b172f6d3",
+            "source_end_byte": 5461,
+            "source_start_byte": 5409
+          }
+        }
+      ]
+    },
+    {
+      "side": "after",
+      "unit": {
+        "body_start_byte": 5462,
+        "code_blocks_total": 0,
+        "events_total": 1,
+        "heading_id": null,
+        "index": 6,
+        "kind": "protected",
+        "protected_reason": "UNSUPPORTED_EDITOR_BLOCK",
+        "raw_sha256": "4580a34709b890a92dd5ef2bf192400c04e3a996730eeb3a7791016d783f839e",
+        "section_ids_total": 0,
+        "semantic_sha256": null,
+        "source_end_byte": 5494,
+        "source_start_byte": 5461
+      },
+      "windows": []
+    }
+  ]
+}

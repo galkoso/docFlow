@@ -8,9 +8,12 @@ import { SessionState } from '../../core/auth/session-state';
 import { ComparisonPage } from './comparison-page';
 import { actor, proposal, snapshot, head, id, file, ready, pending } from './comparison.testing';
 import { rawResponse } from './raw.testing';
+import { readableResponse, readableScope, unitResponse, unitScope } from './readable.testing';
+import { ReadableView } from './readable-view';
+import { By } from '@angular/platform-browser';
 
 describe('Routed comparison page', () => {
-  async function create(initial: Record<string, string | string[]> = { snapshot }) {
+  async function create(initial: Record<string, string | string[]> = { snapshot }, mode: 'raw' | 'readable' = 'raw') {
     const profile = signal<{ user_id: string } | null>({ user_id: actor }), logoutEpoch = signal(0);
     const params = new BehaviorSubject(convertToParamMap({ id: proposal })), query = new BehaviorSubject(convertToParamMap(initial));
     await TestBed.configureTestingModule({ imports: [ComparisonPage], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
@@ -27,6 +30,7 @@ describe('Routed comparison page', () => {
       query.next(convertToParamMap(values)); return Promise.resolve(true);
     });
     const fixture = TestBed.createComponent(ComparisonPage), page = fixture.componentInstance, http = TestBed.inject(HttpTestingController);
+    page.mode.set(mode);
     fixture.detectChanges();
     const request = () => http.expectOne(req => req.url.endsWith('/diff'));
     const body = () => http.expectOne(req => req.url.includes('/diff/files/'));
@@ -100,4 +104,24 @@ describe('Routed comparison page', () => {
     expect(c.query.value.get('offset')).toBe('50'); c.page.previousFiles(50); c.settle();
     c.request().flush(ready(120)); c.settle(); c.http.expectNone(req => req.url.endsWith('/diff')); c.destroy();
   });
+  it('loads readable content by default and cancels its private request when switching to raw or losing identity', async () => {
+    const c = await create({ snapshot }, 'readable'), response = ready(); response.page!.files[0] = readableScope().file;
+    c.request().flush(response); c.settle(); c.page.select(response.page!.files[0].id); c.settle();
+    c.http.expectOne(req => req.url.endsWith('/readable')).flush(readableResponse()); c.settle();
+    const view = c.fixture.debugElement.query(By.directive(ReadableView)).componentInstance as ReadableView;
+    const row = view.state.data()!.page.rows.find(row => row.before?.kind === 'paragraph')!;
+    view.state.select(row.change.id); c.settle();
+    for (const side of ['before', 'after'] as const) {
+      const scope = unitScope('paragraph', side);
+      c.http.expectOne(req => req.url.endsWith(`/units/${scope.unit.index}`) && req.params.get('side') === side).flush(unitResponse(scope));
+    }
+    c.settle(); expect(c.fixture.nativeElement.querySelectorAll('app-document-renderer')).toHaveLength(2);
+    view.state.select(view.state.data()!.page.rows.find(row => row.before?.kind === 'code')!.change.id); c.settle();
+    const requests = c.http.match(req => req.url.includes('/units/')); expect(requests).toHaveLength(2);
+    c.page.mode.set('raw'); c.settle(); expect(requests.every(request => request.cancelled)).toBe(true);
+    const raw = c.body(); expect(raw.request.url.endsWith(response.page!.files[0].id)).toBe(true);
+    c.profile.set(null); c.settle(); expect(raw.cancelled).toBe(true); expect(c.page.raw.data()).toBeNull();
+    expect(c.fixture.nativeElement.querySelector('app-readable-view')).toBeNull(); c.destroy();
+  });
+
 });

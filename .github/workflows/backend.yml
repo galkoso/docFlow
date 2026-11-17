@@ -32,3 +32,5 @@ jobs:
       - run: diff -u ../docs/openapi.json /tmp/specspace-openapi.json
       - run: cargo run --quiet -p specspace-document-engine --example editor_contract > /tmp/specspace-editor-contract.json
       - run: diff -u ../fixtures/editor-contract.json /tmp/specspace-editor-contract.json
+      - run: cargo run --quiet -p specspace-document-engine --example readable_contract > /tmp/specspace-readable-contract.json
+      - run: diff -u ../fixtures/readable-contract.json /tmp/specspace-readable-contract.json

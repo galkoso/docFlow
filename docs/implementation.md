@@ -1204,3 +1204,24 @@ Checkboxes represent verified work only.
   no connected browsers, so visual/keyboard acceptance remains unverified.
   Readable UI, inline word changes, media, selection anchors and the full review/
   merge workflow remain required; this stage does not complete the full goal.
+
+- Readable comparison UI: the default file view pages paired unit metadata and
+  loads only the selected before/after units through independent bounded event
+  controllers. The existing inert GFM renderer preserves headings, formatting,
+  links, tables, lists, code and pinned image context. Continuation reopens known
+  container events with ordered-list item numbers, closes the page's remaining
+  stack, retains code language metadata and never injects Markdown as HTML.
+  Whole-side and per-unit raw fallbacks remain explicit, including an oversized
+  atomic event encountered on a later page. Missing sides are distinct from
+  empty or unavailable source. Mode/file/actor changes cancel private requests
+  and destroy body windows; source is never persisted in browser storage.
+  Validators bind metadata/events to captured actor scope, file/snapshot hashes,
+  immutable unit summaries, exact cursors, container/list continuity and budgets.
+  Added a deterministic Rust-generated readable contract with Hebrew, nested
+  ordered lists, long code, tables and protected HTML; CI checks fixture drift.
+  Twenty-one new scenarios bring the frontend suite to 170 passing tests; the
+  production build, all 81 document-engine tests and engine Clippy pass, and
+  readable fixture regeneration matches. Both CI workflows for the preceding
+  raw viewer stage completed successfully. Browser visual/keyboard acceptance,
+  inline word highlights, dedicated changed-media view, selection anchors and
+  the remaining review/merge/export/import work remain open.

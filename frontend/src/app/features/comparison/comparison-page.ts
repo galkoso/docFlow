@@ -4,10 +4,11 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { SessionState } from '../../core/auth/session-state';
 import { ComparisonState } from './comparison-state';
 import { digest, integer, uuid } from './comparison-evidence';
-import { RawState } from './raw-state';
+import { ReadableView } from './readable-view';
+import { RawScope, RawState } from './raw-state';
 
 @Component({
-  selector: 'app-comparison-page', imports: [RouterLink], providers: [ComparisonState, RawState],
+  selector: 'app-comparison-page', imports: [RouterLink, ReadableView], providers: [ComparisonState, RawState],
   changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './comparison-page.html', styleUrl: './comparison-page.css',
 })
 export class ComparisonPage implements OnDestroy {
@@ -25,6 +26,14 @@ export class ComparisonPage implements OnDestroy {
   private freshIntent = false;
   readonly routeError = signal('');
   readonly showEqual = signal(true);
+  readonly mode = signal<'readable' | 'raw'>('readable');
+  readonly fileScope = computed<RawScope | null>(() => {
+    const response = this.state.data(), selected = this.state.selected(), actor = this.session.profile()?.user_id;
+    return actor && actor === this.state.owner() && response?.summary && selected ? {
+      actor, proposal: response.proposal_id, snapshot: response.snapshot_id, content: response.summary.content_id,
+      head: response.summary.head_sha, base: response.summary.merge_base_sha, file: selected,
+    } : null;
+  });
   readonly proposal = computed(() => this.params().get('id'));
   readonly visible = computed(() => !!this.session.profile() && this.session.profile()?.user_id === this.state.owner());
   readonly segments = computed(() => this.raw.data()?.raw.segments.filter(segment => this.showEqual() || segment.kind !== 'equal') ?? []);
@@ -67,13 +76,8 @@ export class ComparisonPage implements OnDestroy {
       });
     });
     effect(() => {
-      const response = this.state.data(), selected = this.state.selected(), actor = this.session.profile()?.user_id;
-      untracked(() => {
-        this.raw.open(actor && actor === this.state.owner() && response?.summary && selected ? {
-          actor, proposal: response.proposal_id, snapshot: response.snapshot_id, content: response.summary.content_id,
-          head: response.summary.head_sha, base: response.summary.merge_base_sha, file: selected,
-        } : null);
-      });
+      const scope = this.fileScope(), mode = this.mode();
+      untracked(() => this.raw.open(mode === 'raw' ? scope : null));
     });
   }
   fresh(): void {

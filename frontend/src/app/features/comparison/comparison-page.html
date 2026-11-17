@@ -47,6 +47,13 @@
       }
     }
     @if (state.selected(); as file) {
+      <div class="actions" aria-label="תצוגת השוואה">
+        <button (click)="mode.set('readable')" [attr.aria-pressed]="mode() === 'readable'">תצוגה קריאה</button>
+        <button (click)="mode.set('raw')" [attr.aria-pressed]="mode() === 'raw'">מקור גולמי</button>
+      </div>
+      @if (mode() === 'readable') {
+        <app-readable-view [scope]="fileScope()" [repository]="state.data()?.summary?.repository_id ?? null" (rawRequested)="mode.set('raw')" />
+      } @else {
       <section class="raw" aria-label="השוואת מקור"><h2>מקור גולמי — <bdi>{{ file.after?.path ?? file.before?.path }}</bdi></h2>
         @if (raw.busy()) {<p role="status">טוענים מקטע מקור…</p>}
         @if (raw.error()) {<p role="alert">{{ raw.error() }}</p><button (click)="raw.retry()" [disabled]="raw.busy() || raw.authRequired()">בדיקה נוספת של המקטע</button>}
@@ -68,6 +75,7 @@
           }
         }
       </section>
+      }
     }
   }
 }

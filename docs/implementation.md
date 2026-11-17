@@ -1483,3 +1483,26 @@ Checkboxes represent verified work only.
   workflows for the preceding submission-journal commit passed. Public HTTP and
   worker wiring, shared diff/image bodies, PR/check processing, decisions,
   discussions, approvals, merge, bundles and production acceptance remain open.
+
+- Durable review snapshot worker: `ReviewWorker` now drives pending submission
+  jobs through lease-bound comparison preparation, complete media verification
+  and atomic shared publication. Preparation uses authority-checked 60-second
+  leases renewed every 15 seconds; heartbeat waits and publication share the
+  processing deadline. Publication has no competing heartbeat and retains its
+  own final fence. Safe transient reads use journaled bounded backoff and provider
+  retry-after; invalid content/media, denied/stale authority and moved refs fail
+  without persisting private diagnostics. Database publication uncertainty leaves
+  work for receipt observation or expiry/reclaim. Replaced attempts cannot fail
+  newer owners. Shutdown cancels pending reads; expired read-only work restarts,
+  without repeating Git writes. The API starts one review worker with a default
+  900-second timeout (30–900 allowed), sharing the configured frozen provider
+  factory and preparation capacity. Eleven new PostgreSQL worker scenarios cover
+  actual text/image completion, idle behavior, backoff, retry exhaustion, authority
+  revocation before/during reads, stale attempts, shutdown/reclaim, processing
+  deadline and publication rollback/recovery. A separate application-state test
+  verifies configured-source wiring and a missing-provider failure. The context/
+  journal/snapshot/worker suite passes 38 tests; the full backend suite passes
+  412 tests with two existing performance measurements excluded. Workspace Clippy
+  passes. Both workflows for the preceding snapshot-publication commit passed.
+  Public submission/status/snapshot endpoints and their frontend flow, PR/check
+  processing, checkpointed scans and all remaining full-spec work remain open.

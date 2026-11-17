@@ -161,6 +161,10 @@ PR/check orchestration remain in progress.
 
 Internal review-submission work uses migration 010 for immutable request metadata,
 private replay/status and attempt-fenced leases. Lease-specific authorization
-rechecks current roles and the frozen scope before provider work. See
-[formal review preparation](docs/reviews.md). The submission worker and shared
-snapshot publication/API are still being implemented.
+rechecks current roles and the frozen scope before provider work. Migration 011
+adds atomic shared snapshots with complete immutable file/media evidence.
+The runtime starts one review worker; `REVIEW_WORKER_TIMEOUT_SECONDS` defaults
+to 900 (30–900 allowed). It renews leases while reading, safely reclaims expired
+read-only work and publishes with a final lease fence. No PR/check or approval
+is created by this worker. Public submission/status/snapshot endpoints and their
+UI flow remain open. See [formal review preparation](docs/reviews.md).

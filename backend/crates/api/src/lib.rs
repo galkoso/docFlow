@@ -23,6 +23,7 @@ use serde::Serialize;
 use specspace_application::draft::DraftRetention;
 use specspace_application::proposal_reader::ProposalReader;
 use specspace_application::reader::{BookProviderFactory, BookReader};
+use specspace_application::review_preparation::ReviewPreparer;
 use specspace_application::{
     comparison_file::ComparisonFileReader,
     comparison_reader::{BoundProviderFactory, ComparisonReader},
@@ -44,6 +45,12 @@ use specspace_infrastructure::{
     search_index::{IndexError, PgSearchIndex},
 };
 use specspace_infrastructure::{
+    review_authorization::PgReviewAuthorization,
+    review_snapshots::PgReviewSnapshots,
+    review_submissions::{PgReviewSubmissions, SubmissionError},
+    review_worker::ReviewWorker,
+};
+use specspace_infrastructure::{
     save_worker::SaveWorker,
     saves::{PgSaves, SaveJournalError},
 };
@@ -61,6 +68,9 @@ pub struct AppState {
     pub comparisons: Arc<ComparisonReader>,
     pub comparison_jobs: Arc<PgComparisons>,
     pub comparison_files: Arc<ComparisonFileReader>,
+    pub review_submissions: Arc<PgReviewSubmissions>,
+    pub review_snapshots: Arc<PgReviewSnapshots>,
+    review_preparer: Arc<ReviewPreparer>,
     pub drafts: Arc<PgDrafts>,
     pub search_index: Arc<PgSearchIndex>,
     pub saves: Arc<PgSaves>,
@@ -109,10 +119,15 @@ impl AppState {
             )
             .expect("fixed file-read timeout is valid"),
         );
+        let review_preparer =
+            review_preparer(database.clone(), comparisons.clone(), source.clone());
         Self {
             comparison_jobs,
             comparison_files,
             comparisons,
+            review_preparer,
+            review_submissions: Arc::new(PgReviewSubmissions::new(database.clone())),
+            review_snapshots: Arc::new(PgReviewSnapshots::new(database.clone())),
             saves: Arc::new(PgSaves::new(database.clone())),
             drafts: Arc::new(PgDrafts::new(database.clone(), None)),
             database,
@@ -137,7 +152,7 @@ impl AppState {
         self.configure_book_source(source);
     }
 
-    /// Comparison test/production sources must support frozen connection settings;
+    /// Comparison/review sources must support frozen connection settings;
     /// an unbound book source is never silently reused for this capability.
     pub fn configure_comparison_source(&mut self, source: Arc<dyn BoundProviderFactory>) {
         self.comparison_files = Arc::new(
@@ -151,11 +166,13 @@ impl AppState {
         self.comparisons = Arc::new(
             ComparisonReader::new(
                 Arc::new(PgComparisonAuthorization::new(self.database.clone())),
-                source,
+                source.clone(),
                 std::time::Duration::from_secs(900),
             )
             .expect("fixed comparison timeout is valid"),
         );
+        self.review_preparer =
+            review_preparer(self.database.clone(), self.comparisons.clone(), source);
     }
 
     pub fn configure_draft_retention(&mut self, retention: DraftRetention) {
@@ -194,6 +211,17 @@ impl AppState {
             timeout,
         )
     }
+    pub fn review_worker(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<ReviewWorker, SubmissionError> {
+        ReviewWorker::new(
+            self.review_submissions.clone(),
+            self.review_snapshots.clone(),
+            self.review_preparer.clone(),
+            timeout,
+        )
+    }
 
     pub fn index_worker(&self, timeout: std::time::Duration) -> Result<IndexWorker, IndexError> {
         IndexWorker::new(
@@ -215,6 +243,22 @@ impl AppState {
     ) -> Result<SaveWorker, SaveJournalError> {
         SaveWorker::new(self.saves.clone(), self.book_source.clone(), timeout)
     }
+}
+
+fn review_preparer(
+    database: PgPool,
+    comparisons: Arc<ComparisonReader>,
+    source: Arc<dyn BoundProviderFactory>,
+) -> Arc<ReviewPreparer> {
+    Arc::new(
+        ReviewPreparer::new(
+            Arc::new(PgReviewAuthorization::new(database)),
+            comparisons,
+            source,
+            std::time::Duration::from_secs(900),
+        )
+        .expect("fixed review timeout is valid"),
+    )
 }
 
 #[derive(Serialize, utoipa::ToSchema)]

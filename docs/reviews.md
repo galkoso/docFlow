@@ -2,8 +2,9 @@
 
 Review configuration is editable at `/changes/:id/review`; its contract is in
 [`review-configuration.md`](review-configuration.md). Server-side preparation,
-the submission journal and atomic shared snapshot persistence are implemented.
-The submission worker, public submit/status/snapshot API, decisions, discussions,
+the submission journal, durable worker and atomic shared snapshot persistence
+are implemented.
+The public submit/status/snapshot API, decisions, discussions,
 and provider PR/check orchestration remain open.
 
 ## Current server context
@@ -78,11 +79,11 @@ unreferenced newly added images are also verified. Text-only candidates have an
 explicit empty media set. Other unchanged opaque files are not read.
 
 The scan shares the preparer's two-slot limit and deadline. Its permit stays in
-CPU closures through cancellation. Provider errors preserve their backoff and
-are not retried automatically. Invalid media identifies the failing asset path
+CPU closures through cancellation. A scan returns provider errors with their
+backoff; the durable journal decides whether a later attempt is safe. Invalid media identifies the failing asset path
 with a bounded error code; authority changes take precedence over diagnostics.
 A failure never returns partial evidence. Large scans currently restart rather
-than resume; checkpointed media work remains part of durable-worker development.
+than resume; checkpointed media work remains open.
 
 `VerifiedReview::fingerprint` hashes the planned content identity and media
 validation version. It is independent of actor, state-only changes, or incidental
@@ -185,3 +186,40 @@ and binding; it is neither a fresh Git observation nor approval/merge readiness.
 Job status remains private to the original actor with current edit access. These
 store methods are not yet exposed through public HTTP endpoints; shared raw/
 readable/image body reads and snapshot history navigation remain open.
+
+## Durable snapshot worker
+
+`ReviewWorker` claims only the journal's pending, read-only submission jobs. It
+installs lease-specific authority on the shared preparer, loads the exact saved
+comparison, verifies all required media, then invokes atomic snapshot publication.
+The root preparer's capacity and frozen provider factory are shared with its
+lease-bound clones. Configuring a comparison source also configures review
+preparation; an unbound book source never substitutes for this capability.
+
+The API starts one worker and shuts it down with the other background tasks.
+`REVIEW_WORKER_TIMEOUT_SECONDS` defaults to 900 and permits 30–900 seconds. The
+preparation phase uses a 60-second lease with 15-second authority-checked renewals.
+Renewal waits share the processing deadline. Publication runs without a competing
+heartbeat, renews its own lease, and fences its final transaction. The overall
+processing deadline also bounds publication. Failure cleanup uses the journal's
+short database transaction limits. Shutdown cancels pending reads and leaves a
+running lease available for recovery after expiry. Detached CPU work retains
+its preparation permit until it finishes and cannot publish by itself.
+
+Transient read failures and processing timeouts receive bounded exponential
+backoff; provider retry-after values up to one day are honored. Longer requested
+delays stop automatic retries and leave a failed job for an explicit new request.
+Eight attempts exhaust the journal's retry budget and release its mutation slot.
+Invalid content/media, moved refs, stale metadata and revoked authority fail
+definitively. Persisted job results contain bounded error codes, without private
+validation findings, paths or source text. A replaced/expired attempt cannot fail
+or publish over its new owner. Database publication uncertainty leaves work for
+receipt observation or expired-lease recovery; it does not force a failed outcome
+over a possibly committed result. Started/unknown provider operations remain
+outside the worker's claim and failure paths.
+
+This worker performs only Git reads. It does not create PRs, publish checks,
+grant approval or merge. A crash before snapshot commit can repeat reads; a crash
+after commit leaves the successful job and immutable receipt observable. Scans
+currently restart rather than resume. Public submission/status/snapshot endpoints
+and the corresponding frontend flow remain separate remaining work.

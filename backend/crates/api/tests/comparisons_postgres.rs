@@ -206,6 +206,7 @@ struct Fixture {
     organization: Uuid,
     app: Router,
     worker: ComparisonWorker,
+    review_worker: specspace_infrastructure::review_worker::ReviewWorker,
     provider: Arc<Provider>,
     slots: Arc<tokio::sync::Semaphore>,
     file_resolves: Arc<AtomicUsize>,
@@ -363,6 +364,7 @@ async fn fixture_options(
     }
     let slots = state.render_slots.clone();
     let worker = state.comparison_worker(Duration::from_secs(900)).unwrap();
+    let review_worker = state.review_worker(Duration::from_secs(30)).unwrap();
     Fixture {
         actor,
         owner,
@@ -370,9 +372,97 @@ async fn fixture_options(
         organization,
         app: router(state),
         worker,
+        review_worker,
         provider,
         slots,
         file_resolves,
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn application_state_binds_review_preparation_to_the_configured_comparison_source(
+    pool: PgPool,
+) {
+    use specspace_application::{
+        proposal::{IdempotencyKey, UiImpact},
+        review_configuration::{
+            ReviewArea, ReviewConfigurationRequest, ReviewSettings, ReviewerSelection,
+        },
+        review_submission::{ReviewSubmissionRequest, ValidatedReviewSubmission},
+    };
+    use specspace_infrastructure::{
+        review_configuration::PgReviewConfiguration, review_submissions::PgReviewSubmissions,
+        review_worker::ReviewWork,
+    };
+    for configured in [true, false] {
+        let f = fixture(&pool, configured).await;
+        let product = user(&pool, f.organization, "REVIEWER").await;
+        let development = user(&pool, f.organization, "REVIEWER").await;
+        for (id, domain) in [(product.id, "PRODUCT"), (development.id, "DEVELOPMENT")] {
+            sqlx::query("UPDATE memberships SET review_domains=ARRAY[$3::text] WHERE organization_id=$1 AND user_id=$2").bind(f.organization).bind(id).bind(domain).execute(&pool).await.unwrap();
+        }
+        PgReviewConfiguration::new(pool.clone())
+            .update(
+                f.owner.id,
+                f.proposal,
+                ReviewConfigurationRequest {
+                    request_id: Uuid::new_v4(),
+                    expected_head_sha: HEAD.into(),
+                    expected_proposal_version: 1,
+                    expected_configuration_version: 1,
+                    settings: ReviewSettings {
+                        ui_impact: UiImpact::No,
+                        ui_impact_reason: Some("No UI changes".into()),
+                        assignments: vec![
+                            ReviewerSelection {
+                                reviewer_id: product.id,
+                                domain: ReviewArea::Product,
+                                required: true,
+                            },
+                            ReviewerSelection {
+                                reviewer_id: development.id,
+                                domain: ReviewArea::Development,
+                                required: true,
+                            },
+                        ],
+                    },
+                },
+            )
+            .await
+            .unwrap();
+        let submissions = PgReviewSubmissions::new(pool.clone());
+        let input = ValidatedReviewSubmission::new(
+            f.owner.id,
+            f.proposal,
+            ReviewSubmissionRequest {
+                expected_head_sha: HEAD.into(),
+                expected_target_sha: MAIN.into(),
+                expected_proposal_version: 2,
+                expected_configuration_version: 2,
+                expected_policy_version: 1,
+            },
+        )
+        .unwrap();
+        let ticket = submissions
+            .reserve(
+                &input,
+                &IdempotencyKey::parse(Uuid::new_v4().to_string()).unwrap(),
+            )
+            .await
+            .unwrap();
+        let result = f.review_worker.run_once().await.unwrap();
+        let status = submissions.status(f.owner.id, ticket.job_id).await.unwrap();
+        if configured {
+            assert_eq!(result, ReviewWork::Completed(ticket.job_id));
+            assert!(f.provider.reads.load(Ordering::SeqCst) > 0);
+            assert!(status.publication.is_some());
+            assert_eq!(status.phase, "SNAPSHOT_READY");
+        } else {
+            assert_eq!(result, ReviewWork::Failed(ticket.job_id));
+            assert_eq!(f.provider.reads.load(Ordering::SeqCst), 0);
+            assert_eq!(status.error_code.as_deref(), Some("REVIEW_SETUP_REQUIRED"));
+            assert!(status.publication.is_none());
+        }
     }
 }
 async fn get(

@@ -19,15 +19,22 @@ use specspace_infrastructure::{
 use std::{
     collections::BTreeMap,
     sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
+#[path = "snapshots/worker.rs"]
+mod worker;
 struct Source {
     trees: BTreeMap<String, BTreeMap<String, Vec<u8>>>,
     reads: AtomicUsize,
     target: AtomicUsize,
+    failure: Mutex<Option<GitError>>,
+    blocked: AtomicBool,
+    started: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+    invalid_media: AtomicBool,
 }
 fn sha(digit: usize) -> CommitSha {
     CommitSha::parse(digit.to_string().repeat(40)).unwrap()
@@ -36,6 +43,13 @@ fn sha(digit: usize) -> CommitSha {
 impl GitProvider for Source {
     async fn main_head(&self) -> Result<CommitSha, GitError> {
         self.reads.fetch_add(1, Ordering::SeqCst);
+        self.started.notify_one();
+        if self.blocked.load(Ordering::SeqCst) {
+            self.release.notified().await;
+        }
+        if let Some(error) = self.failure.lock().unwrap().clone() {
+            return Err(error);
+        }
         Ok(sha(self.target.load(Ordering::SeqCst)))
     }
     async fn branch_head(&self, branch: &BranchName) -> Result<CommitSha, GitError> {
@@ -63,6 +77,9 @@ impl GitProvider for Source {
         max: usize,
     ) -> Result<Vec<u8>, GitError> {
         self.reads.fetch_add(1, Ordering::SeqCst);
+        if self.invalid_media.load(Ordering::SeqCst) {
+            return Ok(vec![0]);
+        }
         let bytes = self.trees[commit.as_str()][path.as_str()].clone();
         assert!(bytes.len() <= max);
         Ok(bytes)
@@ -113,6 +130,13 @@ async fn setup(pool: &PgPool) -> (Fixture, Arc<Source>, ReviewPreparer) {
     setup_media(pool, true).await
 }
 async fn setup_media(pool: &PgPool, include_media: bool) -> (Fixture, Arc<Source>, ReviewPreparer) {
+    setup_body(pool, include_media, None).await
+}
+async fn setup_body(
+    pool: &PgPool,
+    include_media: bool,
+    body: Option<&str>,
+) -> (Fixture, Arc<Source>, ReviewPreparer) {
     let f = fixture(pool).await;
     sqlx::query("UPDATE proposals SET base_sha=$2,target_sha=$3 WHERE id=$1")
         .bind(f.proposal)
@@ -138,6 +162,9 @@ async fn setup_media(pool: &PgPool, include_media: bool) -> (Fixture, Arc<Source
         ));
         after.insert(path, image);
     }
+    if let Some(body) = body {
+        after = tree(body);
+    }
     let source = Arc::new(Source {
         trees: BTreeMap::from([
             (sha(0).as_str().into(), tree("Before")),
@@ -146,6 +173,11 @@ async fn setup_media(pool: &PgPool, include_media: bool) -> (Fixture, Arc<Source
         ]),
         reads: AtomicUsize::new(0),
         target: AtomicUsize::new(2),
+        failure: Mutex::new(None),
+        blocked: AtomicBool::new(false),
+        started: tokio::sync::Notify::new(),
+        release: tokio::sync::Notify::new(),
+        invalid_media: AtomicBool::new(false),
     });
     let factory = Arc::new(Factory {
         source: source.clone(),
@@ -175,6 +207,22 @@ async fn prepared(
     version: i64,
 ) -> (SubmissionLease, VerifiedReview) {
     let store = PgReviewSubmissions::new(pool.clone());
+    reserve(pool, f, version).await;
+    let lease = store.claim(Uuid::new_v4(), 300).await.unwrap().unwrap();
+    let bound = preparer.with_authorization(Arc::new(store.authorization(&lease)));
+    let candidate = bound
+        .prepare(f.owner, f.proposal, lease.expectation().clone())
+        .await
+        .unwrap();
+    let verified = bound.verify_media(candidate).await.unwrap();
+    (lease, verified)
+}
+async fn reserve(
+    pool: &PgPool,
+    f: &Fixture,
+    version: i64,
+) -> specspace_application::review_submission::ReviewSubmissionAccepted {
+    let store = PgReviewSubmissions::new(pool.clone());
     let input = ValidatedReviewSubmission::new(
         f.owner,
         f.proposal,
@@ -193,15 +241,7 @@ async fn prepared(
             &IdempotencyKey::parse(Uuid::new_v4().to_string()).unwrap(),
         )
         .await
-        .unwrap();
-    let lease = store.claim(Uuid::new_v4(), 300).await.unwrap().unwrap();
-    let bound = preparer.with_authorization(Arc::new(store.authorization(&lease)));
-    let candidate = bound
-        .prepare(f.owner, f.proposal, lease.expectation().clone())
-        .await
-        .unwrap();
-    let verified = bound.verify_media(candidate).await.unwrap();
-    (lease, verified)
+        .unwrap()
 }
 
 #[sqlx::test(migrations = "../../migrations")]

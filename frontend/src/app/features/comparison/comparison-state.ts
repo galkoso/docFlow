@@ -2,12 +2,12 @@ import { computed, inject, Injectable, OnDestroy, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subscription, timeout } from 'rxjs';
 import { ComparisonApi, ComparisonChange, ComparisonRequest, DiffResponse } from '../../core/api/comparison-api';
-import { changeIdentity, errorCode, integer, PAGE_SIZE, sha, summaryIdentity, uuid, validDiff } from './comparison-evidence';
+import { changeIdentity, digest, errorCode, integer, PAGE_SIZE, sha, summaryIdentity, uuid, validDiff } from './comparison-evidence';
 
 type Status = 'idle' | 'loading' | 'queued' | 'publishing' | 'retry_wait' | 'ready' | 'failed' | 'error' | 'suspended' | 'waiting';
 interface Intent {
   actor: string; proposal: string; request: Readonly<ComparisonRequest> | null;
-  snapshot: string | null; job: string | null; summary: string | null; terminal: string | null; offset: number;
+  snapshot: string | null; job: string | null; summary: string | null; terminal: string | null; offset: number; file: string | null;
 }
 export interface ComparisonSelection { head?: string; target?: string; request_id?: string; }
 /** Page-owned private state. New preparation is explicit, accepted work is only
@@ -49,25 +49,42 @@ export class ComparisonState implements OnDestroy {
     }
     if (this.busy() && this.intent?.proposal === proposal && !selection.request_id) return false;
     this.clear(); this.owner.set(actor); this.active.set(true); this.requestId.set(request.request_id);
-    this.intent = { actor, proposal, request, snapshot: null, job: null, summary: null, terminal: null, offset: 0 };
+    this.intent = { actor, proposal, request, snapshot: null, job: null, summary: null, terminal: null, offset: 0, file: null };
     this.fetch(); return true;
   }
   openSnapshot(actor: string, proposal: string, snapshot: string, offset = 0): boolean {
     if (!this.canOwn(actor)) return false;
     if (!uuid(actor) || !uuid(proposal) || !uuid(snapshot) || !integer(offset, 40000)) return this.invalidInput();
     if (this.intent?.actor === actor && this.intent.proposal === proposal && this.intent.snapshot === snapshot) {
-      if (this.intent.offset !== offset) {
+      const located = this.intent.file != null; this.intent.file = null;
+      if (this.intent.offset !== offset || located) {
         this.cancel(); this.intent.offset = offset; this.polls = 0; this.fetch();
       }
       return false; // Includes promotion of our receipt into the route URL.
     }
     this.clear(); this.owner.set(actor); this.active.set(true); this.snapshot.set(snapshot);
-    this.intent = { actor, proposal, request: null, snapshot, job: null, summary: null, terminal: null, offset };
+    this.intent = { actor, proposal, request: null, snapshot, job: null, summary: null, terminal: null, offset, file: null };
+    this.fetch(); return true;
+  }
+  openFile(actor: string, proposal: string, snapshot: string, file: string): boolean {
+    if (!this.canOwn(actor)) return false;
+    if (!uuid(actor) || !uuid(proposal) || !uuid(snapshot) || !digest(file)) return this.invalidInput();
+    if (this.intent?.actor === actor && this.intent.proposal === proposal && this.intent.snapshot === snapshot) {
+      if (this.intent.file !== file && this.busy()) this.cancel();
+      if (this.selected()?.id === file) { this.intent.file = file; return false; }
+      if (this.data()?.page?.files.some(change => change.id === file)) {
+        this.intent.file = file; this.select(file); return false;
+      }
+      if (this.intent.file === file) return false;
+      this.cancel(); this.intent.file = file; this.selected.set(null); this.data.set(null); this.polls = 0; this.fetch(); return true;
+    }
+    this.clear(); this.owner.set(actor); this.active.set(true); this.snapshot.set(snapshot);
+    this.intent = { actor, proposal, request: null, snapshot, job: null, summary: null, terminal: null, offset: 0, file };
     this.fetch(); return true;
   }
   files(offset: number): void {
     if (!this.active() || !this.intent?.snapshot || this.data()?.state !== 'READY' || !integer(offset, 40000)) return;
-    this.cancel(); this.intent.offset = offset; this.polls = 0; this.fetch();
+    this.cancel(); this.intent.offset = offset; this.intent.file = null; this.polls = 0; this.fetch();
   }
   select(id: string): boolean {
     if (!this.active() || this.data()?.state !== 'READY') return false;
@@ -122,16 +139,17 @@ export class ComparisonState implements OnDestroy {
     if (!intent || !this.active() || this.busy()) return;
     this.stopTimer(); const generation = this.generation;
     const expected = { proposal: intent.proposal, snapshot: intent.snapshot, job: intent.job, summary: intent.summary,
-      request: intent.request, offset: intent.offset };
+      request: intent.request, offset: intent.file ? null : intent.offset };
     this.busy.set(true); this.error.set(''); this.errorCode.set('');
     if (!this.data()) this.status.set('loading');
-    const request = intent.snapshot ? this.api.page(intent.actor, intent.proposal, intent.snapshot, intent.offset, PAGE_SIZE)
-      : this.api.prepare(intent.actor, intent.proposal, intent.request!);
+    const request = intent.snapshot ? intent.file ? this.api.filePage(intent.actor, intent.proposal, intent.snapshot, intent.file)
+      : this.api.page(intent.actor, intent.proposal, intent.snapshot, intent.offset, PAGE_SIZE) : this.api.prepare(intent.actor, intent.proposal, intent.request!);
     this.request = request.pipe(timeout(20_000)).subscribe({
       next: response => {
         if (!this.current(intent, generation)) return;
         this.busy.set(false);
-        if (!validDiff(response, expected) || intent.summary != null && response.state !== 'READY') { this.mismatch(); return; }
+        if (!validDiff(response, expected) || intent.summary != null && response.state !== 'READY'
+          || response.state === 'READY' && intent.file != null && !response.page?.files.some(change => change.id === intent.file)) { this.mismatch(); return; }
         const terminal = response.state === 'PENDING' ? null : JSON.stringify([response.state, response.job_state,
           response.phase, response.attempts, response.completed_at, response.error_code ?? null]);
         const known = new Map((this.data()?.page?.files ?? []).map(file => [file.id, changeIdentity(file)]));
@@ -143,6 +161,8 @@ export class ComparisonState implements OnDestroy {
         intent.snapshot = response.snapshot_id; intent.job = response.job_id;
         if (response.summary) intent.summary = summaryIdentity(response.summary);
         this.snapshot.set(response.snapshot_id); this.uncertain.set(false); this.data.set(structuredClone(response));
+        if (response.page) intent.offset = response.page.offset;
+        if (intent.file && response.state === 'READY') this.select(intent.file);
         this.status.set(response.phase.toLowerCase() as Status);
         if (response.state === 'FAILED') {
           this.errorCode.set(response.error_code ?? ''); this.error.set('הכנת ההשוואה לא הושלמה. יש לבדוק את הסיבה לפני הכנת השוואה חדשה.'); return;

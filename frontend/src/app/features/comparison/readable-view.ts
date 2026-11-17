@@ -13,7 +13,7 @@ import { wordChanges, WordChanges } from './word-changes';
   template: `
     <h2>השוואה קריאה — <bdi>{{ scope()?.file?.after?.path ?? scope()?.file?.before?.path }}</bdi></h2>
     @if (state.busy()) {<p role="status">טוענים את יחידות המסמך…</p>}
-    @if (state.error()) {<p role="alert">{{ state.error() }}</p>
+    @if (state.error()) {<button (click)="rowSelected.emit(null)">תחילת רשימת היחידות</button><p role="alert">{{ state.error() }}</p>
       @if (state.authRequired()) {<button (click)="session.refresh()">בדיקת התחברות מחדש</button>}
       @else {<button (click)="state.retry()">בדיקה נוספת של אותה גרסה</button>}
     }
@@ -25,7 +25,7 @@ import { wordChanges, WordChanges } from './word-changes';
       } @else {
         <nav aria-label="יחידות ההשוואה">
           @for (row of result.page.rows; track row.change.id) {
-            <button class="unit" (click)="state.select(row.change.id)" [attr.aria-pressed]="state.selected()?.change?.id === row.change.id">
+            <button class="unit" (click)="choose(row.change.id)" [attr.aria-pressed]="state.selected()?.change?.id === row.change.id">
               {{ label(row.after?.kind ?? row.before!.kind) }} · {{ label(row.change.status) }}
               @if (row.after?.heading_id ?? row.before?.heading_id; as heading) {<bdi>{{ heading }}</bdi>}
               <small>לפני {{ row.before ? row.before.index + 1 : 'לא קיים' }} · אחרי {{ row.after ? row.after.index + 1 : 'לא קיים' }}</small>
@@ -61,6 +61,8 @@ import { wordChanges, WordChanges } from './word-changes';
 export class ReadableView {
   readonly scope = input<RawScope | null>(null);
   readonly repository = input<string | null>(null);
+  readonly row = input<string | null>(null);
+  readonly rowSelected = output<string | null>();
   readonly rawRequested = output<void>();
   readonly state = inject(ReadableState);
   private readonly sides = viewChildren(ReadableSide);
@@ -85,7 +87,8 @@ export class ReadableView {
   readonly after = computed(() => this.side('after'));
   readonly beforeAssets = computed(() => this.assets('before'));
   readonly afterAssets = computed(() => this.assets('after'));
-  constructor() { effect(() => { const scope = this.scope(); untracked(() => this.state.open(scope)); }); }
+  constructor() { effect(() => { const scope = this.scope(), row = this.row(); untracked(() => this.state.open(scope, row)); }); }
+  choose(id: string): void { this.state.select(id); this.rowSelected.emit(id); }
   previous(offset: number): void { this.state.page(Math.max(0, offset - 50)); }
   label(value: string): string {
     return ({ metadata: 'נתוני מסמך', heading: 'כותרת', paragraph: 'פסקה', list: 'רשימה', quote: 'ציטוט', code: 'קוד', table: 'טבלה',

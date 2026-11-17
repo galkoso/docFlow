@@ -12,7 +12,7 @@
     @else if (state.canCheck()) {<button (click)="state.check()">בדיקת מצב ההשוואה</button>}
     @if (state.authRequired() || raw.authRequired()) {<button (click)="session.refresh()">בדיקת התחברות מחדש</button>}
   </div>
-  @if (state.error()) {<p class="notice" role="alert">{{ state.error() }} <code>{{ state.errorCode() }}</code></p>}
+  @if (state.error()) {@if (location()?.file) {<button (click)="clearFile()">תחילת רשימת הקבצים</button>}<p class="notice" role="alert">{{ state.error() }} <code>{{ state.errorCode() }}</code></p>}
   @if (state.busy()) {<p role="status">בודקים את ההשוואה שנבחרה…</p>}
   @if (visible()) {
     @if (state.data(); as result) {
@@ -47,15 +47,19 @@
       }
     }
     @if (state.selected(); as file) {
+      @if (invalidUnitKind()) {<p role="alert">לסוג קובץ זה אין יחידות טקסט להשוואה קריאה.</p>
+        <button (click)="selectUnit(null)">הצגת הקובץ ללא בחירת יחידה</button>
+      } @else {
+      @if (selectionHref(); as href) {<a [href]="href">קישור לבחירה בהשוואה האישית</a>}
       @if (file.kind === 'asset') {<app-comparison-image [scope]="fileScope()" />}
       @else if (file.kind === 'other') {<p>אין תצוגה מקדימה לסוג קובץ זה.</p>}
       @else {
       <div class="actions" aria-label="תצוגת השוואה">
-        <button (click)="mode.set('readable')" [attr.aria-pressed]="mode() === 'readable'">תצוגה קריאה</button>
-        <button (click)="mode.set('raw')" [attr.aria-pressed]="mode() === 'raw'">מקור גולמי</button>
+        <button (click)="setMode('readable')" [attr.aria-pressed]="mode() === 'readable'">תצוגה קריאה</button>
+        <button (click)="setMode('raw')" [attr.aria-pressed]="mode() === 'raw'">מקור גולמי</button>
       </div>
       @if (mode() === 'readable') {
-        <app-readable-view [scope]="fileScope()" [repository]="state.data()?.summary?.repository_id ?? null" (rawRequested)="mode.set('raw')" />
+        <app-readable-view [row]="unit()" (rowSelected)="selectUnit($event)" [scope]="fileScope()" [repository]="state.data()?.summary?.repository_id ?? null" (rawRequested)="setMode('raw')" />
       } @else {
       <section class="raw" aria-label="השוואת מקור"><h2>מקור גולמי — <bdi>{{ file.after?.path ?? file.before?.path }}</bdi></h2>
         @if (raw.busy()) {<p role="status">טוענים מקטע מקור…</p>}
@@ -78,6 +82,7 @@
           }
         }
       </section>
+      }
       }
       }
     }

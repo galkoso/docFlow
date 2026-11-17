@@ -226,4 +226,33 @@ describe('Comparison snapshot lifecycle', () => {
     expect(state.data()?.page?.offset).toBe(50);
   });
 
+  it('locates a selected file on a later page without preparing or trusting an old list position', () => {
+    state.openFile(actor, proposal, snapshot, file(75).id); const located = request();
+    expect(located.request.params.keys().sort()).toEqual(['file', 'limit', 'snapshot']);
+    expect(located.request.params.get('file')).toBe(file(75).id); located.flush(ready(120, 50));
+    expect(state.selected()?.id).toBe(file(75).id); expect(state.data()?.page?.offset).toBe(50);
+    state.openFile(actor, proposal, snapshot, file(75).id); state.openFile(actor, proposal, snapshot, file(76).id);
+    expect(state.selected()?.id).toBe(file(76).id); http.expectNone(req => req.url.endsWith('/diff'));
+    state.files(100); const obsolete = request(); state.openFile(actor, proposal, snapshot, file(75).id);
+    expect(obsolete.cancelled).toBe(true); expect(state.selected()?.id).toBe(file(75).id);
+    state.openSnapshot(actor, proposal, snapshot); const list = request();
+    expect(list.request.params.has('file')).toBe(false); expect(list.request.params.get('offset')).toBe('0'); list.flush(ready(120));
+  });
+  it('pins a file locator through failures and same-actor refresh, and rejects a page without that identity', () => {
+    state.openFile(actor, proposal, snapshot, file(75).id); const first = request(); first.error(new ProgressEvent('error'));
+    state.retry(); const retry = request(); expect(retry.request.params.toString()).toBe(first.request.params.toString());
+    retry.flush(ready(120)); expect(state.data()).toBeNull(); expect(state.errorCode()).toBe('COMPARISON_RESPONSE_MISMATCH');
+    state.retry(); request().flush(ready(120, 50)); state.identity(null); expect(state.selected()).toBeNull();
+    state.identity(actor); const restored = request(); expect(restored.request.params.get('file')).toBe(file(75).id);
+    restored.flush(ready(120, 50)); expect(state.selected()?.id).toBe(file(75).id); expect(state.requestId()).toBeNull();
+  });
+  it('cancels obsolete file locations and never silently prepares after an unknown immutable ID', () => {
+    state.openFile(actor, proposal, snapshot, file(75).id); const old = request();
+    state.openFile(actor, proposal, snapshot, file(99).id); expect(old.cancelled).toBe(true);
+    request().flush({ error: { code: 'NOT_FOUND' } }, { status: 404, statusText: 'Not found' });
+    expect(state.selected()).toBeNull(); expect(state.snapshot()).toBe(snapshot);
+    vi.advanceTimersByTime(60000); http.expectNone(req => req.url.endsWith('/diff'));
+    state.openSnapshot(actor, proposal, snapshot); request().flush(ready()); expect(state.data()?.state).toBe('READY');
+  });
+
 });

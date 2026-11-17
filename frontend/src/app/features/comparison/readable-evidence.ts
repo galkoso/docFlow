@@ -66,16 +66,16 @@ export function pageIdentity(page: ReadablePage): string {
   const side = (s: SideSummary) => [s.state, s.sha256 ?? null, s.document_id ?? null, s.source_bytes, s.units_total, s.error_code ?? null];
   return JSON.stringify([page.ready, page.raw_changed, page.total, side(page.before), side(page.after)]);
 }
-export function validPage(response: ReadableFileResponse, scope: RawScope, offset: number): boolean {
+export function validPage(response: ReadableFileResponse, scope: RawScope, offset: number | null): boolean {
   if (!sameFile(response, scope)) return false;
   const page = response.page;
   if (!page || !validSide(page.before, scope.file.before) || !validSide(page.after, scope.file.after)
     || page.ready !== ![page.before.state, page.after.state].includes('RAW_REQUIRED')
     || page.raw_changed !== ((scope.file.before?.sha256 ?? null) !== (scope.file.after?.sha256 ?? null))
-    || !integer(page.total, page.before.units_total + page.after.units_total) || page.offset !== offset
-    || !Array.isArray(page.rows) || page.rows.length !== Math.min(50, Math.max(0, page.total - offset))) return false;
+    || !integer(page.total, page.before.units_total + page.after.units_total) || (offset == null ? !integer(page.offset, 20004) || page.offset % 50 !== 0 : page.offset !== offset)
+    || !Array.isArray(page.rows) || page.rows.length !== Math.min(50, Math.max(0, page.total - page.offset))) return false;
   if (!page.ready && page.total !== 0 || page.ready && page.total < Math.max(page.before.units_total, page.after.units_total)) return false;
-  const next = offset + page.rows.length;
+  const next = page.offset + page.rows.length;
   if ((page.next_offset ?? null) !== (next < page.total ? next : null)) return false;
   const ids = new Set<string>(), before = new Set<number>(), after = new Set<number>();
   return page.rows.every(row => {

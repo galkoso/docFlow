@@ -1292,3 +1292,22 @@ Checkboxes represent verified work only.
   tests cover later pages, private scope, stale identities and no-Git location.
   The full backend suite and workspace Clippy pass. OpenAPI and the typed client
   are regenerated; existing readable fixtures retain their exact contract.
+
+- Restorable comparison selection: Angular URLs now retain snapshot, immutable
+  file ID, readable paired-unit ID and readable/raw view. Restoration locates
+  exact identities directly instead of scanning or trusting stale page offsets.
+  File/unit receipt validation requires the requested identity in the bounded
+  returned page; refresh/retry preserves actor and snapshot without preparation.
+  Browser back can reuse validated files already in memory; selecting another
+  file cancels an obsolete in-flight page. Raw-view URLs select the whole file,
+  while unit locators require readable view; applying a unit locator to a media
+  file is explicit and cannot fetch an unrelated body. Unknown IDs can return to
+  the same snapshot's file/unit list without silently selecting latest refs.
+  Latest preparation clears old file/unit locators, mode switches cancel bodies,
+  and private selection links contain no actor, source text or approval authority.
+  Links target the current actor's private comparison, not a shared formal review.
+  Twelve new frontend scenarios bring the suite to 204 passing tests. Production
+  build passes, and OpenAPI/readable fixture checks show no drift. Both CI
+  workflows for the preceding image-view stage passed. Raw chunk/window position
+  links, persisted formal review anchors/decisions, browser/human acceptance and
+  all remaining merge/bundle/production requirements remain open.

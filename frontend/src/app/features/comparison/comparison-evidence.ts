@@ -70,7 +70,7 @@ export function summaryIdentity(v: ComparisonSummary): string {
     v.before_findings_total, v.before_findings.map(f => [f.code, f.path]), v.after_findings_total, v.after_findings.map(f => [f.code, f.path])]);
 }
 export interface ExpectedComparison {
-  proposal: string; snapshot: string | null; job: string | null; summary: string | null; request: Readonly<ComparisonRequest> | null; offset: number;
+  proposal: string; snapshot: string | null; job: string | null; summary: string | null; request: Readonly<ComparisonRequest> | null; offset: number | null;
 }
 export function validDiff(v: DiffResponse, expected: ExpectedComparison): boolean {
   if (!v || v.proposal_id !== expected.proposal || !uuid(v.snapshot_id) || !uuid(v.job_id)
@@ -94,7 +94,7 @@ export function validDiff(v: DiffResponse, expected: ExpectedComparison): boolea
     || expected.request?.target && s.target_sha !== expected.request.target) return false;
   if (v.historical_head !== (s.head_sha !== v.current_head_sha) || v.context_changed !== (s.proposal_version !== v.current_proposal_version
     || s.recorded_head_sha !== v.current_head_sha || s.proposal_state !== v.current_proposal_state)) return false;
-  if (page.snapshot_id !== v.snapshot_id || page.content_id !== s.content_id || page.total !== s.changes_total || page.offset !== expected.offset
+  if (page.snapshot_id !== v.snapshot_id || page.content_id !== s.content_id || page.total !== s.changes_total || (!integer(page.offset, 40000) || (expected.offset == null ? page.offset % PAGE_SIZE !== 0 : page.offset !== expected.offset))
     || !Array.isArray(page.files) || page.files.length !== Math.min(PAGE_SIZE, Math.max(0, page.total - page.offset))) return false;
   const next = page.offset + page.files.length;
   return (page.next_offset ?? null) === (next < page.total ? next : null) && page.files.every(validChange)

@@ -17,7 +17,7 @@ import { displayHash, imageResponse, imageScope } from './image.testing';
 describe('Routed comparison page', () => {
   async function create(initial: Record<string, string | string[]> = { snapshot }, mode: 'raw' | 'readable' = 'raw') {
     const profile = signal<{ user_id: string } | null>({ user_id: actor }), logoutEpoch = signal(0);
-    const params = new BehaviorSubject(convertToParamMap({ id: proposal })), query = new BehaviorSubject(convertToParamMap(initial));
+    const params = new BehaviorSubject(convertToParamMap({ id: proposal })), query = new BehaviorSubject(convertToParamMap({ view: mode, ...initial }));
     await TestBed.configureTestingModule({ imports: [ComparisonPage], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
       { provide: IMAGE_DIGEST, useValue: async () => displayHash },
       { provide: SessionState, useValue: { profile, logoutEpoch, status: () => profile() ? 'authenticated' : 'anonymous', refresh: vi.fn() } },
@@ -143,6 +143,56 @@ describe('Routed comparison page', () => {
       c.http.expectNone(req => req.url.endsWith('/readable')); c.profile.set(null); c.settle();
       expect(c.fixture.nativeElement.querySelector('img')).toBeNull(); expect(revoke).toHaveBeenCalledWith('blob:http://localhost/image'); c.destroy();
     } finally { vi.unstubAllGlobals(); }
+  });
+
+  it('restores a file and paired unit directly from a frozen link without preparing or scanning list pages', async () => {
+    const metadata = readableResponse(), target = metadata.page.rows.find(row => row.after?.kind === 'heading')!.change.id;
+    const c = await create({ snapshot, file: readableScope().file.id, unit: target, view: 'readable' }, 'readable');
+    const root = c.request(); expect(root.request.params.get('file')).toBe(readableScope().file.id);
+    expect(root.request.params.has('offset')).toBe(false); expect(root.request.params.has('request_id')).toBe(false);
+    const response = ready(); response.page!.files[0] = readableScope().file; root.flush(response); c.settle();
+    const units = c.http.expectOne(req => req.url.endsWith('/readable'));
+    expect(units.request.params.get('row')).toBe(target); expect(units.request.params.has('offset')).toBe(false);
+    units.flush(metadata); c.settle();
+    for (const side of ['before', 'after'] as const) {
+      const scope = unitScope('heading', side);
+      c.http.expectOne(req => req.url.endsWith(`/units/${scope.unit.index}`) && req.params.get('side') === side).flush(unitResponse(scope));
+    }
+    c.settle(); expect(c.fixture.nativeElement.querySelector('app-document-renderer h2').textContent).toBe('כותרת');
+    const href = c.page.selectionHref()!; expect(href).toContain(`snapshot=${snapshot}`); expect(href).toContain(`unit=${target}`);
+    expect(href).not.toContain('actor'); c.http.expectNone(req => req.url.endsWith('/diff'));
+    c.page.fresh(); c.settle(); const fresh = c.request(); expect(fresh.request.params.has('file')).toBe(false);
+    expect(c.query.value.has('file')).toBe(false); expect(c.query.value.has('unit')).toBe(false);
+    fresh.flush(pending()); c.settle(); c.destroy();
+  });
+
+  it('restores browser back selection and writes view changes without new preparation or redundant inventory reads', async () => {
+    const c = await create(); c.request().flush(ready(2)); c.settle();
+    c.page.select(file().id); c.settle(); c.body().flush(rawResponse()); c.settle(); expect(c.query.value.get('file')).toBe(file().id);
+    c.page.select(file(1).id); c.settle(); const next = rawResponse(); next.file = file(1); c.body().flush(next); c.settle();
+    c.query.next(convertToParamMap({ snapshot, file: file().id, view: 'raw' })); c.settle(); c.body().flush(rawResponse()); c.settle();
+    expect(c.page.state.selected()?.id).toBe(file().id); c.http.expectNone(req => req.url.endsWith('/diff'));
+    c.page.setMode('readable'); c.settle(); expect(c.query.value.get('view')).toBe('readable');
+    const metadata = c.http.expectOne(req => req.url.endsWith('/readable'));
+    c.page.setMode('raw'); c.settle(); expect(metadata.cancelled).toBe(true); c.body().flush(rawResponse()); c.settle();
+    expect(c.query.value.get('view')).toBe('raw'); c.destroy();
+  });
+
+  it('returns from an unknown file locator to the existing snapshot list without silently replacing the snapshot', async () => {
+    const c = await create({ snapshot, file: '9'.repeat(64) });
+    c.request().flush({ error: { code: 'NOT_FOUND' } }, { status: 404, statusText: 'Not found' }); c.settle();
+    expect(c.page.state.snapshot()).toBe(snapshot); expect(c.page.state.selected()).toBeNull();
+    c.page.clearFile(); c.settle(); const list = c.request(); expect(list.request.params.has('file')).toBe(false);
+    expect(list.request.params.get('snapshot')).toBe(snapshot); list.flush(ready()); c.settle(); c.destroy();
+  });
+
+  it('does not silently apply a readable-unit locator to an image file', async () => {
+    const source = imageScope(), c = await create({ snapshot, file: source.file.file.id, unit: 'd'.repeat(64), view: 'readable' }, 'readable');
+    const response = ready(); response.page!.files[0] = source.file.file; c.request().flush(response); c.settle();
+    expect(c.page.invalidUnitKind()).toBe(true); expect(c.fixture.nativeElement.querySelector('[role=alert]').textContent).toContain('אין יחידות טקסט');
+    c.http.expectNone(req => req.url.endsWith('/image') || req.url.endsWith('/readable'));
+    c.page.selectUnit(null); c.settle(); const image = c.http.expectOne(req => req.url.endsWith('/image'));
+    expect(image.request.params.get('snapshot')).toBe(snapshot); c.destroy(); expect(image.cancelled).toBe(true);
   });
 
 });

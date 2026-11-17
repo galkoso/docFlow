@@ -145,5 +145,6 @@ See [the save protocol](docs/commit-saves.md).
 Durable comparison preparation uses migration 008 and one read-only worker.
 `COMPARISON_WORKER_TIMEOUT_SECONDS` defaults to 900 (30–900 allowed). Metadata
 pages survive restart and recheck current access without reloading Git source;
-Markdown and binaries stay in Git. The HTTP diff routes and file views are still
-in progress. See [comparison boundaries and evidence](docs/diffs.md).
+Markdown and binaries stay in Git. Authenticated diff preparation/progress and
+snapshot-pinned metadata pages are available; file views and the comparison UI
+remain in progress. See [comparison boundaries and evidence](docs/diffs.md).

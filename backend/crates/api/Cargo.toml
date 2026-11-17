@@ -56,3 +56,7 @@ workspace = true
 [[test]]
 name = "saves_postgres"
 required-features = ["postgres-tests"]
+
+[[test]]
+name = "comparisons_postgres"
+required-features = ["postgres-tests"]

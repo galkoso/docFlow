@@ -85,6 +85,8 @@ pub struct ComparisonStatus {
     pub error_code: Option<String>,
     pub current_head_sha: String,
     pub current_version: i64,
+    pub current_state: String,
+    pub completed_at: Option<String>,
     pub summary: Option<ComparisonSummary>,
 }
 #[derive(Serialize)]
@@ -448,7 +450,7 @@ impl PgComparisons {
         let mut tx = self.transaction().await?;
         let (row, current) = self.read_scope(&mut tx, actor, proposal, snapshot).await?;
         let summary = ready_summary(&mut tx, &row).await?;
-        let (job_state,attempts,job_result):(String,i32,Option<serde_json::Value>)=sqlx::query_as("SELECT state,attempts,result FROM jobs WHERE id=$1 AND organization_id=$2 AND kind='COMPARE_PROPOSAL'").bind(row.job_id).bind(row.organization_id).fetch_one(&mut *tx).await?;
+        let (job_state,attempts,job_result,completed_at):(String,i32,Option<serde_json::Value>,Option<String>)=sqlx::query_as(r#"SELECT j.state,j.attempts,j.result,to_char(s.completed_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM jobs j JOIN comparison_snapshots s ON s.job_id=j.id AND s.organization_id=j.organization_id WHERE j.id=$1 AND j.organization_id=$2 AND j.kind='COMPARE_PROPOSAL'"#).bind(row.job_id).bind(row.organization_id).fetch_one(&mut *tx).await?;
         if row.state == "PENDING" && !matches!(job_state.as_str(), "QUEUED" | "RUNNING") {
             return Err(ComparisonStoreError::InvalidSnapshot);
         }
@@ -481,6 +483,8 @@ impl PgComparisons {
             error_code: row.error_code,
             current_head_sha: current.recorded_head.as_str().into(),
             current_version: current.version,
+            current_state: current.state,
+            completed_at,
             summary,
         };
         tx.commit().await?;

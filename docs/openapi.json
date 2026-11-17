@@ -244,7 +244,7 @@
           {
             "name": "X-Expected-Actor",
             "in": "header",
-            "description": "Required captured actor UUID for SAVE_PROPOSAL jobs",
+            "description": "Required captured actor UUID for SAVE_PROPOSAL and COMPARE_PROPOSAL jobs",
             "required": false,
             "schema": {
               "type": [
@@ -1174,6 +1174,184 @@
             }
           },
           "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/diff": {
+      "get": {
+        "tags": [
+          "crate::comparisons"
+        ],
+        "operationId": "proposalDiff",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "description": "Captured owner of this derived read",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "query",
+            "description": "Exact replay identity for a new derived read; mutually exclusive with snapshot.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "query",
+            "description": "Durable snapshot returned by the initial request. Pages never reselect refs.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "head",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Immutable ready page or explicit terminal failure status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiffResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Derived comparison queued/loading; no complete result is claimed",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Canonical snapshot status/page URL"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Seconds before polling"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiffResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3273,6 +3451,210 @@
           }
         }
       },
+      "Change": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "content_changed",
+          "mode_changed",
+          "catalog_position_changed"
+        ],
+        "properties": {
+          "after": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Side"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Side"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "catalog_position_changed": {
+            "type": "boolean"
+          },
+          "content_changed": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "description": "File-level identity binds both snapshots and paths; not a review approval."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind"
+          },
+          "matched_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MatchMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode_changed": {
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          }
+        }
+      },
+      "ComparisonJobResult": {
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "progress_path"
+        ],
+        "properties": {
+          "content_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress_path": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ComparisonSummary": {
+        "type": "object",
+        "required": [
+          "content_id",
+          "proposal_id",
+          "repository_id",
+          "proposal_version",
+          "branch",
+          "proposal_state",
+          "head_sha",
+          "target_sha",
+          "merge_base_sha",
+          "observed_main_sha",
+          "recorded_head_sha",
+          "recorded_base_sha",
+          "historical_head",
+          "target_outdated",
+          "base_outdated",
+          "external_branch_change",
+          "before_file_count",
+          "after_file_count",
+          "changes_total",
+          "before_findings",
+          "before_findings_total",
+          "after_findings",
+          "after_findings_total"
+        ],
+        "properties": {
+          "after_file_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "after_findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "after_findings_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "base_outdated": {
+            "type": "boolean"
+          },
+          "before_file_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "before_findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "before_findings_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "branch": {
+            "type": "string"
+          },
+          "changes_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "content_id": {
+            "type": "string"
+          },
+          "external_branch_change": {
+            "type": "boolean"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "historical_head": {
+            "type": "boolean"
+          },
+          "merge_base_sha": {
+            "type": "string"
+          },
+          "observed_branch_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observed_main_sha": {
+            "type": "string"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_state": {
+            "type": "string"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recorded_base_sha": {
+            "type": "string"
+          },
+          "recorded_head_sha": {
+            "type": "string"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_outdated": {
+            "type": "boolean"
+          },
+          "target_sha": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateProposal": {
         "type": "object",
         "required": [
@@ -3389,6 +3771,140 @@
           "proposal_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "DiffFiles": {
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "content_id",
+          "offset",
+          "total",
+          "files"
+        ],
+        "properties": {
+          "content_id": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            }
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "DiffResponse": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "snapshot_id",
+          "job_id",
+          "state",
+          "job_state",
+          "phase",
+          "attempts",
+          "current_head_sha",
+          "current_proposal_version",
+          "current_proposal_state",
+          "context_changed"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "context_changed": {
+            "type": "boolean"
+          },
+          "current_head_sha": {
+            "type": "string"
+          },
+          "current_proposal_state": {
+            "type": "string"
+          },
+          "current_proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "historical_head": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "job_state": {
+            "type": "string"
+          },
+          "page": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DiffFiles"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phase": {
+            "type": "string"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "summary": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ComparisonSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -4142,6 +4658,21 @@
           }
         }
       },
+      "Finding": {
+        "type": "object",
+        "required": [
+          "code",
+          "path"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      },
       "Health": {
         "type": "object",
         "required": [
@@ -4227,6 +4758,16 @@
             "type": "integer",
             "format": "int32"
           },
+          "comparison": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ComparisonJobResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "creation": {
             "oneOf": [
               {
@@ -4285,12 +4826,29 @@
           }
         }
       },
+      "Kind": {
+        "type": "string",
+        "enum": [
+          "document",
+          "asset",
+          "catalog",
+          "other"
+        ]
+      },
       "LinkKind": {
         "type": "string",
         "enum": [
           "figma",
           "ticket",
           "development_pr"
+        ]
+      },
+      "MatchMethod": {
+        "type": "string",
+        "enum": [
+          "document_id",
+          "path",
+          "exact_blob"
         ]
       },
       "MatchWindow": {
@@ -5332,6 +5890,50 @@
           }
         }
       },
+      "Side": {
+        "type": "object",
+        "required": [
+          "path",
+          "blob_oid",
+          "bytes",
+          "executable"
+        ],
+        "properties": {
+          "blob_oid": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "catalog_position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "document_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "executable": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "SourcePreview": {
         "type": "object",
         "required": [
@@ -5442,6 +6044,15 @@
             "type": "boolean"
           }
         }
+      },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "added",
+          "deleted",
+          "modified",
+          "renamed"
+        ]
       },
       "SyncState": {
         "type": "string",

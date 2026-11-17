@@ -232,6 +232,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalDiff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/documents/{document}": {
         parameters: {
             query?: never;
@@ -488,6 +504,53 @@ export interface components {
         AuthAvailability: {
             login_available: boolean;
         };
+        Change: {
+            after?: components["schemas"]["Side"] | null;
+            before?: components["schemas"]["Side"] | null;
+            catalog_position_changed: boolean;
+            content_changed: boolean;
+            /** @description File-level identity binds both snapshots and paths; not a review approval. */
+            id: string;
+            kind: components["schemas"]["Kind"];
+            matched_by?: components["schemas"]["MatchMethod"] | null;
+            mode_changed: boolean;
+            status: components["schemas"]["Status"];
+        };
+        ComparisonJobResult: {
+            content_id?: string | null;
+            progress_path: string;
+            /** Format: uuid */
+            snapshot_id: string;
+        };
+        ComparisonSummary: {
+            after_file_count: number;
+            after_findings: components["schemas"]["Finding"][];
+            after_findings_total: number;
+            base_outdated: boolean;
+            before_file_count: number;
+            before_findings: components["schemas"]["Finding"][];
+            before_findings_total: number;
+            branch: string;
+            changes_total: number;
+            content_id: string;
+            external_branch_change: boolean;
+            head_sha: string;
+            historical_head: boolean;
+            merge_base_sha: string;
+            observed_branch_sha?: string | null;
+            observed_main_sha: string;
+            /** Format: uuid */
+            proposal_id: string;
+            proposal_state: string;
+            /** Format: int64 */
+            proposal_version: number;
+            recorded_base_sha: string;
+            recorded_head_sha: string;
+            /** Format: uuid */
+            repository_id: string;
+            target_outdated: boolean;
+            target_sha: string;
+        };
         CreateProposal: {
             branch: string;
             /** Format: uuid */
@@ -522,6 +585,38 @@ export interface components {
             head_sha: string;
             /** Format: uuid */
             proposal_id: string;
+        };
+        DiffFiles: {
+            content_id: string;
+            files: components["schemas"]["Change"][];
+            next_offset?: number | null;
+            offset: number;
+            /** Format: uuid */
+            snapshot_id: string;
+            total: number;
+        };
+        DiffResponse: {
+            /** Format: int32 */
+            attempts: number;
+            completed_at?: string | null;
+            context_changed: boolean;
+            current_head_sha: string;
+            current_proposal_state: string;
+            /** Format: int64 */
+            current_proposal_version: number;
+            error_code?: string | null;
+            historical_head?: boolean | null;
+            /** Format: uuid */
+            job_id: string;
+            job_state: string;
+            page?: components["schemas"]["DiffFiles"] | null;
+            phase: string;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            state: string;
+            summary?: components["schemas"]["ComparisonSummary"] | null;
         };
         DocumentBlock: {
             block_id: string;
@@ -713,6 +808,10 @@ export interface components {
         ErrorBody: {
             error: components["schemas"]["ApiError"];
         };
+        Finding: {
+            code: string;
+            path: string;
+        };
         Health: {
             status: string;
         };
@@ -735,6 +834,7 @@ export interface components {
         JobStatus: {
             /** Format: int32 */
             attempts: number;
+            comparison?: components["schemas"]["ComparisonJobResult"] | null;
             creation?: components["schemas"]["CreationResult"] | null;
             error_code?: string | null;
             /** Format: uuid */
@@ -748,7 +848,11 @@ export interface components {
             state: string;
         };
         /** @enum {string} */
+        Kind: "document" | "asset" | "catalog" | "other";
+        /** @enum {string} */
         LinkKind: "figma" | "ticket" | "development_pr";
+        /** @enum {string} */
+        MatchMethod: "document_id" | "path" | "exact_blob";
         /**
          * @description Visible text intervals within one document. Matching uses each entire block,
          *     so a viewport/formatting boundary never changes literal-search semantics.
@@ -1012,6 +1116,16 @@ export interface components {
             section_id: string;
             title: string;
         };
+        Side: {
+            blob_oid: string;
+            /** Format: int64 */
+            bytes: number;
+            catalog_position?: number | null;
+            document_id?: string | null;
+            executable: boolean;
+            path: string;
+            sha256?: string | null;
+        };
         SourcePreview: {
             base_parse_error?: string | null;
             /**
@@ -1041,6 +1155,8 @@ export interface components {
             updated_at: string;
             version_selected: boolean;
         };
+        /** @enum {string} */
+        Status: "added" | "deleted" | "modified" | "renamed";
         /** @enum {string} */
         SyncState: "provisioning" | "in_sync" | "head_moved" | "provider_missing" | "provider_unavailable" | "not_configured";
         TeamChoice: {
@@ -1253,7 +1369,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Required captured actor UUID for SAVE_PROPOSAL jobs */
+                /** @description Required captured actor UUID for SAVE_PROPOSAL and COMPARE_PROPOSAL jobs */
                 "X-Expected-Actor"?: string | null;
             };
             path: {
@@ -1883,6 +1999,101 @@ export interface operations {
                 };
             };
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalDiff: {
+        parameters: {
+            query?: {
+                /** @description Exact replay identity for a new derived read; mutually exclusive with snapshot. */
+                request_id?: string;
+                /** @description Durable snapshot returned by the initial request. Pages never reselect refs. */
+                snapshot?: string;
+                head?: string;
+                target?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header: {
+                /** @description Captured owner of this derived read */
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Immutable ready page or explicit terminal failure status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiffResponse"];
+                };
+            };
+            /** @description Derived comparison queued/loading; no complete result is claimed */
+            202: {
+                headers: {
+                    /** @description Canonical snapshot status/page URL */
+                    Location?: string;
+                    /** @description Seconds before polling */
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiffResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

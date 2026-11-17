@@ -198,6 +198,7 @@ pub struct JobStatus {
     pub creation: Option<CreationResult>,
     pub save: Option<crate::saves::SaveResult>,
     pub save_failure: Option<crate::saves::SaveFailure>,
+    pub comparison: Option<crate::comparisons::ComparisonJobResult>,
 }
 #[derive(sqlx::FromRow)]
 struct JobRow {
@@ -214,7 +215,7 @@ struct JobRow {
     index_state: Option<String>,
     index_error: Option<String>,
 }
-#[utoipa::path(get, path = "/api/v1/jobs/{job}", security(("sessionCookie" = [])), params(("job" = Uuid, Path), ("X-Expected-Actor" = Option<Uuid>, Header, description = "Required captured actor UUID for SAVE_PROPOSAL jobs")),
+#[utoipa::path(get, path = "/api/v1/jobs/{job}", security(("sessionCookie" = [])), params(("job" = Uuid, Path), ("X-Expected-Actor" = Option<Uuid>, Header, description = "Required captured actor UUID for SAVE_PROPOSAL and COMPARE_PROPOSAL jobs")),
     responses((status = 200, body = JobStatus), (status = 400, body = ErrorBody), (status = 401, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 503, body = ErrorBody)))]
 pub(crate) async fn job_status(
     State(state): State<AppState>,
@@ -228,6 +229,9 @@ pub(crate) async fn job_status(
     let Ok(Path(job)) = path else {
         return invalid_query();
     };
+    if let Some(response) = crate::comparisons::job_status(&state, &headers, &actor, job).await {
+        return response;
+    }
     if let Some(response) = crate::saves::job_status(&state, &headers, &actor, job).await {
         return response;
     }
@@ -316,6 +320,7 @@ pub(crate) async fn job_status(
         creation,
         save: None,
         save_failure: None,
+        comparison: None,
     })
     .into_response()
 }

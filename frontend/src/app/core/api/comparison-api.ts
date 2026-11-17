@@ -1,0 +1,29 @@
+import { inject, Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import type { components } from './generated/schema';
+
+export type DiffResponse = components['schemas']['DiffResponse'];
+export type DiffFiles = components['schemas']['DiffFiles'];
+export type ComparisonSummary = components['schemas']['ComparisonSummary'];
+export type ComparisonChange = components['schemas']['Change'];
+export type ComparisonJob = components['schemas']['JobStatus'];
+export interface ComparisonRequest { readonly request_id: string; readonly head?: string; readonly target?: string; }
+
+@Injectable({ providedIn: 'root' })
+export class ComparisonApi {
+  private readonly http = inject(HttpClient);
+  prepare(actor: string, proposal: string, request: ComparisonRequest) {
+    // Copy the captured selection now, including when subscription is delayed.
+    return this.http.get<DiffResponse>(this.path(proposal), { params: { ...request }, headers: this.actor(actor) });
+  }
+  page(actor: string, proposal: string, snapshot: string, offset = 0, limit = 50) {
+    return this.http.get<DiffResponse>(this.path(proposal), {
+      params: { snapshot, offset, limit }, headers: this.actor(actor),
+    });
+  }
+  job(actor: string, job: string) {
+    return this.http.get<ComparisonJob>(`/api/v1/jobs/${encodeURIComponent(job)}`, { headers: this.actor(actor) });
+  }
+  private path(proposal: string) { return `/api/v1/proposals/${encodeURIComponent(proposal)}/diff`; }
+  private actor(actor: string) { return { 'X-Expected-Actor': actor }; }
+}

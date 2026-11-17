@@ -1,8 +1,8 @@
 # Commit-pinned proposal comparisons
 
 The raw engine, complete inventory preparation and authorized comparison loader
-and durable metadata jobs/pages are implemented. The HTTP diff routes, UI,
-file-level views and review anchors remain required work.
+and durable metadata jobs/pages are implemented, with authenticated HTTP progress
+and paged inventories. The UI, file-level views and review anchors remain required work.
 
 ## Provider graph boundary
 
@@ -134,7 +134,7 @@ lineage checks, empty-history sharing, revocation/reconfiguration/version races,
 ref movement, forged source/size limits, scope/readiness and cancellation/timeout.
 Three PostgreSQL scenarios cover real tenant/membership/account checks, Reader
 access, closed/provisioning context and bound settings/setup failures. The loader
-is wired into API application state but has no HTTP endpoint yet.
+is wired into API application state and invoked by the durable comparison worker.
 
 ## Implemented: durable progress and metadata pages
 
@@ -179,13 +179,50 @@ PostgreSQL scenarios cover a 620-file multi-batch publication, empty comparisons
 restart/paging, duplicate requests and quotas, stale owners, backoff, mid-batch
 rollback/reclaim, malformed/exhausted jobs, revocation and frozen scope, source
 privacy, incomplete database publication and immutable evidence. These are
-backend store/worker checks; no HTTP or browser acceptance is claimed yet.
+backend store/worker checks; HTTP coverage is described below and browser acceptance
+remains open.
+
+## Implemented: authenticated HTTP contract
+
+`GET /api/v1/proposals/:id/diff?request_id=<uuid>` reserves a derived comparison;
+optional `head` and `target` select exact commit IDs. Capture the request UUID,
+selection and `X-Expected-Actor` before sending, and reuse them on an uncertain
+result. An exact replay returns the original snapshot, including after a later
+proposal head. This GET requires a captured actor header to prevent cross-site
+requests from enqueuing work. The authenticated session and current access remain
+authoritative; the header grants no access.
+
+Queued/loading responses are 202 with a canonical `Location` containing
+`?snapshot=<uuid>` and `Retry-After: 2`. Poll that snapshot URL. READY returns 200
+with frozen summary and a metadata page; FAILED returns 200 with explicit terminal
+state/error and no summary or page. A successful status read alone does not mean
+a successful comparison. Offset defaults to zero and limit to 50 (1–100 allowed).
+Subsequent pages use only snapshot/offset/limit, never a new request or ref
+selection. Pages retain snapshot/content identity and make no provider reads.
+
+Responses include current proposal head/version/state separately from the frozen
+summary, plus explicit historical-head/context-changed flags and UTC completion
+time. Closed proposals can retain readable historical comparisons. Access and
+binding are rechecked after page retrieval; private requests are not shared with
+another member, including an administrator. Membership revocation blocks reads;
+removing the user's last membership invalidates the session. All responses use
+`Cache-Control: no-store`. Invalid or ambiguous query combinations return 400;
+changed selection under the same key returns 409. Admission returns 429 with
+`Retry-After: 60`, while exact replay remains exempt.
+
+`GET /api/v1/jobs/:job` requires the same captured actor for comparison jobs and
+returns only a typed snapshot/content pointer and canonical progress path. It
+never exposes source bodies, raw job payloads or provider connection settings.
+OpenAPI and the Angular `ComparisonApi` expose these contracts without automatic
+retries. Six PostgreSQL HTTP scenarios cover queued-to-ready pages, private jobs,
+malformed requests, shared-cookie identity changes, revocation/reconfiguration,
+historical results, replay/quotas and explicit setup failure. Two client scenarios
+cover captured request identity across deferred subscription/replay and paging
+without reselecting refs. These checks do not complete file-view or review acceptance.
 
 ## Remaining workflow
 
-The HTTP workflow must expose reservation/progress and durable paged metadata,
-using the stored snapshot identity for every subsequent page. File-level raw
-and readable views still need pinned body reads/verification, bounded windows
+File-level raw and readable views still need pinned body reads/verification, bounded windows
 and rechecks after rendering work. They must use stored paths/ref identities
 rather than reloading the whole book for each page. Runtime body caching,
 retention/operational pruning and cold-load performance still need hardening.

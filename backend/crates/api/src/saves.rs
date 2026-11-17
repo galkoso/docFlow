@@ -302,6 +302,7 @@ pub(crate) async fn job_status(
             creation: None,
             save,
             save_failure,
+            comparison: None,
         })
         .into_response(),
     )

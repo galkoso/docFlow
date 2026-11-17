@@ -1015,3 +1015,18 @@ Checkboxes represent verified work only.
   passes all twelve new PostgreSQL scenarios and workspace Clippy. OpenAPI and
   editor fixtures regenerate without drift. Migration 008 applied locally and
   the restarted API reports ready with one comparison worker running.
+
+
+- Authenticated comparison HTTP contract: captured actor/request identity queues
+  derived reads, with canonical snapshot polling and immutable inventory pages.
+  Every page and generic job pointer rechecks current private scope and provider
+  binding. Historical summaries retain their original head/version alongside
+  current proposal state and explicit change flags. Terminal failure stays
+  explicit without a fake ready page. OpenAPI and an Angular typed client cover
+  the contract without automatic retries. Six PostgreSQL HTTP scenarios and two
+  client scenarios cover identity, replay/quotas, paging, revocation, configuration,
+  historical closure and missing setup. File bodies, readable/raw diff UI, review
+  anchors and remaining review/merge lifecycle are still required.
+  Full backend workspace tests and Clippy pass; the frontend production build
+  and all 115 tests pass. Both CI workflows for the preceding worker commit
+  completed successfully. The new contract is generated from the server schema.

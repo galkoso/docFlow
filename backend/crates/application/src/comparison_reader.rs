@@ -145,6 +145,15 @@ impl LoadedComparison {
     pub fn id(&self) -> &str {
         &self.id
     }
+    pub fn actor(&self) -> Uuid {
+        self.context.actor
+    }
+    pub fn organization(&self) -> Uuid {
+        self.context.organization
+    }
+    pub fn binding(&self) -> &RepositoryBinding {
+        &self.context.connection
+    }
     pub fn proposal(&self) -> Uuid {
         self.context.proposal
     }
@@ -705,6 +714,12 @@ mod tests {
         proposal: Uuid,
     }
     fn fixture() -> Fixture {
+        fixture_body("proposal edit")
+    }
+    fn fixture_body(proposal_body: &str) -> Fixture {
+        fixture_asset(proposal_body, None)
+    }
+    fn fixture_asset(proposal_body: &str, asset: Option<(String, Vec<u8>)>) -> Fixture {
         let actor = Uuid::new_v4();
         let proposal = Uuid::new_v4();
         let binding = RepositoryBinding {
@@ -733,6 +748,14 @@ mod tests {
             ("assets/opaque.bin".into(),vec![255,0,1]),
         ])
         };
+        let mut trees = BTreeMap::from([
+            (OLD.into(), tree("before")),
+            (HEAD.into(), tree(proposal_body)),
+            (MAIN.into(), tree("main-only change")),
+        ]);
+        if let Some((path, bytes)) = asset {
+            trees.get_mut(HEAD).unwrap().insert(path, bytes);
+        }
         let provider = Arc::new(Provider {
             target: Mutex::new(MAIN.into()),
             branch: Mutex::new(Some(HEAD.into())),
@@ -742,11 +765,7 @@ mod tests {
                 (NEXT.into(), vec![MAIN.into()]),
                 (LATER.into(), vec![HEAD.into()]),
             ]),
-            trees: BTreeMap::from([
-                (OLD.into(), tree("before")),
-                (HEAD.into(), tree("proposal edit")),
-                (MAIN.into(), tree("main-only change")),
-            ]),
+            trees,
             tree_reads: Mutex::new(vec![]),
             text_reads: Mutex::new(vec![]),
             after_read: Mutex::new(None),
@@ -1020,4 +1039,5 @@ mod tests {
             assert_eq!(f.factory.calls.load(Ordering::SeqCst), 0);
         }
     }
+    mod review;
 }

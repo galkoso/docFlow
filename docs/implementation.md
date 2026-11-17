@@ -1311,3 +1311,26 @@ Checkboxes represent verified work only.
   workflows for the preceding image-view stage passed. Raw chunk/window position
   links, persisted formal review anchors/decisions, browser/human acceptance and
   all remaining merge/bundle/production requirements remain open.
+
+- Review preparation core (stage 3): a non-deserializable server context and the
+  verified complete comparison produce a bounded immutable review plan. The
+  candidate validates the full after-book, preserves every changed file, requires
+  current saved head/target/version and an editable authorized actor, and rejects
+  empty/historical/final/moved-branch or stale-target input. Active qualified
+  non-author reviewer assignments must contain distinct product/development
+  reviewers, plus design when UI impact is yes. Undecided UI and an outdated base
+  remain explicit; no approval outcome is inferred from preparation.
+  Canonical fingerprints bind frozen source refs, repository connection, proposal
+  metadata, UI impact/reason, policy/configuration versions, assignments and the
+  complete change/media manifest. Actor/list ordering/state-only version changes
+  do not manufacture a different shared content identity. Metadata fingerprinting
+  streams through a bounded buffer rather than encoding whole source bodies.
+  Referenced and newly added media become deduplicated verification requirements;
+  the pure plan neither fetches binaries nor fabricates decoder receipts. Source
+  warnings (including missing alt) and full truncated-diagnostic counts remain
+  visible for later review/merge gates. Twelve new cases use the real verified
+  comparison loader; all 74 application tests and workspace Clippy pass. Both CI
+  workflows for the preceding selection-link stage completed successfully.
+  Durable submission/snapshot publication, media verification receipts, PR/check
+  orchestration, review anchors/decisions/discussions and review UI still require
+  implementation; this pure plan is not an exposed or completed review workflow.

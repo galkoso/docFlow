@@ -9,3 +9,5 @@ pub mod search;
 pub mod comparison;
 pub mod comparison_file;
 pub mod comparison_reader;
+
+pub mod review;

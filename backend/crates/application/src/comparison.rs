@@ -199,6 +199,13 @@ impl Snapshot {
     pub fn commit(&self) -> &CommitSha {
         &self.commit
     }
+    /// Verified complete tree metadata and optional exact text, without
+    /// exposing mutable source maps or serializing whole source snapshots.
+    pub fn entries(&self) -> impl Iterator<Item = (&Side, Option<&str>)> {
+        self.files
+            .values()
+            .map(|file| (&file.side, file.source.as_deref()))
+    }
     pub fn source(&self, path: &str) -> Option<&str> {
         self.files.get(path)?.source.as_deref()
     }

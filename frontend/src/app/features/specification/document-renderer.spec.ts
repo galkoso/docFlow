@@ -164,4 +164,22 @@ describe('Canonical document renderer', () => {
     expect(element.querySelectorAll('br')).toHaveLength(1);
     expect(element.querySelector('mark.active.line-break')?.getAttribute('data-match-id')).toBe('line');
   });
+  it('renders semantic word changes across formatting and search marks without changing visible text', async () => {
+    const fixture = TestBed.createComponent(DocumentRenderer), value = '🙂 מְחיקה עכשיו';
+    fixture.componentRef.setInput('events', [open('paragraph'), text('🙂 מְ'), open('strong'), text('חיקה', 5), close('strong'),
+      text(' עכשיו', 9), close('paragraph')]);
+    fixture.componentRef.setInput('changes', [{ block_id: 'b1', start_utf16: 3, end_utf16: 9, kind: 'removed' }]);
+    fixture.componentRef.setInput('hits', [{ block_id: 'b1', document_id: 'd', section_id: 's', match_id: 'm', start_utf16: 5,
+      end_utf16: 12, book_order: 0, excerpt: value }]);
+    await fixture.whenStable(); const element: HTMLElement = fixture.nativeElement;
+    expect(element.querySelector('p')?.textContent).toBe(value);
+    expect([...element.querySelectorAll('del.diff-removed')].map(part => part.textContent).join('')).toBe('מְחיקה');
+    expect(element.querySelector('strong > span > mark > del')?.textContent).toBe('חיקה');
+    expect(element.querySelector('del')?.getAttribute('aria-label')).toBe('טקסט שהוסר');
+    fixture.componentRef.setInput('changes', [{ block_id: 'b1', start_utf16: 10, end_utf16: 15, kind: 'added' }]);
+    await fixture.whenStable(); expect(element.querySelector('del.diff-removed')).toBeNull();
+    expect([...element.querySelectorAll('ins.diff-added')].map(part => part.textContent).join('')).toBe('עכשיו');
+    expect(element.querySelector('p')?.textContent).toBe(value);
+  });
+
 });

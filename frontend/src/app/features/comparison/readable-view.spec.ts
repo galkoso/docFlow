@@ -80,4 +80,25 @@ describe('Readable before and after view', () => {
     c.http.expectNone(req => req.params.get('side') === 'before'); c.destroy();
   });
 
+  it('emphasizes changed words only after both complete paired units arrive and clears them on selection or scope loss', async () => {
+    const c = await create(); c.select('paragraph');
+    const element: HTMLElement = c.fixture.nativeElement;
+    expect([...element.querySelectorAll('del.diff-removed')].map(part => part.textContent).join('')).toBe('Original');
+    expect([...element.querySelectorAll('ins.diff-added')].map(part => part.textContent).join('')).toBe('Changed');
+    expect(element.querySelector('strong del, strong ins')).toBeNull();
+    expect(element.textContent).toContain('− לפני השינוי'); expect(element.textContent).toContain('+ אחרי השינוי');
+    c.select('list'); expect(element.querySelector('ins.diff-added, del.diff-removed')).toBeNull();
+    c.select('heading'); expect(element.querySelector('ins.diff-added')?.textContent).toBe('חדשה');
+    c.fixture.componentRef.setInput('scope', null); c.settle(); expect(element.querySelector('ins.diff-added, del.diff-removed')).toBeNull(); c.destroy();
+  });
+
+  it('does not reuse a visible window or word emphasis across actors even for the same source hashes', async () => {
+    const c = await create(); c.select('paragraph');
+    const scope = readableScope(); scope.actor = '00000000-0000-4000-8000-000000000099';
+    c.fixture.componentRef.setInput('scope', scope); c.settle();
+    expect(c.fixture.nativeElement.querySelector('app-document-renderer')).toBeNull();
+    const metadata = c.http.expectOne(req => req.url.endsWith('/readable'));
+    expect(metadata.request.headers.get('X-Expected-Actor')).toBe(scope.actor); c.destroy();
+  });
+
 });

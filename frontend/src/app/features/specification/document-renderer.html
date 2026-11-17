@@ -63,5 +63,11 @@
   }
 </ng-template>
 <ng-template #leaf let-chunk>
-  <span appTextWindow [window]="chunk.window" [attr.data-block-id]="chunk.event.block_id" [attr.data-offset-utf16]="chunk.event.offset_utf16">@for (part of parts().get(chunk.event); track $index) {@if (part.matchId) {<mark [class.active]="part.matchId === activeMatch()" [class.line-break]="chunk.event.kind === 'break'" [attr.data-match-id]="part.matchId">{{ part.text }}</mark>} @else {{{ part.text }}}}</span>
+  <span appTextWindow [window]="chunk.window" [attr.data-block-id]="chunk.event.block_id" [attr.data-offset-utf16]="chunk.event.offset_utf16">@for (part of parts().get(chunk.event); track $index) {@if (part.matchId) {<mark [class.active]="part.matchId === activeMatch()" [class.line-break]="chunk.event.kind === 'break'" [attr.data-match-id]="part.matchId"><ng-container *ngTemplateOutlet="changedPart; context: { $implicit: part }" /></mark>} @else {<ng-container *ngTemplateOutlet="changedPart; context: { $implicit: part }" />}}</span>
+</ng-template>
+
+<ng-template #changedPart let-part>
+  @if (part.change === 'added') {<ins class="diff-added" aria-label="טקסט נוסף">{{ part.text }}</ins>}
+  @else if (part.change === 'removed') {<del class="diff-removed" aria-label="טקסט שהוסר">{{ part.text }}</del>}
+  @else {{{ part.text }}}
 </ng-template>

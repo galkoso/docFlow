@@ -12,7 +12,7 @@ import { stackIdentity, UnitScope, validUnitResponse } from './readable-window';
 export class ReadableUnitState implements OnDestroy {
   private readonly api = inject(ComparisonApi);
   private scope: UnitScope | null = null;
-  private key = '';
+  private readonly key = signal('');
   private generation = 0;
   private request?: Subscription;
   private cursor: EventCursor = { event: 0, offset: 0 };
@@ -32,8 +32,11 @@ export class ReadableUnitState implements OnDestroy {
       this.clear(); this.error.set('פרטי יחידת ההשוואה אינם תקינים.'); return;
     }
     const key = JSON.stringify([fileKey, scope.side, unitIdentity(scope.unit)]);
-    if (key === this.key) return;
-    this.clear(); this.scope = structuredClone(scope); this.key = key; this.fetch();
+    if (key === this.key()) return;
+    this.clear(); this.scope = structuredClone(scope); this.key.set(key); this.fetch();
+  }
+  owns(scope: UnitScope): boolean {
+    return this.key() === JSON.stringify([scopeKey(scope.file), scope.side, unitIdentity(scope.unit)]);
   }
   next(): void {
     const window = this.data()?.window;
@@ -47,7 +50,7 @@ export class ReadableUnitState implements OnDestroy {
   }
   retry(): void { if (this.scope && !this.busy() && !this.authRequired()) this.fetch(this.cursor); }
   clear(): void {
-    ++this.generation; this.request?.unsubscribe(); this.request = undefined; this.scope = null; this.key = '';
+    ++this.generation; this.request?.unsubscribe(); this.request = undefined; this.scope = null; this.key.set('');
     this.cursor = { event: 0, offset: 0 }; this.history = []; this.boundary = null;
     this.data.set(null); this.events.set([]); this.busy.set(false); this.error.set(''); this.authRequired.set(false); this.canBack.set(false);
   }

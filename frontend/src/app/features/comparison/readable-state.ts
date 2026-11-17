@@ -12,7 +12,7 @@ import type { RawScope } from './raw-state';
 export class ReadableState implements OnDestroy {
   private readonly api = inject(ComparisonApi);
   private scope: RawScope | null = null;
-  private key = '';
+  private readonly key = signal('');
   private generation = 0;
   private request?: Subscription;
   private offset = 0;
@@ -25,11 +25,12 @@ export class ReadableState implements OnDestroy {
   open(scope: RawScope | null): void {
     if (!scope) { this.clear(); return; }
     const key = scopeKey(scope);
-    if (key && key === this.key) return;
+    if (key && key === this.key()) return;
     this.clear();
     if (!key) { this.error.set('לא ניתן להציג השוואה קריאה לקובץ שנבחר.'); return; }
-    this.scope = structuredClone(scope); this.key = key; this.fetch();
+    this.scope = structuredClone(scope); this.key.set(key); this.fetch();
   }
+  owns(scope: RawScope): boolean { return scopeKey(scope) === this.key(); }
   page(offset: number): void {
     if (!this.scope || !integer(offset, 20004) || this.busy() || this.authRequired()) return;
     this.offset = offset; this.fetch();
@@ -40,7 +41,7 @@ export class ReadableState implements OnDestroy {
   }
   retry(): void { if (this.scope && !this.busy() && !this.authRequired()) this.fetch(); }
   clear(): void {
-    ++this.generation; this.request?.unsubscribe(); this.request = undefined; this.scope = null; this.key = ''; this.offset = 0; this.metadata = null;
+    ++this.generation; this.request?.unsubscribe(); this.request = undefined; this.scope = null; this.key.set(''); this.offset = 0; this.metadata = null;
     this.data.set(null); this.selected.set(null); this.busy.set(false); this.error.set(''); this.authRequired.set(false);
   }
   ngOnDestroy(): void { this.clear(); }

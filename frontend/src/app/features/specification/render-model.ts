@@ -7,7 +7,8 @@ export type MatchWindow = components['schemas']['MatchWindow'];
 export const TEXT_WINDOW_UTF16 = 1024;
 export interface TextChunk { event: RenderEvent; window: MatchWindow | null; }
 export interface RenderNode { event: RenderEvent; children: RenderNode[]; chunks?: TextChunk[]; alignment?: 'left' | 'center' | 'right'; }
-export interface TextPart { text: string; matchId?: string; }
+export interface TextChange { block_id: string; start_utf16: number; end_utf16: number; kind: 'added' | 'removed'; }
+export interface TextPart { text: string; matchId?: string; change?: TextChange['kind']; }
 export interface AssetContext { repository: string; commit: string; proposal?: string; }
 
 /** Split display leaves without splitting graphemes. A giant grapheme needs only
@@ -72,7 +73,7 @@ export function renderTree(events: RenderEvent[]): RenderNode[] {
 }
 
 /** Intersect server UTF-16 ranges with each text leaf, including formatted leaves. */
-export function textParts(event: RenderEvent, hits: TextHighlight[]): TextPart[] {
+export function textParts(event: RenderEvent, hits: TextHighlight[], changes: TextChange[] = []): TextPart[] {
   const text = event.text ?? '';
   const start = event.offset_utf16;
   if (start == null || !event.block_id) return [{ text }];
@@ -89,7 +90,25 @@ export function textParts(event: RenderEvent, hits: TextHighlight[]): TextPart[]
     offset = to;
   }
   if (offset < text.length) parts.push({ text: text.slice(offset) });
-  return parts;
+  const overlays = changes.filter(change => change.block_id === event.block_id && change.end_utf16 > start
+    && change.start_utf16 < start + text.length);
+  if (!overlays.length) return parts;
+  const output: TextPart[] = []; let position = start;
+  for (const part of parts) {
+    const end = position + part.text.length, cuts = new Set([position, end]);
+    for (const change of overlays) {
+      if (change.start_utf16 > position && change.start_utf16 < end) cuts.add(change.start_utf16);
+      if (change.end_utf16 > position && change.end_utf16 < end) cuts.add(change.end_utf16);
+    }
+    const boundaries = [...cuts].sort((a, b) => a - b);
+    for (let index = 0; index + 1 < boundaries.length; index++) {
+      const from = boundaries[index], to = boundaries[index + 1];
+      const change = overlays.find(change => change.start_utf16 <= from && change.end_utf16 >= to)?.kind;
+      output.push({ ...part, text: part.text.slice(from - position, to - position), ...(change ? { change } : {}) });
+    }
+    position = end;
+  }
+  return output;
 }
 
 export function externalLink(destination?: string | null): string | null {

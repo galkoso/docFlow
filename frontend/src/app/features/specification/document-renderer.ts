@@ -1,6 +1,7 @@
 import { afterRenderEffect, ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked, viewChildren } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { assetSource, AssetContext, externalLink, renderTree, textParts, RenderEvent, SearchHit, TextHighlight, TextPart } from './render-model';
+import { assetSource, AssetContext, externalLink, renderTree, textParts, RenderEvent, SearchHit, TextChange, TextHighlight, TextPart }
+  from './render-model';
 import type { MatchWindow } from '../../core/api/book-api';
 import { TextWindow } from './text-window';
 import { HighlightContext, VisibleHighlights } from './visible-highlights';
@@ -18,6 +19,8 @@ import { HighlightContext, VisibleHighlights } from './visible-highlights';
     .table-scroll { overflow-x: auto; } table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid #cdd7df; padding: .5rem .75rem; text-align: start; }
     th { background: #f0f3f6; } mark { background: #fff0a6; color: #142333; }
+    ins.diff-added { background: #c9f1d3; color: #173d22; text-decoration: underline; }
+    del.diff-removed { background: #fbd1ce; color: #66231f; text-decoration: line-through; }
     mark.active { background: #ffd15c; outline: 2px solid #8d6413; }
     mark.line-break { display: inline-block; min-width: .4em; }
     .unsupported { color: #765217; border: 1px solid #dcc78f; padding: .5rem; }
@@ -28,6 +31,7 @@ import { HighlightContext, VisibleHighlights } from './visible-highlights';
 export class DocumentRenderer {
   readonly events = input.required<RenderEvent[]>();
   readonly hits = input<SearchHit[]>([]);
+  readonly changes = input<TextChange[]>([]);
   readonly activeMatch = input<string | null>(null);
   readonly sectionPrefix = input('');
   readonly internalLinks = input<Record<string, string>>({});
@@ -55,7 +59,7 @@ export class DocumentRenderer {
     while (pending.length) {
       const node = pending.pop()!;
       for (const child of node.children) pending.push(child);
-      for (const chunk of node.chunks ?? []) parts.set(chunk.event, textParts(chunk.event, byBlock.get(chunk.event.block_id ?? '') ?? []));
+      for (const chunk of node.chunks ?? []) parts.set(chunk.event, textParts(chunk.event, byBlock.get(chunk.event.block_id ?? '') ?? [], this.changes()));
     }
     return parts;
   });

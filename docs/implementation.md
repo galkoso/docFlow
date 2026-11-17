@@ -1225,3 +1225,23 @@ Checkboxes represent verified work only.
   raw viewer stage completed successfully. Browser visual/keyboard acceptance,
   inline word highlights, dedicated changed-media view, selection anchors and
   the remaining review/merge/export/import work remain open.
+
+- Readable inline word emphasis: complete paired units now get exact visible-word
+  comparison with no Unicode/case normalization. Structural block boundaries
+  prevent matching across incompatible GFM layouts; formatted leaves retain their
+  original block/UTF-16 coordinates. A bounded LCS checks uniqueness of matched
+  token identities, suppresses ambiguous repeated-word alignments and caps text,
+  tokens, matrix cells and output ranges. Grapheme boundaries preserve niqqud,
+  astral/ZWJ emoji and decomposed text. Shared whitespace is not falsely marked
+  when punctuation changes. Partial windows keep unit-level change markers.
+  The inert renderer overlays semantic ins/del elements with search marks while
+  preserving visible text. Readable units use explicit +/- labels and red/green
+  context without relying on color alone. Reactive captured-scope ownership also
+  gates body/word display when actor, file or selected unit changes.
+  Seven algorithm tests include exhaustive optimal alignments for short repeated
+  sequences; renderer and view tests cover formatting/search overlap, real Rust
+  fixtures, partial-window suppression and identity/selection clearing. Production
+  build and all 180 frontend tests pass. Both CI workflows for the preceding
+  readable-view stage completed successfully. Changed-media viewing, restorable
+  selection anchors, browser acceptance and the full review/merge/bundle lifecycle
+  remain open; this is not a completion claim for the full specification.

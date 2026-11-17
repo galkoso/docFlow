@@ -8,6 +8,7 @@ export const routes: Routes = [
   { path: 'changes', title: 'הצעות שינוי | SpecSpace', loadComponent: () => import('./features/proposals/proposals').then(m => m.Proposals) },
   { path: 'changes/new', title: 'פתיחת הצעה | SpecSpace', canDeactivate: [creationExit], loadComponent: () => import('./features/proposals/proposal-create').then(m => m.ProposalCreate) },
   { path: 'changes/:id', title: 'פרטי הצעה | SpecSpace', loadComponent: () => import('./features/proposals/proposal-detail').then(m => m.ProposalDetailPage) },
+  { path: 'changes/:id/diff', title: 'השוואת השינוי | SpecSpace', loadComponent: () => import('./features/comparison/comparison-page').then(m => m.ComparisonPage) },
   { path: 'changes/:id/book', title: 'תוכן ההצעה | SpecSpace', loadComponent: () => import('./features/specification/specification').then(m => m.Specification) },
   { path: 'changes/:id/edit/:document', title: 'עריכת הצעה | SpecSpace', canDeactivate: [editorExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange',
     loadComponent: () => import('./features/editor/editor-page').then(m => m.EditorPage) },

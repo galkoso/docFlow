@@ -1186,3 +1186,21 @@ Checkboxes represent verified work only.
   document/asset/catalog/other `Kind`. Wire JSON is unchanged. Regenerated the
   checked-in OpenAPI and Angular client. Both API contract tests pass, including
   a regression assertion for the two distinct enum references.
+
+- Routed comparison and raw source viewer: `/changes/:id/diff` restores the
+  captured preparation intent or immutable snapshot/page from its URL; proposal
+  detail links to it. Latest preparation removes stale snapshot/page selection.
+  Hebrew RTL desktop columns place before on the right; narrow layouts carry
+  real DOM side labels. Branch and pinned source/target refs, findings, historical
+  context, no-change state and file evidence remain visible. Source is escaped
+  text with explicit addition/removal markers and optional equal context.
+  One 32 KiB raw window lives in page memory; history keeps coordinates only.
+  Actor/snapshot/content/file evidence, hashes, UTF-8 ranges, chunk progression,
+  response budgets and cross-window continuity are checked before display.
+  Scope loss cancels requests and destroys source; retries keep the same cursor.
+  Eight raw-window and seven routed-page tests cover navigation, retry, Unicode,
+  malformed evidence, empty versus absent files, session changes and inert HTML.
+  Production build and all 149 frontend tests pass. Browser discovery returned
+  no connected browsers, so visual/keyboard acceptance remains unverified.
+  Readable UI, inline word changes, media, selection anchors and the full review/
+  merge workflow remain required; this stage does not complete the full goal.

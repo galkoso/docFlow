@@ -1,0 +1,73 @@
+<a [routerLink]="['/changes', proposal()]">לפרטי ההצעה</a>
+<h1>השוואת לפני ואחרי</h1>
+@if (!session.profile()) {
+  <p role="status">{{ session.status() === 'loading' ? 'בודקים התחברות…' : 'יש להתחבר כדי לצפות בהשוואה.' }}</p>
+  <a href="/api/v1/auth/login">התחברות ארגונית</a>
+} @else {
+  @if (routeError()) {<p role="alert">{{ routeError() }}</p>}
+  @if (state.identityChanged() || !visible()) {<p role="status">יש לבחור השוואה עבור ההתחברות הנוכחית.</p>}
+  <div class="actions">
+    <button (click)="fresh()" [disabled]="state.busy()">הכנת השוואה עדכנית</button>
+    @if (state.canRetry()) {<button (click)="state.retry()">ניסיון נוסף לאותה בקשה</button>}
+    @else if (state.canCheck()) {<button (click)="state.check()">בדיקת מצב ההשוואה</button>}
+    @if (state.authRequired() || raw.authRequired()) {<button (click)="session.refresh()">בדיקת התחברות מחדש</button>}
+  </div>
+  @if (state.error()) {<p class="notice" role="alert">{{ state.error() }} <code>{{ state.errorCode() }}</code></p>}
+  @if (state.busy()) {<p role="status">בודקים את ההשוואה שנבחרה…</p>}
+  @if (visible()) {
+    @if (state.data(); as result) {
+      @if (result.state === 'PENDING') {<p role="status">ההשוואה בהכנה. מצב: {{ label(result.phase) }}. טרם התקבלה תוצאה מלאה.</p>}
+      @if (result.summary; as summary) {
+        <p>ענף ההצעה: <bdi dir="ltr">{{ summary.branch }}</bdi> · ענף יעד: <bdi dir="ltr">main</bdi></p>
+        <div class="versions"><p>לפני — מקור השינוי בענף: <code>{{ summary.merge_base_sha }}</code></p>
+          <p>אחרי — גרסת ההצעה: <code>{{ summary.head_sha }}</code></p>
+          <p>יעד ההשוואה: <code>{{ summary.target_sha }}</code></p>
+          <p>main בעת הכנת ההשוואה: <code>{{ summary.observed_main_sha }}</code></p></div>
+        @if (result.historical_head || result.context_changed) {<p class="notice" role="status">מוצגת השוואה שמורה. פרטי ההצעה או הראש הרשום השתנו מאז הכנתה.</p>}
+        @if (summary.target_outdated || summary.base_outdated) {<p class="notice">גרסת הבסיס או היעד שונה מ־main שנצפה בעת ההכנה.</p>}
+        @if (summary.external_branch_change) {<p class="notice">ענף ההצעה ב־Git שונה מהראש הרשום או אינו זמין.</p>}
+        @if (summary.before_findings_total || summary.after_findings_total) {<details><summary>ממצאי מקור: לפני {{ summary.before_findings_total }}, אחרי {{ summary.after_findings_total }}</summary>
+          @for (finding of summary.before_findings; track $index) {<p>לפני: <bdi>{{ finding.path }}</bdi> — {{ finding.code }}</p>}
+          @for (finding of summary.after_findings; track $index) {<p>אחרי: <bdi>{{ finding.path }}</bdi> — {{ finding.code }}</p>}
+        </details>}
+        @if (state.noChanges()) {<p role="status">אין שינויים. תוצאה זו אינה אישור להצעה.</p>}
+        @if (result.page; as page) {
+          <section aria-label="קבצים שהשתנו"><h2>קבצים שהשתנו — {{ page.total }}</h2>
+            @for (file of page.files; track file.id) {<button class="file" (click)="select(file.id)" [attr.aria-pressed]="state.selected()?.id === file.id">
+              <bdi>{{ file.before?.path ?? 'קובץ חדש' }}</bdi> ← <bdi>{{ file.after?.path ?? 'קובץ נמחק' }}</bdi>
+              <span>{{ label(file.status) }} · {{ label(file.kind) }}</span>
+              @if (file.mode_changed) {<span>שינוי הרשאות קובץ</span>} @if (file.catalog_position_changed) {<span>שינוי מיקום בספר</span>}
+            </button>}
+            <p>מיקום ברשימה: {{ page.offset }} · {{ page.files.length }} קבצים מוצגים</p>
+            <button [disabled]="state.busy() || page.offset === 0" (click)="files(0)">תחילת הרשימה</button>
+            <button [disabled]="state.busy() || page.offset === 0" (click)="previousFiles(page.offset)">הקבצים הקודמים</button>
+            @if (page.next_offset != null) {<button [disabled]="state.busy()" (click)="files(page.next_offset!)">הקבצים הבאים</button>}
+          </section>
+        }
+      }
+    }
+    @if (state.selected(); as file) {
+      <section class="raw" aria-label="השוואת מקור"><h2>מקור גולמי — <bdi>{{ file.after?.path ?? file.before?.path }}</bdi></h2>
+        @if (raw.busy()) {<p role="status">טוענים מקטע מקור…</p>}
+        @if (raw.error()) {<p role="alert">{{ raw.error() }}</p><button (click)="raw.retry()" [disabled]="raw.busy() || raw.authRequired()">בדיקה נוספת של המקטע</button>}
+        @if (raw.data(); as view) {
+          @if (!view.raw.detailed) {<p>מוצגת החלפה רחבה של המקור. כל התוכן נגיש באמצעות המקטעים.</p>}
+          <label><input type="checkbox" [checked]="showEqual()" (change)="showEqual.set(!showEqual())">הצגת תוכן זהה</label>
+          <div class="pair headings"><h3>לפני — לקריאה בלבד {{ file.before ? '' : '(לא קיים)' }}</h3><h3>אחרי {{ file.after ? '' : '(לא קיים)' }}</h3></div>
+          @for (segment of segments(); track $index) {
+            <div class="pair" [class.removed]="segment.kind === 'delete'" [class.added]="segment.kind === 'insert'">
+              <div><span class="side-label">לפני — לקריאה בלבד</span><span class="marker">{{ segment.kind === 'delete' ? '− הוסר' : segment.kind === 'equal' ? '= זהה' : '' }}</span><small>שורה {{ segment.old_start_line }} · בית {{ segment.old_start_byte }}</small><pre dir="auto" tabindex="0" aria-label="מקור לפני">{{ segment.old_text }}</pre></div>
+              <div><span class="side-label">אחרי</span><span class="marker">{{ segment.kind === 'insert' ? '+ נוסף' : segment.kind === 'equal' ? '= זהה' : '' }}</span><small>שורה {{ segment.new_start_line }} · בית {{ segment.new_start_byte }}</small><pre dir="auto" tabindex="0" aria-label="מקור אחרי">{{ segment.new_text }}</pre></div>
+            </div>
+          }
+          @if (!view.raw.segments.length) {<p>אין תוכן טקסט במקטע זה.</p>}
+          <div class="actions"><button (click)="raw.back()" [disabled]="raw.busy() || !raw.canBack()">המקטע הקודם</button>
+            <button (click)="raw.next()" [disabled]="raw.busy() || !view.raw.next">המקטע הבא</button></div>
+          @if (file.after?.document_id && !state.data()?.historical_head && ['DRAFT', 'IN_REVIEW', 'CHANGES_REQUESTED', 'APPROVED'].includes(state.data()?.current_proposal_state ?? '')) {
+            <a [routerLink]="['/changes', proposal(), 'edit', file.after!.document_id]" [queryParams]="{ commit: view.head_sha }">פתיחת אחרי בעורך</a>
+          }
+        }
+      </section>
+    }
+  }
+}

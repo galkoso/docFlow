@@ -8,21 +8,60 @@ use axum::{
 };
 use serde::Deserialize;
 use specspace_application::review_configuration::{
-    ConfigurationUpdated, ReviewConfiguration, ReviewConfigurationRequest,
+    ConfigurationUpdated, ReviewArea, ReviewConfiguration, ReviewConfigurationRequest,
+    ReviewerCandidates,
 };
 use specspace_infrastructure::review_configuration::{ConfigurationError, PgReviewConfiguration};
 use uuid::Uuid;
 pub fn routes() -> Router<AppState> {
-    Router::new().route(
-        "/api/v1/proposals/{proposal}/review/configuration",
-        get(read)
-            .put(update)
-            .layer(DefaultBodyLimit::max(128 * 1024)),
-    )
+    Router::new()
+        .route(
+            "/api/v1/proposals/{proposal}/review/configuration",
+            get(read)
+                .put(update)
+                .layer(DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route(
+            "/api/v1/proposals/{proposal}/review/reviewers",
+            get(candidates),
+        )
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NoQuery {}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CandidateQuery {
+    domain: ReviewArea,
+    after: Option<Uuid>,
+}
+#[utoipa::path(get,path="/api/v1/proposals/{proposal}/review/reviewers",operation_id="proposalReviewerCandidates",security(("sessionCookie"=[])),
+    params(("proposal"=Uuid,Path),("X-Expected-Actor"=Uuid,Header),("domain"=ReviewArea,Query),("after"=Option<Uuid>,Query)),
+    responses((status=200,body=ReviewerCandidates),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=503,body=ErrorBody)))]
+pub(crate) async fn candidates(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<Uuid>, axum::extract::rejection::PathRejection>,
+    query: Result<Query<CandidateQuery>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let actor = match auth::authenticate(&state, &headers).await {
+        Ok(actor) => actor,
+        Err(error) => return error.into_response(),
+    };
+    if let Err(error) = auth::verify_actor(&headers, &actor) {
+        return error.into_response();
+    }
+    let (Ok(Path(proposal)), Ok(Query(query))) = (path, query) else {
+        return proposals::invalid_query();
+    };
+    match PgReviewConfiguration::new(state.database)
+        .candidates(actor.user_id, proposal, query.domain, query.after)
+        .await
+    {
+        Ok(result) => Json(result).into_response(),
+        Err(error) => failure(error),
+    }
+}
 #[utoipa::path(get,path="/api/v1/proposals/{proposal}/review/configuration",operation_id="proposalReviewConfiguration",security(("sessionCookie"=[])),
     params(("proposal"=Uuid,Path),("X-Expected-Actor"=Uuid,Header)),
     responses((status=200,body=ReviewConfiguration),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=503,body=ErrorBody)))]

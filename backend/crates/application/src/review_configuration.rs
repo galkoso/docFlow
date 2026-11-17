@@ -115,6 +115,21 @@ pub struct ReviewerStatus {
 }
 #[derive(Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ReviewerCandidate {
+    pub reviewer_id: Uuid,
+    pub display_name: String,
+}
+#[derive(Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ReviewerCandidates {
+    pub proposal_id: Uuid,
+    pub configuration_version: i64,
+    pub domain: ReviewArea,
+    pub reviewers: Vec<ReviewerCandidate>,
+    pub next_after: Option<Uuid>,
+}
+#[derive(Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewConfiguration {
     pub proposal_id: Uuid,
     pub proposal_version: i64,

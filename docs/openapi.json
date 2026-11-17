@@ -3483,6 +3483,112 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/reviewers": {
+      "get": {
+        "tags": [
+          "crate::review_configuration"
+        ],
+        "operationId": "proposalReviewerCandidates",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ReviewArea"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewerCandidates"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/specification": {
       "get": {
         "tags": [
@@ -7236,6 +7342,57 @@
           }
         },
         "additionalProperties": false
+      },
+      "ReviewerCandidate": {
+        "type": "object",
+        "required": [
+          "reviewer_id",
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ReviewerCandidates": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "configuration_version",
+          "domain",
+          "reviewers"
+        ],
+        "properties": {
+          "configuration_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ReviewArea"
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reviewers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewerCandidate"
+            }
+          }
+        }
       },
       "ReviewerSelection": {
         "type": "object",

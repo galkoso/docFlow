@@ -607,3 +607,154 @@ async fn malformed_and_ineligible_intents_never_create_history(pool: PgPool) {
     .unwrap();
     assert_eq!(count, 1);
 }
+
+fn candidates_path(f: &Fixture, query: &str) -> String {
+    format!("/api/v1/proposals/{}/review/reviewers?{query}", f.proposal)
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn candidate_lists_enforce_scope_domain_role_activity_and_author_independence(pool: PgPool) {
+    let f = fixture(&pool).await;
+    let foreign = fixture(&pool).await;
+    let reader = actor(&pool, f.org, "READER", vec!["PRODUCT"]).await;
+    let contributor = actor(&pool, f.org, "CONTRIBUTOR", vec!["PRODUCT"]).await;
+    let unqualified = actor(&pool, f.org, "REVIEWER", vec![]).await;
+    let disabled = actor(&pool, f.org, "REVIEWER", vec!["PRODUCT"]).await;
+    sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
+        .bind(disabled.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE memberships SET role='ADMIN',review_domains=ARRAY['PRODUCT'] WHERE organization_id=$1 AND user_id=$2").bind(f.org).bind(f.owner.id).execute(&pool).await.unwrap();
+    let uri = candidates_path(&f, "domain=PRODUCT");
+    let (status, page) = request(&f.app, &reader, &uri, None, true, false).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(page["proposal_id"], f.proposal.to_string());
+    assert_eq!(page["configuration_version"], 1);
+    assert_eq!(page["domain"], "PRODUCT");
+    assert_eq!(page["reviewers"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        page["reviewers"][0]["reviewer_id"],
+        f.product.id.to_string()
+    );
+    assert!(page["next_after"].is_null());
+    for excluded in [
+        &f.owner,
+        &f.development,
+        &reader,
+        &contributor,
+        &unqualified,
+        &disabled,
+        &foreign.product,
+    ] {
+        assert!(
+            !page["reviewers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|reviewer| reviewer["reviewer_id"] == excluded.id.to_string())
+        );
+    }
+    assert_eq!(
+        request(&f.app, &foreign.owner, &uri, None, true, false)
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        request(&f.app, &reader, &uri, None, false, false).await.0,
+        StatusCode::CONFLICT
+    );
+    for query in [
+        "domain=PRODUCT&domain=DESIGN",
+        "domain=product",
+        "domain=PRODUCT&after=not-a-uuid",
+        "domain=PRODUCT&limit=1000",
+        "after=00000000-0000-4000-8000-000000000001",
+    ] {
+        assert_eq!(
+            request(
+                &f.app,
+                &reader,
+                &candidates_path(&f, query),
+                None,
+                true,
+                false
+            )
+            .await
+            .0,
+            StatusCode::BAD_REQUEST,
+            "{query}"
+        );
+    }
+    sqlx::query("UPDATE memberships SET review_domains=ARRAY['DESIGN'] WHERE organization_id=$1 AND user_id=$2").bind(f.org).bind(f.product.id).execute(&pool).await.unwrap();
+    let (_, updated) = request(&f.app, &reader, &uri, None, true, false).await;
+    assert_eq!(updated["reviewers"], json!([]));
+    let (_, design) = request(
+        &f.app,
+        &reader,
+        &candidates_path(&f, "domain=DESIGN"),
+        None,
+        true,
+        false,
+    )
+    .await;
+    assert_eq!(
+        design["reviewers"][0]["reviewer_id"],
+        f.product.id.to_string()
+    );
+    let changes: i64 = sqlx::query_scalar("SELECT count(*) FROM review_configuration_operations")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(changes, 0);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn candidate_keyset_pages_are_bounded_complete_and_reauthorize_every_page(pool: PgPool) {
+    let f = fixture(&pool).await;
+    sqlx::query("INSERT INTO users(id,issuer,external_subject,display_name) SELECT gen_random_uuid(),'candidates',n::text,repeat('א',250) FROM generate_series(1,54) n").execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO memberships(organization_id,user_id,role,review_domains) SELECT $1,id,'REVIEWER',ARRAY['PRODUCT'] FROM users WHERE issuer='candidates'").bind(f.org).execute(&pool).await.unwrap();
+    let (_, first) = request(
+        &f.app,
+        &f.owner,
+        &candidates_path(&f, "domain=PRODUCT"),
+        None,
+        true,
+        false,
+    )
+    .await;
+    let users = first["reviewers"].as_array().unwrap();
+    assert_eq!(users.len(), 50);
+    assert!(
+        users
+            .iter()
+            .all(|user| user["display_name"].as_str().unwrap().chars().count() <= 200)
+    );
+    let cursor = first["next_after"].as_str().unwrap();
+    assert_eq!(
+        cursor,
+        users.last().unwrap()["reviewer_id"].as_str().unwrap()
+    );
+    let uri = candidates_path(&f, &format!("domain=PRODUCT&after={cursor}"));
+    let (status, second) = request(&f.app, &f.owner, &uri, None, true, false).await;
+    assert_eq!(status, StatusCode::OK, "{second}");
+    assert_eq!(second["reviewers"].as_array().unwrap().len(), 5);
+    assert!(second["next_after"].is_null());
+    let actual: Vec<Uuid> = users
+        .iter()
+        .chain(second["reviewers"].as_array().unwrap())
+        .map(|user| Uuid::parse_str(user["reviewer_id"].as_str().unwrap()).unwrap())
+        .collect();
+    let expected: Vec<Uuid> = sqlx::query_scalar("SELECT user_id FROM memberships WHERE organization_id=$1 AND 'PRODUCT'=ANY(review_domains) ORDER BY user_id").bind(f.org).fetch_all(&pool).await.unwrap();
+    assert_eq!(actual, expected);
+    sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
+        .bind(f.owner.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        request(&f.app, &f.owner, &uri, None, true, false).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+}

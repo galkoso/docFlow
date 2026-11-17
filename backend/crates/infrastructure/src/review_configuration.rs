@@ -83,6 +83,37 @@ impl PgReviewConfiguration {
         tx.commit().await?;
         Ok(result)
     }
+    pub async fn candidates(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        domain: ReviewArea,
+        after: Option<Uuid>,
+    ) -> Result<ReviewerCandidates, ConfigurationError> {
+        let mut tx = self.transaction().await?;
+        let row = current(&mut tx, actor, proposal, false).await?;
+        // Read-only keyset pagination, scoped before looking up member names.
+        // Extra row detects continuation without silently truncating the list.
+        let users = sqlx::query_as::<_,User>("SELECT u.id,left(u.display_name,200) AS display_name,u.status FROM users u JOIN memberships m ON m.user_id=u.id WHERE m.organization_id=$1 AND u.id<>$2 AND u.status='ACTIVE' AND m.role IN ('REVIEWER','MAINTAINER','ADMIN') AND $3=ANY(m.review_domains) AND ($4::uuid IS NULL OR u.id>$4) ORDER BY u.id LIMIT 51 FOR SHARE OF u,m")
+            .bind(row.organization_id).bind(row.author_id).bind(domain.as_str()).bind(after).fetch_all(&mut *tx).await?;
+        let next_after = (users.len() > 50).then(|| users[49].id);
+        let result = ReviewerCandidates {
+            proposal_id: proposal,
+            configuration_version: row.review_configuration_version,
+            domain,
+            reviewers: users
+                .into_iter()
+                .take(50)
+                .map(|user| ReviewerCandidate {
+                    reviewer_id: user.id,
+                    display_name: user.display_name,
+                })
+                .collect(),
+            next_after,
+        };
+        tx.commit().await?;
+        Ok(result)
+    }
     pub async fn update(
         &self,
         actor: Uuid,

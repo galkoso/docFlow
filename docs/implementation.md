@@ -1357,3 +1357,15 @@ Checkboxes represent verified work only.
   for the previous review-plan commit passed. See `review-configuration.md` for
   the exact contract. Picker/review UI, formal submission/snapshots, decisions,
   discussions and PR/check/merge orchestration remain open.
+
+- Reviewer selection source: an actor-bound read-only endpoint lists current
+  eligible reviewers by domain, excluding authors, inactive/unqualified users
+  and other organizations. UUID keyset pagination returns at most 50 bounded
+  names with explicit continuation, and reauthorizes every page. It makes no Git
+  calls and does not change configuration or confer edit authority. Two new
+  PostgreSQL/HTTP cases cover filters, strict queries, scope/revocation and all
+  55 users across multiple pages; all 11 configuration API scenarios pass.
+  Workspace Clippy, generated OpenAPI/client, production build and all 207
+  frontend tests pass. A typed-client continuation case preserves actor/domain
+  identity. This supplies the future picker; the review UI and formal workflow
+  remain open.

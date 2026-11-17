@@ -456,6 +456,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/reviewers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalReviewerCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/specification": {
         parameters: {
             query?: never;
@@ -1327,6 +1343,21 @@ export interface components {
             assignments: components["schemas"]["ReviewerSelection"][];
             ui_impact: components["schemas"]["UiImpact"];
             ui_impact_reason?: string | null;
+        };
+        ReviewerCandidate: {
+            display_name: string;
+            /** Format: uuid */
+            reviewer_id: string;
+        };
+        ReviewerCandidates: {
+            /** Format: int64 */
+            configuration_version: number;
+            domain: components["schemas"]["ReviewArea"];
+            /** Format: uuid */
+            next_after?: string | null;
+            /** Format: uuid */
+            proposal_id: string;
+            reviewers: components["schemas"]["ReviewerCandidate"][];
         };
         ReviewerSelection: {
             domain: components["schemas"]["ReviewArea"];
@@ -3828,6 +3859,72 @@ export interface operations {
                 };
             };
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalReviewerCandidates: {
+        parameters: {
+            query: {
+                domain: components["schemas"]["ReviewArea"];
+                after?: string;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewerCandidates"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

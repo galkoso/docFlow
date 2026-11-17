@@ -6,7 +6,7 @@ use utoipa::{
 #[derive(OpenApi)]
 #[openapi(
     info(title = "SpecSpace API", version = "0.1.0"),
-    paths(crate::review_configuration::read, crate::review_configuration::update, crate::live, crate::ready, crate::auth::login, crate::auth::availability, crate::auth::callback, crate::auth::logout, crate::auth::me,
+    paths(crate::review_configuration::read, crate::review_configuration::update, crate::review_configuration::candidates, crate::live, crate::ready, crate::auth::login, crate::auth::availability, crate::auth::callback, crate::auth::logout, crate::auth::me,
         crate::specification::repositories, crate::specification::specification, crate::specification::document, crate::specification::find, crate::specification::asset,
         crate::specification::highlights, crate::proposals::create, crate::proposals::job_status, crate::proposal_reads::list, crate::proposal_reads::detail, crate::proposal_reads::options, crate::creation_context::prepare,
         crate::proposal_content::specification, crate::proposal_content::document, crate::proposal_content::find, crate::proposal_content::highlights, crate::proposal_content::asset,

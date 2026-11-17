@@ -68,6 +68,22 @@ Revoking membership or qualification invalidates eligibility without deleting
 historical assignments. Final submission must independently enforce distinct
 qualified product/development reviewers and design when UI impact is yes.
 
+## Eligible reviewer list
+
+`GET /api/v1/proposals/{proposal}/review/reviewers?domain=PRODUCT` returns up to
+50 eligible users in UUID order, with names capped at 200 characters. It requires
+the session and captured actor, checks current proposal/organization access, and
+excludes disabled users, the author, unqualified roles and other domains.
+Readers can view the list but gain no edit authority. It makes no Git calls.
+
+Responses include `proposal_id`, `configuration_version`, `domain`, `reviewers`,
+and `next_after`. Continue with the same domain and `after=next_after`; a null
+cursor means the list is complete. Each page rechecks access and current
+eligibility; it is a live selection list, not a frozen review snapshot. Unknown,
+duplicate, missing or malformed query fields are rejected. Saving still rechecks
+all selected users and expected versions. The typed client retains the captured
+actor on continuation requests.
+
 ## Persistence and invalidation
 
 Migration 009 creates an initial revision for existing and newly created

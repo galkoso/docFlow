@@ -45,4 +45,22 @@ describe('Review configuration request identity', () => {
     read.flush({});
     http.verify();
   });
+
+  it('keeps domain and continuation explicit while binding each page to its captured actor', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ReviewConfigurationApi);
+    const http = TestBed.inject(HttpTestingController);
+    api.candidates('original', 'proposal', 'PRODUCT').subscribe();
+    const first = http.expectOne(request => request.url.endsWith('/review/reviewers'));
+    expect(first.request.params.get('domain')).toBe('PRODUCT');
+    expect(first.request.params.has('after')).toBe(false);
+    first.flush({});
+    api.candidates('original', 'proposal', 'PRODUCT', 'continuation').subscribe();
+    const next = http.expectOne(request => request.url.endsWith('/review/reviewers'));
+    expect(next.request.headers.get('X-Expected-Actor')).toBe('original');
+    expect(next.request.params.get('domain')).toBe('PRODUCT');
+    expect(next.request.params.get('after')).toBe('continuation');
+    next.flush({});
+    http.verify();
+  });
 });

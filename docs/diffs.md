@@ -508,6 +508,40 @@ also cover the readable routes. Two client scenarios cover metadata paging and
 frozen manual replay after another actor polls. Browser diff UI, media views,
 formal review anchors and review/merge acceptance remain required.
 
+## Implemented: page-owned comparison lifecycle controller
+
+Angular `ComparisonState` captures one actor/proposal and an immutable preparation
+UUID/selection. Unknown or timed-out preparation keeps that exact intent for
+explicit retry. Once a receipt is validated, progress and file pages use only
+the accepted snapshot; URL promotion into that snapshot performs no new
+preparation. Explicit request-key/snapshot/page navigation cancels obsolete
+requests and advances a generation guard. Sixteen lifecycle scenarios cover
+these boundaries alongside source/context validation and private-memory handling.
+
+Receipts are checked for proposal/snapshot/job identity, state/phase consistency,
+completion, selected refs and immutable summary identity. File pages retain
+content identity, counts, cursor continuity, unique file IDs, canonical paths,
+side evidence and independent change flags. Known selected/page descriptors
+cannot change under an existing file identity. Terminal outcomes cannot regress.
+Current mutable proposal head/version/state remain separate from frozen summary
+fields, allowing historical closure without mixing a later head into the result.
+An empty READY inventory is explicitly no changes, with no approval implication.
+
+Progress polls every two seconds for at most 450 pending observations, then
+requires explicit checking without claiming failure. HTTP errors stop timers;
+manual retry retains its request or snapshot. Requests have a 20-second deadline.
+Temporary unknown authentication cancels work and hides private metadata and file
+selection. Same-actor refresh can observe an accepted snapshot automatically,
+while an unaccepted request requires explicit replay. Different identity or
+completed logout purges private state and never starts work on its own. Context
+conflicts remain distinct from authentication failures. Activated/retry getters
+stay reactive even when first read before an intent exists.
+
+The production build and all 134 frontend tests pass (19 files). This controller
+is not yet a routed page: URL/session effects, raw/readable body controllers,
+viewport rendering, browser RTL/accessibility/IME acceptance and media views
+remain required. No comparison data is persisted in browser storage.
+
 ## Remaining workflow
 
 Readable AST comparisons still need browser/controller integration and performance

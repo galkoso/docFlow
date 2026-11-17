@@ -1164,3 +1164,19 @@ Checkboxes represent verified work only.
   the editor fixture has no drift. The restarted API reports ready and both new
   routes require authentication. Both CI workflows for the preceding bounded
   readable-window commit completed successfully.
+
+
+- Angular comparison lifecycle controller: component-owned intent freezes actor,
+  proposal, request UUID and selection. Accepted snapshots are observed/paged
+  without new preparation. Response evidence, immutable summary/known file
+  descriptors and terminal outcomes are validated before installation. Explicit
+  navigation cancels stale generations; polling/timeouts stop at bounded limits
+  without false failure. Same-actor authentication can resume accepted observation,
+  unaccepted intent requires manual replay, and identity change/logout purges
+  private metadata and selection. Context conflicts never silently retarget.
+  No-change is distinct from approval. Sixteen lifecycle scenarios cover capture,
+  malformed/mixed receipts, paging/navigation, expiry/retry, scope changes and
+  reactive getters. Production build and all 134 frontend tests pass. Both CI
+  workflows for the preceding readable HTTP commit completed successfully.
+  Route/page, body viewers, browser acceptance, media and the remaining review/
+  merge lifecycle remain required; the full goal remains unfinished.

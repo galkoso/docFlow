@@ -30,7 +30,7 @@ pub struct Finding {
     pub code: String,
     pub path: String,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Side {
     pub path: String,
@@ -294,7 +294,7 @@ pub enum MatchMethod {
     Path,
     ExactBlob,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Change {
     /// File-level identity binds both snapshots and paths; not a review approval.

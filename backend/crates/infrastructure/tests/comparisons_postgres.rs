@@ -739,3 +739,152 @@ async fn new_request_rate_limits_do_not_break_exact_replay_after_metadata_advanc
     assert_eq!(reserve(&f, "rate-0").await, first.unwrap());
     assert_eq!(f.provider.reads.load(Ordering::SeqCst), 0);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn individual_file_reads_use_only_ready_private_evidence_and_frozen_refs(pool: PgPool) {
+    use specspace_application::comparison_file::{
+        ComparisonFileAuthorization, ComparisonFileReader, FileReadError,
+    };
+    let f = fixture(&pool).await;
+    let ticket = reserve(&f, "file-read").await;
+    assert!(matches!(
+        f.store
+            .resolve_file(f.actor, f.proposal, ticket.snapshot_id, &"0".repeat(64))
+            .await,
+        Err(FileReadError::NotReady)
+    ));
+    f.worker.run_once().await.unwrap();
+    let page = f
+        .store
+        .page(f.actor, f.proposal, ticket.snapshot_id, 0, 1)
+        .await
+        .unwrap();
+    let file = &page.files[0].id;
+    let context = f
+        .store
+        .resolve_file(f.actor, f.proposal, ticket.snapshot_id, file)
+        .await
+        .unwrap();
+    let reader = ComparisonFileReader::new(
+        f.store.clone(),
+        Arc::new(Factory {
+            provider: f.provider.clone(),
+            repository: context.scope.connection.repository,
+        }),
+        Duration::from_secs(60),
+    )
+    .unwrap();
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let loaded = reader
+        .load(f.actor, f.proposal, ticket.snapshot_id, file)
+        .await
+        .unwrap();
+    assert_eq!(loaded.snapshot(), ticket.snapshot_id);
+    assert_eq!(loaded.content_id(), page.content_id);
+    assert_eq!(loaded.merge_base().as_str(), OLD);
+    assert_eq!(loaded.head().as_str(), HEAD);
+    assert!(
+        loaded
+            .before()
+            .unwrap()
+            .contains("PRIVATE SOURCE SENTINEL before")
+    );
+    assert!(
+        loaded
+            .after()
+            .unwrap()
+            .contains("PRIVATE SOURCE SENTINEL edited")
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 2);
+    assert!(matches!(
+        reader
+            .load(f.owner, f.proposal, ticket.snapshot_id, file)
+            .await,
+        Err(FileReadError::NotFound)
+    ));
+    assert!(matches!(
+        reader
+            .load(f.actor, f.proposal, ticket.snapshot_id, &"0".repeat(64))
+            .await,
+        Err(FileReadError::NotFound)
+    ));
+    assert!(matches!(
+        reader.load(f.actor, f.proposal, Uuid::new_v4(), file).await,
+        Err(FileReadError::NotFound)
+    ));
+    sqlx::query("UPDATE proposals SET head_sha=$2,version=version+1,state='CLOSED' WHERE id=$1")
+        .bind(f.proposal)
+        .bind("4".repeat(40))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let historical = reader
+        .load(f.actor, f.proposal, ticket.snapshot_id, file)
+        .await
+        .unwrap();
+    assert_eq!(historical.head().as_str(), HEAD);
+    assert_eq!(historical.before(), loaded.before());
+    assert_eq!(historical.after(), loaded.after());
+    assert!(matches!(
+        reader.recheck(f.actor, &loaded).await,
+        Err(FileReadError::Access(ComparisonReadError::ContextChanged))
+    ));
+    sqlx::query("UPDATE repositories SET installation_id='8' WHERE id=$1")
+        .bind(context.scope.connection.repository)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        reader
+            .load(f.actor, f.proposal, ticket.snapshot_id, file)
+            .await,
+        Err(FileReadError::Access(ComparisonReadError::ContextChanged))
+    ));
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 4);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn file_reader_discards_source_when_access_is_revoked_during_provider_io(pool: PgPool) {
+    use specspace_application::comparison_file::{
+        ComparisonFileAuthorization, ComparisonFileReader, FileReadError,
+    };
+    let f = fixture(&pool).await;
+    let ticket = reserve(&f, "file-revocation").await;
+    f.worker.run_once().await.unwrap();
+    let page = f
+        .store
+        .page(f.actor, f.proposal, ticket.snapshot_id, 0, 1)
+        .await
+        .unwrap();
+    let file = &page.files[0].id;
+    let context = f
+        .store
+        .resolve_file(f.actor, f.proposal, ticket.snapshot_id, file)
+        .await
+        .unwrap();
+    let reader = ComparisonFileReader::new(
+        f.store.clone(),
+        Arc::new(Factory {
+            provider: f.provider.clone(),
+            repository: context.scope.connection.repository,
+        }),
+        Duration::from_secs(60),
+    )
+    .unwrap();
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    *f.provider.hook.lock().unwrap() = Some((pool.clone(), f.actor));
+    assert!(matches!(
+        reader
+            .load(f.actor, f.proposal, ticket.snapshot_id, file)
+            .await,
+        Err(FileReadError::Access(ComparisonReadError::NotFound))
+    ));
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 1);
+    assert!(matches!(
+        reader
+            .load(f.actor, f.proposal, ticket.snapshot_id, file)
+            .await,
+        Err(FileReadError::Access(ComparisonReadError::NotFound))
+    ));
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 1);
+}

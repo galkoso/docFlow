@@ -1030,3 +1030,19 @@ Checkboxes represent verified work only.
   Full backend workspace tests and Clippy pass; the frontend production build
   and all 115 tests pass. Both CI workflows for the preceding worker commit
   completed successfully. The new contract is generated from the server schema.
+
+
+- Individual comparison text-file loading: private READY rows resolve frozen
+  base/head paths and provider binding, without accepting browser paths/refs.
+  Exact length, Git-framed blob ID and SHA-256 are verified before bounded raw
+  alignment. Empty files and missing sides stay distinct; historical closed
+  proposals retain their published pair. Rechecks after connection, each fetch,
+  CPU and optional later rendering reject changed scope. Two loads and a fixed
+  runtime 60-second deadline bound work; cancellation retains the CPU permit
+  until it exits. Eight application and two PostgreSQL scenarios cover these
+  boundaries, corruption, revocation, backoff and recovery. No source is persisted
+  or serialized implicitly. Runtime configuration shares the frozen provider
+  capability. File HTTP/windowing, body caching, readable/asset views, UI and
+  review/merge workflows remain required.
+  Full backend workspace tests and Clippy pass after this stage. Both CI
+  workflows for the preceding HTTP contract commit also completed successfully.

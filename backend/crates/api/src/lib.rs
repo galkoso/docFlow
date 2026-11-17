@@ -19,10 +19,13 @@ use axum::{
     routing::get,
 };
 use serde::Serialize;
-use specspace_application::comparison_reader::{BoundProviderFactory, ComparisonReader};
 use specspace_application::draft::DraftRetention;
 use specspace_application::proposal_reader::ProposalReader;
 use specspace_application::reader::{BookProviderFactory, BookReader};
+use specspace_application::{
+    comparison_file::ComparisonFileReader,
+    comparison_reader::{BoundProviderFactory, ComparisonReader},
+};
 use specspace_git_adapter::app_auth::GitHubAppKey;
 use specspace_infrastructure::authorization::PgProposalReadAuthorization;
 use specspace_infrastructure::comparison_authorization::PgComparisonAuthorization;
@@ -56,6 +59,7 @@ pub struct AppState {
     pub proposal_books: Arc<ProposalReader>,
     pub comparisons: Arc<ComparisonReader>,
     pub comparison_jobs: Arc<PgComparisons>,
+    pub comparison_files: Arc<ComparisonFileReader>,
     pub drafts: Arc<PgDrafts>,
     pub search_index: Arc<PgSearchIndex>,
     pub saves: Arc<PgSaves>,
@@ -95,8 +99,18 @@ impl AppState {
             )
             .expect("fixed comparison timeout is valid"),
         );
+        let comparison_jobs = Arc::new(PgComparisons::new(database.clone()));
+        let comparison_files = Arc::new(
+            ComparisonFileReader::new(
+                comparison_jobs.clone(),
+                source.clone(),
+                std::time::Duration::from_secs(60),
+            )
+            .expect("fixed file-read timeout is valid"),
+        );
         Self {
-            comparison_jobs: Arc::new(PgComparisons::new(database.clone())),
+            comparison_jobs,
+            comparison_files,
             comparisons,
             saves: Arc::new(PgSaves::new(database.clone())),
             drafts: Arc::new(PgDrafts::new(database.clone(), None)),
@@ -125,6 +139,14 @@ impl AppState {
     /// Comparison test/production sources must support frozen connection settings;
     /// an unbound book source is never silently reused for this capability.
     pub fn configure_comparison_source(&mut self, source: Arc<dyn BoundProviderFactory>) {
+        self.comparison_files = Arc::new(
+            ComparisonFileReader::new(
+                self.comparison_jobs.clone(),
+                source.clone(),
+                std::time::Duration::from_secs(60),
+            )
+            .expect("fixed file-read timeout is valid"),
+        );
         self.comparisons = Arc::new(
             ComparisonReader::new(
                 Arc::new(PgComparisonAuthorization::new(self.database.clone())),

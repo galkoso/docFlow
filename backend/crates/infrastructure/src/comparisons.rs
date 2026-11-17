@@ -602,3 +602,49 @@ async fn audit(
     sqlx::query("INSERT INTO audit_events(id,organization_id,actor_id,action,entity_id,result) VALUES($1,$2,$3,$4,$5,$6)").bind(Uuid::new_v4()).bind(context.organization).bind(context.actor).bind(action).bind(snapshot).bind(result).execute(&mut **tx).await?;
     Ok(())
 }
+
+#[async_trait::async_trait]
+impl specspace_application::comparison_file::ComparisonFileAuthorization for PgComparisons {
+    async fn resolve_file(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        file: &str,
+    ) -> Result<
+        specspace_application::comparison_file::FileReadContext,
+        specspace_application::comparison_file::FileReadError,
+    > {
+        use specspace_application::comparison_file::{FileReadContext, FileReadError};
+        let read = async {
+            if file.len() != 64 || !file.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+                return Err(ComparisonStoreError::NotFound);
+            }
+            let mut tx = self.transaction().await?;
+            let (row, scope) = self.read_scope(&mut tx, actor, proposal, snapshot).await?;
+            let summary = ready_summary(&mut tx, &row).await?.ok_or(ComparisonStoreError::NotReady)?;
+            let value: Option<serde_json::Value> = sqlx::query_scalar("SELECT change FROM comparison_files WHERE snapshot_id=$1 AND organization_id=$2 AND file_id=$3")
+                .bind(snapshot).bind(row.organization_id).bind(file).fetch_optional(&mut *tx).await?;
+            let change: Change = serde_json::from_value(value.ok_or(ComparisonStoreError::NotFound)?)
+                .map_err(|_| ComparisonStoreError::InvalidSnapshot)?;
+            if change.id != file { return Err(ComparisonStoreError::InvalidSnapshot); }
+            let context = FileReadContext {
+                scope,
+                snapshot,
+                content_id: summary.content_id,
+                merge_base: CommitSha::parse(summary.merge_base_sha).map_err(|_| ComparisonStoreError::InvalidSnapshot)?,
+                head: CommitSha::parse(summary.head_sha).map_err(|_| ComparisonStoreError::InvalidSnapshot)?,
+                change,
+            };
+            tx.commit().await?;
+            Ok(context)
+        }.await;
+        read.map_err(|error| match error {
+            ComparisonStoreError::Read(error) => FileReadError::Access(error),
+            ComparisonStoreError::NotFound => FileReadError::NotFound,
+            ComparisonStoreError::NotReady => FileReadError::NotReady,
+            ComparisonStoreError::Unavailable => FileReadError::Unavailable,
+            _ => FileReadError::InvalidEvidence,
+        })
+    }
+}

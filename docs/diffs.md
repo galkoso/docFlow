@@ -220,6 +220,41 @@ historical results, replay/quotas and explicit setup failure. Two client scenari
 cover captured request identity across deferred subscription/replay and paging
 without reselecting refs. These checks do not complete file-view or review acceptance.
 
+## Implemented: source-verified individual text-file loading
+
+`ComparisonFileReader` resolves a file only through a READY, successful private
+comparison and its immutable file row. The server owns the before/after paths,
+merge-base/head commits, connection settings, sizes, blob IDs and SHA-256 hashes;
+clients supply only snapshot and file identities. It reads at most the selected
+pair, without ref selection, ancestry requests, full-tree/book reloads, main
+cache writes or Git mutations. Historical/closed results remain pinned to their
+published source even when current proposal metadata has advanced.
+
+Documents and catalogs up to 2MiB per side are supported. Missing sides and
+present empty files stay distinct. Malformed YAML/Markdown, line endings, Unicode
+and HTML remain exact raw source. Actual byte length, Git-framed blob identity
+and SHA-256 must all match before an aligned result can be returned. Binary
+assets and other file kinds are rejected explicitly by this text capability;
+image views still require their own verified media path.
+
+Current private scope and frozen provider binding are rechecked after connecting,
+after each source fetch and after CPU verification/alignment. An explicit recheck
+is available after later rendering awaits. Source/context types are not response
+DTOs and have no serialization/debug derivation. Two loads run at a time with no
+unbounded queue; the runtime uses a 60-second deadline (30–120 allowed). Bounded
+blocking CPU owns the capacity permit through request cancellation. Provider
+backoff is preserved without automatic retries. No source bodies are persisted.
+
+Eight application scenarios cover exact historical renames, empty/add/delete,
+forged provider/stored evidence, invalid/oversized/non-text inputs, access changes
+at async boundaries, backoff, capacity/cancellation and timeout recovery. Two
+PostgreSQL scenarios prove READY/private scope, exact pinned bodies, later closure
+and configuration changes, plus access revocation during a provider fetch. The
+runtime source configuration wires this capability alongside the inventory
+worker. File HTTP endpoints, bounded response windows, body caching and readable
+AST views remain subsequent work; this loader alone completes no diff UI or
+review acceptance requirement.
+
 ## Remaining workflow
 
 File-level raw and readable views still need pinned body reads/verification, bounded windows

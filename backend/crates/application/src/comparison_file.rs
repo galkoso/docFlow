@@ -1,6 +1,7 @@
 //! Private, source-verified file reads from a published comparison. Browser paths
 //! and refs never enter provider calls; only server-resolved immutable evidence.
 mod cache;
+pub mod image;
 
 use crate::{
     comparison::{Change, Kind, Side},
@@ -25,6 +26,7 @@ pub enum FileReadError {
     NotReady,
     InvalidEvidence,
     UnsupportedKind,
+    InvalidImage(&'static str),
     TooLarge,
     Busy,
     TimedOut,
@@ -244,7 +246,7 @@ fn digest(value: &str) -> bool {
             .bytes()
             .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
 }
-fn validate(context: &FileReadContext) -> Result<(), FileReadError> {
+fn validate_context(context: &FileReadContext) -> Result<(), FileReadError> {
     if context.scope.organization.is_nil()
         || context.scope.connection.repository.is_nil()
         || context.scope.connection.remote_id == 0
@@ -255,6 +257,10 @@ fn validate(context: &FileReadContext) -> Result<(), FileReadError> {
     {
         return Err(FileReadError::InvalidEvidence);
     }
+    Ok(())
+}
+fn validate(context: &FileReadContext) -> Result<(), FileReadError> {
+    validate_context(context)?;
     if !matches!(context.change.kind, Kind::Document | Kind::Catalog) {
         return Err(FileReadError::UnsupportedKind);
     }

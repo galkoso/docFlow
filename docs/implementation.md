@@ -1245,3 +1245,20 @@ Checkboxes represent verified work only.
   readable-view stage completed successfully. Changed-media viewing, restorable
   selection anchors, browser acceptance and the full review/merge/bundle lifecycle
   remain open; this is not a completion claim for the full specification.
+
+- Comparison image API: a captured-actor request selects a published private
+  file/snapshot and before/after side, never a browser path or Git ref. The shared
+  file-reader capacity/deadline covers bounded binary fetch, exact length/Git OID
+  and optional SHA checks, content-addressed path/MIME validation, metadata-free
+  PNG decoding and display hashing off the executor. The CPU closure owns its
+  permit through cancellation. Current authorization is rechecked before/after
+  fetch, after decode and immediately before HTTP publication. Missing sides,
+  unsupported/executable files, excessive sizes, malformed evidence and provider
+  backoff stay explicit; no originals or decoded-image cache are returned.
+  A bounded base64url ImageEvidence header binds the PNG body to actor, frozen
+  source refs/file/side, original hash/OID/bytes and derivative hash/dimensions.
+  OpenAPI and typed blob client are regenerated consistently. Five image reader
+  scenarios and four HTTP scenarios cover real fixture pixels, private trailer
+  stripping, forged source, absence, revocation and pinned closed/history reads.
+  The full backend suite and workspace Clippy pass; local API restarts ready,
+  and an anonymous request to the new route returns 401.

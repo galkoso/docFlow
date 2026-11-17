@@ -60,6 +60,7 @@ impl ComparisonFileAuthorization for Authority {
 struct Provider {
     context: FileReadContext,
     sources: Mutex<(String, String)>,
+    binary: Mutex<Option<(Vec<u8>, Vec<u8>)>>,
     reads: AtomicUsize,
     failure: Mutex<Option<GitError>>,
     gate: tokio::sync::Notify,
@@ -109,11 +110,34 @@ impl GitProvider for Provider {
     }
     async fn read_bytes(
         &self,
-        _: &CommitSha,
-        _: &RepositoryPath,
-        _: usize,
+        commit: &CommitSha,
+        path: &RepositoryPath,
+        limit: usize,
     ) -> Result<Vec<u8>, GitError> {
-        panic!("text only")
+        assert_eq!(limit, specspace_document_engine::media::MAX_ASSET_BYTES);
+        self.reads.fetch_add(1, Ordering::SeqCst);
+        if self.block.load(Ordering::SeqCst) {
+            self.gate.notified().await;
+        }
+        if let Some(error) = self.failure.lock().unwrap().clone() {
+            return Err(error);
+        }
+        let binary = self.binary.lock().unwrap();
+        let sources = binary.as_ref().expect("text reads cannot fetch binary");
+        if commit == &self.context.merge_base {
+            assert_eq!(
+                path.as_str(),
+                self.context.change.before.as_ref().unwrap().path
+            );
+            Ok(sources.0.clone())
+        } else {
+            assert_eq!(commit, &self.context.head);
+            assert_eq!(
+                path.as_str(),
+                self.context.change.after.as_ref().unwrap().path
+            );
+            Ok(sources.1.clone())
+        }
     }
     async fn list_files(&self, _: &CommitSha) -> Result<Vec<FileEntry>, GitError> {
         panic!("must not reload full trees")
@@ -189,6 +213,7 @@ impl Fixture {
         let provider = Arc::new(Provider {
             context: context.clone(),
             sources: Mutex::new((before.into(), after.into())),
+            binary: Mutex::new(None),
             reads: AtomicUsize::new(0),
             failure: Mutex::new(None),
             gate: tokio::sync::Notify::new(),
@@ -692,3 +717,5 @@ async fn a_failed_final_authorization_never_admits_verified_source_to_the_cache(
     f.load().await.unwrap();
     assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 4);
 }
+
+mod image;

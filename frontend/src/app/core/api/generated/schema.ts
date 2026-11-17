@@ -264,6 +264,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/diff/files/{file}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalComparisonImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/diff/files/{file}/readable": {
         parameters: {
             query?: never;
@@ -913,6 +929,35 @@ export interface components {
             query: string;
             snapshot_sha: string;
         };
+        /**
+         * @description ASCII-only identities and bounded display metadata. Serialized as unpadded
+         *     base64url JSON in X-Comparison-Image; the body is only re-encoded PNG pixels.
+         */
+        ImageEvidence: {
+            /** Format: uuid */
+            actor_id: string;
+            content_id: string;
+            display_bytes: number;
+            display_sha256: string;
+            file_id: string;
+            head_sha: string;
+            /** Format: int32 */
+            height: number;
+            merge_base_sha: string;
+            /** Format: uuid */
+            proposal_id: string;
+            side: components["schemas"]["ImageSide"];
+            /** Format: uuid */
+            snapshot_id: string;
+            source_blob_oid: string;
+            /** Format: int64 */
+            source_bytes: number;
+            source_sha256: string;
+            /** Format: int32 */
+            width: number;
+        };
+        /** @enum {string} */
+        ImageSide: "before" | "after";
         /** @enum {string} */
         InitialMode: "manual" | "ai";
         JobStatus: {
@@ -2375,6 +2420,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RawFileResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalComparisonImage: {
+        parameters: {
+            query: {
+                snapshot: string;
+                side: components["schemas"]["ImageSide"];
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified metadata-free PNG display derivative, never original bytes */
+            200: {
+                headers: {
+                    /** @description Unpadded base64url JSON ImageEvidence binding this body to actor/snapshot/file/side and source/display SHA-256 */
+                    "X-Comparison-Image"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": components["schemas"]["PngDisplay"];
                 };
             };
             400: {

@@ -42,6 +42,7 @@ fn sha(value: &str) -> CommitSha {
 }
 struct Provider {
     files: BTreeMap<String, String>,
+    images: BTreeMap<String, Vec<u8>>,
     reads: AtomicUsize,
     backoff: AtomicUsize,
     hook: Mutex<Option<(PgPool, Uuid)>>,
@@ -107,11 +108,32 @@ impl GitProvider for Provider {
     }
     async fn read_bytes(
         &self,
-        _: &CommitSha,
-        _: &RepositoryPath,
-        _: usize,
+        commit: &CommitSha,
+        path: &RepositoryPath,
+        limit: usize,
     ) -> Result<Vec<u8>, GitError> {
-        panic!("inventory cannot fetch opaque media")
+        assert_eq!(commit.as_str(), HEAD);
+        assert_eq!(limit, specspace_document_engine::media::MAX_ASSET_BYTES);
+        self.reads.fetch_add(1, Ordering::SeqCst);
+        match self.backoff.load(Ordering::SeqCst) {
+            2 => {
+                return Err(GitError::RateLimited {
+                    retry_after_seconds: Some(13),
+                });
+            }
+            3 => return Ok(b"forged source".to_vec()),
+            4 => return Err(GitError::FileMissing),
+            _ => {}
+        }
+        let hook = self.hook.lock().unwrap().take();
+        if let Some((pool, actor)) = hook {
+            sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
+                .bind(actor)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        Ok(self.images[path.as_str()].clone())
     }
     async fn list_files(&self, commit: &CommitSha) -> Result<Vec<FileEntry>, GitError> {
         Ok(self
@@ -130,6 +152,17 @@ impl GitProvider for Provider {
                     mode: FileMode::Regular,
                 }
             })
+            .chain(
+                self.images
+                    .iter()
+                    .filter(|_| commit.as_str() == HEAD)
+                    .map(|(path, bytes)| FileEntry {
+                        path: RepositoryPath::parse(path).unwrap(),
+                        blob_sha: blob::oid(bytes, 40).unwrap(),
+                        size: bytes.len() as u64,
+                        mode: FileMode::Regular,
+                    }),
+            )
             .collect())
     }
     async fn commit_metadata(&self, _: &CommitSha) -> Result<CommitMetadata, GitError> {
@@ -279,8 +312,25 @@ async fn fixture_options(
             files.insert(path.into(), format!("---\ndocument_id: {id}\ntitle: Presence\nowner_team: fixture\nschema_version: 1\n---\n{body}\n"));
         }
     }
+    let mut images = BTreeMap::new();
+    if asset {
+        use sha2::{Digest, Sha256};
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../fixtures/repository/assets");
+        let bytes = std::fs::read(
+            std::fs::read_dir(root)
+                .unwrap()
+                .next()
+                .unwrap()
+                .unwrap()
+                .path(),
+        )
+        .unwrap();
+        images.insert(format!("assets/{:x}.png", Sha256::digest(&bytes)), bytes);
+    }
     let provider = Arc::new(Provider {
         files,
+        images,
         reads: AtomicUsize::new(0),
         backoff: AtomicUsize::new(0),
         hook: Mutex::new(None),
@@ -1310,4 +1360,176 @@ async fn readable_cpu_capacity_and_source_failures_keep_retry_and_failure_states
     drop(held);
     assert_eq!(get(&f.app, &f.actor, &path, true).await.0, StatusCode::OK);
     assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+}
+
+async fn image_response(
+    app: &Router,
+    user: &User,
+    uri: &str,
+    bound: bool,
+) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+    let mut request = Request::builder()
+        .uri(uri)
+        .header("Cookie", format!("specspace-session={}", user.token));
+    if bound {
+        request = request.header("X-Expected-Actor", user.id.to_string());
+    }
+    let response = app
+        .clone()
+        .oneshot(request.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = response.status();
+    let headers = response.headers().clone();
+    assert_eq!(headers["cache-control"], "no-store");
+    let body = response
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes()
+        .to_vec();
+    (status, headers, body)
+}
+async fn ready_image(f: &Fixture) -> (Value, Value, String) {
+    let (ticket, _) = ready_file(f).await;
+    let path = format!(
+        "/api/v1/proposals/{}/diff?snapshot={}",
+        f.proposal,
+        ticket["snapshot_id"].as_str().unwrap()
+    );
+    let (_, ready, _, _) = get(&f.app, &f.actor, &path, true).await;
+    let file = ready["page"]["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|file| {
+            file["kind"] == "asset"
+                && file["after"]["path"]
+                    .as_str()
+                    .is_some_and(|p| p.len() == 75)
+        })
+        .unwrap()
+        .clone();
+    let uri = format!(
+        "/api/v1/proposals/{}/diff/files/{}/image?snapshot={}&side=after",
+        f.proposal,
+        file["id"].as_str().unwrap(),
+        ticket["snapshot_id"].as_str().unwrap()
+    );
+    (ticket, file, uri)
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn comparison_image_returns_only_verified_pixels_with_private_snapshot_and_body_evidence(
+    pool: PgPool,
+) {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    use sha2::{Digest, Sha256};
+    let f = fixture_source(&pool, true, "before", true).await;
+    let (ticket, file, path) = ready_image(&f).await;
+    sqlx::query("UPDATE proposals SET state='CLOSED',head_sha=$2,version=version+1 WHERE id=$1")
+        .bind(f.proposal)
+        .bind("4".repeat(40))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let (status, headers, body) = image_response(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
+    assert_eq!(headers["content-type"], "image/png");
+    assert_eq!(headers["x-content-type-options"], "nosniff");
+    assert!(body.starts_with(b"\x89PNG\r\n\x1a\n"));
+    let evidence: Value = serde_json::from_slice(
+        &URL_SAFE_NO_PAD
+            .decode(headers["X-Comparison-Image"].as_bytes())
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(evidence["actor_id"], f.actor.id.to_string());
+    assert_eq!(evidence["snapshot_id"], ticket["snapshot_id"]);
+    assert_eq!(evidence["file_id"], file["id"]);
+    assert_eq!(evidence["head_sha"], HEAD);
+    assert_eq!(evidence["merge_base_sha"], OLD);
+    assert_eq!(evidence["source_blob_oid"], file["after"]["blob_oid"]);
+    assert_eq!(evidence["source_bytes"], file["after"]["bytes"]);
+    assert_eq!(
+        evidence["source_sha256"],
+        file["after"]["path"].as_str().unwrap()[7..71]
+    );
+    assert_eq!(
+        evidence["display_sha256"],
+        format!("{:x}", Sha256::digest(&body))
+    );
+    assert_eq!(evidence["display_bytes"], body.len());
+    assert_eq!(evidence["width"], 1);
+    assert_eq!(evidence["height"], 1);
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 1);
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn comparison_image_rejects_foreign_snapshots_missing_sides_unbound_actors_and_ambiguous_queries(
+    pool: PgPool,
+) {
+    let f = fixture_source(&pool, true, "before", true).await;
+    let (_, _, path) = ready_image(&f).await;
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        image_response(&f.app, &f.actor, &path, false).await.0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        image_response(&f.app, &f.owner, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        image_response(
+            &f.app,
+            &f.actor,
+            &path.replace("side=after", "side=before"),
+            true
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    for query in ["&side=before", "&head=other", "&snapshot=duplicate"] {
+        let (status, headers, _) =
+            image_response(&f.app, &f.actor, &format!("{path}{query}"), true).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(!headers.contains_key("X-Comparison-Image"));
+    }
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn comparison_image_never_returns_unverified_or_revoked_pixels_and_preserves_backoff(
+    pool: PgPool,
+) {
+    let f = fixture_source(&pool, true, "before", true).await;
+    let (_, _, path) = ready_image(&f).await;
+    for mode in [2, 3, 4] {
+        f.provider.backoff.store(mode, Ordering::SeqCst);
+        let (status, headers, body) = image_response(&f.app, &f.actor, &path, true).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert!(!headers.contains_key("X-Comparison-Image"));
+        assert!(serde_json::from_slice::<Value>(&body).is_ok());
+        if mode == 2 {
+            assert_eq!(headers["retry-after"], "13");
+        }
+    }
+    f.provider.backoff.store(0, Ordering::SeqCst);
+    *f.provider.hook.lock().unwrap() = Some((pool.clone(), f.actor.id));
+    let (_, headers, body) = image_response(&f.app, &f.actor, &path, true).await;
+    assert!(!headers.contains_key("X-Comparison-Image"));
+    assert!(!body.starts_with(b"\x89PNG"));
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn comparison_image_final_authorization_occurs_after_decode_before_response_publication(
+    pool: PgPool,
+) {
+    let f = fixture_options(&pool, true, "before", true, Some(5), false).await;
+    let (_, _, path) = ready_image(&f).await;
+    let (status, headers, body) = image_response(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(!headers.contains_key("X-Comparison-Image"));
+    assert!(!body.starts_with(b"\x89PNG"));
+    assert_eq!(f.file_resolves.load(Ordering::SeqCst), 5);
 }

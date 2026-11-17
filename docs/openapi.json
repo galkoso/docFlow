@@ -1533,6 +1533,147 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/diff/files/{file}/image": {
+      "get": {
+        "tags": [
+          "crate::comparisons::image"
+        ],
+        "operationId": "proposalComparisonImage",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ImageSide"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified metadata-free PNG display derivative, never original bytes",
+            "headers": {
+              "X-Comparison-Image": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Unpadded base64url JSON ImageEvidence binding this body to actor/snapshot/file/side and source/display SHA-256"
+              }
+            },
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/PngDisplay"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/diff/files/{file}/readable": {
       "get": {
         "tags": [
@@ -5344,6 +5485,91 @@
             "type": "string"
           }
         }
+      },
+      "ImageEvidence": {
+        "type": "object",
+        "description": "ASCII-only identities and bounded display metadata. Serialized as unpadded\nbase64url JSON in X-Comparison-Image; the body is only re-encoded PNG pixels.",
+        "required": [
+          "actor_id",
+          "proposal_id",
+          "snapshot_id",
+          "content_id",
+          "file_id",
+          "side",
+          "merge_base_sha",
+          "head_sha",
+          "source_blob_oid",
+          "source_sha256",
+          "source_bytes",
+          "display_sha256",
+          "display_bytes",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content_id": {
+            "type": "string"
+          },
+          "display_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "display_sha256": {
+            "type": "string"
+          },
+          "file_id": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "merge_base_sha": {
+            "type": "string"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "side": {
+            "$ref": "#/components/schemas/ImageSide"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_blob_oid": {
+            "type": "string"
+          },
+          "source_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "source_sha256": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "ImageSide": {
+        "type": "string",
+        "enum": [
+          "before",
+          "after"
+        ]
       },
       "InitialMode": {
         "type": "string",

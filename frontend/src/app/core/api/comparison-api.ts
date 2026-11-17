@@ -2,6 +2,8 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { components } from './generated/schema';
 
+export type ImageEvidence = components['schemas']['ImageEvidence'];
+export type ImageSide = components['schemas']['ImageSide'];
 export type DiffResponse = components['schemas']['DiffResponse'];
 export type DiffFiles = components['schemas']['DiffFiles'];
 export type ComparisonSummary = components['schemas']['ComparisonSummary'];
@@ -47,6 +49,11 @@ export class ComparisonApi {
     cursor: EventCursor = { event: 0, offset: 0 }, maxBytes = 32768) {
     return this.http.get<ReadableUnitResponse>(`${this.path(proposal)}/files/${encodeURIComponent(file)}/readable/units/${unit}`, {
       params: { snapshot, side, event: cursor.event, offset: cursor.offset, max_bytes: maxBytes }, headers: this.actor(actor),
+    });
+  }
+  image(actor: string, proposal: string, snapshot: string, file: string, side: ImageSide) {
+    return this.http.get(`${this.path(proposal)}/files/${encodeURIComponent(file)}/image`, {
+      params: { snapshot, side }, headers: this.actor(actor), responseType: 'blob', observe: 'response',
     });
   }
   job(actor: string, job: string) {

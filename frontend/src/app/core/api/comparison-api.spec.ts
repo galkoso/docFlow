@@ -121,4 +121,16 @@ describe('Pinned comparison requests', () => {
     http.verify();
   });
 
+  it('loads a comparison image as a captured-actor blob response with only immutable side and snapshot selection', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ComparisonApi), http = TestBed.inject(HttpTestingController);
+    const request = api.image('captured', 'proposal/one', 'snapshot', 'file', 'before'); request.subscribe({ error: () => {} });
+    const first = http.expectOne(req => req.url.endsWith('/file/image'));
+    expect(first.request.url).toContain('/proposal%2Fone/'); expect(first.request.headers.get('X-Expected-Actor')).toBe('captured');
+    expect(first.request.responseType).toBe('blob'); expect(first.request.params.keys().sort()).toEqual(['side', 'snapshot']);
+    expect(first.request.params.get('side')).toBe('before'); first.error(new ProgressEvent('error'));
+    request.subscribe(); const retry = http.expectOne(req => req.url.endsWith('/file/image'));
+    expect(retry.request.params.toString()).toBe(first.request.params.toString()); retry.flush(new Blob([], { type: 'image/png' })); http.verify();
+  });
+
 });

@@ -1,3 +1,4 @@
+pub(crate) mod image;
 pub(crate) mod raw;
 pub(crate) mod readable;
 
@@ -28,6 +29,7 @@ use uuid::Uuid;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/v1/proposals/{proposal}/diff", get(read))
+        .merge(image::routes())
         .merge(raw::routes())
         .merge(readable::routes())
 }

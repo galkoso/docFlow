@@ -1279,3 +1279,16 @@ Checkboxes represent verified work only.
   Browser connection remains unavailable, so physical image/layout/keyboard
   acceptance remains open. Restorable selection anchors and all remaining
   review/merge/bundle/production requirements are still part of the active goal.
+
+- Immutable comparison locators: snapshot inventory reads can select the bounded
+  page containing a file ID, excluding an ordinal query. PostgreSQL resolves its
+  immutable ordinal under current actor-private scope, then the normal page read
+  and final status read recheck access/context. This needs no provider IO and
+  survives process restart and later proposal closure/head changes. Readable row
+  queries similarly locate a paired-unit ID within the verified exact source
+  pair on the bounded CPU path, excluding an offset query. Unknown IDs return
+  explicit 404; IDs cannot follow a different file or full source pair. Syntax,
+  duplicate and mixed-query rejection remain strict. Engine, PostgreSQL and HTTP
+  tests cover later pages, private scope, stale identities and no-Git location.
+  The full backend suite and workspace Clippy pass. OpenAPI and the typed client
+  are regenerated; existing readable fixtures retain their exact contract.

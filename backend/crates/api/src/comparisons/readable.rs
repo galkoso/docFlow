@@ -23,6 +23,8 @@ pub(super) fn routes() -> Router<AppState> {
 pub struct PageQuery {
     pub snapshot: Uuid,
     pub offset: Option<usize>,
+    /// Select a page by immutable paired-unit identity; excludes offset.
+    pub row: Option<String>,
     pub limit: Option<usize>,
 }
 #[derive(Clone, Copy, Deserialize, Serialize, utoipa::ToSchema)]
@@ -94,7 +96,17 @@ pub(crate) async fn page(
     };
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(50);
-    if query.snapshot.is_nil() || offset > 20004 || !(1..=100).contains(&limit) {
+    if query.snapshot.is_nil()
+        || offset > 20004
+        || !(1..=100).contains(&limit)
+        || query.row.as_ref().is_some_and(|row| {
+            query.offset.is_some()
+                || row.len() != 64
+                || !row
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        })
+    {
         return invalid();
     }
     let (loaded, page) = match render(
@@ -103,7 +115,10 @@ pub(crate) async fn page(
         proposal,
         query.snapshot,
         &file,
-        move |pair| pair.page(offset, limit),
+        move |pair| match query.row {
+            Some(row) => pair.page_containing(&row, limit),
+            None => pair.page(offset, limit),
+        },
     )
     .await
     {
@@ -301,6 +316,13 @@ fn invalid() -> Response {
 fn window_failure(error: ReadableWindowError) -> Response {
     match error {
         ReadableWindowError::InvalidCursor | ReadableWindowError::InvalidLimit => invalid(),
+        ReadableWindowError::UnknownRow => proposals::problem(
+            StatusCode::NOT_FOUND,
+            "NOT_FOUND",
+            "היחידה המבוקשת אינה קיימת בהשוואה השמורה.",
+            false,
+            None,
+        ),
         ReadableWindowError::InvalidEvidence => raw::file_failure(FileReadError::InvalidEvidence),
         _ => proposals::problem(
             StatusCode::UNPROCESSABLE_ENTITY,

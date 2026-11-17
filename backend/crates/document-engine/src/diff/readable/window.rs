@@ -20,6 +20,7 @@ pub const MAX_EVENT_WINDOW_JSON_BYTES: usize = 384 * 1024;
 #[derive(Debug, PartialEq, Eq)]
 pub enum ReadableWindowError {
     InvalidCursor,
+    UnknownRow,
     InvalidLimit,
     Unavailable,
     ProtectedSource,
@@ -119,6 +120,23 @@ pub struct ReadablePage {
     pub rows: Vec<ReadableRow>,
 }
 impl ReadablePair {
+    /// Identity is derived from both complete source hashes and exact unit
+    /// evidence; callers additionally bind this location to file and snapshot.
+    pub fn page_containing(
+        &self,
+        row: &str,
+        limit: usize,
+    ) -> Result<ReadablePage, ReadableWindowError> {
+        if !(1..=100).contains(&limit) {
+            return Err(ReadableWindowError::InvalidLimit);
+        }
+        let ordinal = self
+            .changes
+            .iter()
+            .position(|change| change.id == row)
+            .ok_or(ReadableWindowError::UnknownRow)?;
+        self.page(ordinal / limit * limit, limit)
+    }
     pub fn page(&self, offset: usize, limit: usize) -> Result<ReadablePage, ReadableWindowError> {
         if offset > MAX_ROWS {
             return Err(ReadableWindowError::InvalidCursor);

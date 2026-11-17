@@ -1246,6 +1246,15 @@
             }
           },
           {
+            "name": "file",
+            "in": "query",
+            "description": "Select the page containing this immutable file ID; excludes offset.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "head",
             "in": "query",
             "required": false,
@@ -1723,6 +1732,15 @@
             "schema": {
               "type": "integer",
               "minimum": 0
+            }
+          },
+          {
+            "name": "row",
+            "in": "query",
+            "description": "Select a page by immutable paired-unit identity; excludes offset.",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           },
           {

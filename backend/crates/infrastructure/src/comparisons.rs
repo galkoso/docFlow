@@ -490,6 +490,44 @@ impl PgComparisons {
         tx.commit().await?;
         Ok(result)
     }
+    /// Resolve immutable identity to its bounded page under current private
+    /// snapshot authorization. No provider IO or browser-controlled ordinal.
+    pub async fn page_containing(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        file: &str,
+        limit: usize,
+    ) -> Result<ComparisonPage, ComparisonStoreError> {
+        if !(1..=100).contains(&limit)
+            || file.len() != 64
+            || !file
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(ComparisonStoreError::InvalidQuery);
+        }
+        let mut tx = self.transaction().await?;
+        let (row, _) = self.read_scope(&mut tx, actor, proposal, snapshot).await?;
+        let summary = ready_summary(&mut tx, &row)
+            .await?
+            .ok_or(ComparisonStoreError::NotReady)?;
+        let ordinal: Option<i32> = sqlx::query_scalar("SELECT ordinal FROM comparison_files WHERE snapshot_id=$1 AND organization_id=$2 AND file_id=$3")
+            .bind(snapshot).bind(row.organization_id).bind(file).fetch_optional(&mut *tx).await?;
+        let ordinal = ordinal.ok_or(ComparisonStoreError::NotFound)?;
+        if ordinal < 0 || ordinal as usize >= summary.changes_total {
+            return Err(ComparisonStoreError::InvalidSnapshot);
+        }
+        let offset = ordinal as usize / limit * limit;
+        tx.commit().await?;
+        // The ordinary page reader rechecks current access after location lookup.
+        let page = self.page(actor, proposal, snapshot, offset, limit).await?;
+        if !page.files.iter().any(|change| change.id == file) {
+            return Err(ComparisonStoreError::InvalidSnapshot);
+        }
+        Ok(page)
+    }
     pub async fn page(
         &self,
         actor: Uuid,

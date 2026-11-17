@@ -2302,6 +2302,8 @@ export interface operations {
                 request_id?: string;
                 /** @description Durable snapshot returned by the initial request. Pages never reselect refs. */
                 snapshot?: string;
+                /** @description Select the page containing this immutable file ID; excludes offset. */
+                file?: string;
                 head?: string;
                 target?: string;
                 offset?: number;
@@ -2571,6 +2573,8 @@ export interface operations {
             query: {
                 snapshot: string;
                 offset?: number;
+                /** @description Select a page by immutable paired-unit identity; excludes offset. */
+                row?: string;
                 limit?: number;
             };
             header: {

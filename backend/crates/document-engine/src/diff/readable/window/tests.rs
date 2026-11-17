@@ -375,3 +375,30 @@ fn ordered_list_windows_preserve_item_numbers_inside_and_between_items() {
         [1, 6]
     );
 }
+
+#[test]
+fn immutable_row_identity_locates_its_page_and_never_retargets_across_source_pairs() {
+    let body = (0..120)
+        .map(|n| format!("Paragraph {n} before.\n\n"))
+        .collect::<String>();
+    let before = source(&body);
+    let after = before.replace("before", "after");
+    let pair = ReadablePair::prepare(Some(&before), Some(&after));
+    assert!(pair.ready);
+    let id = &pair.changes[75].id;
+    let page = pair.page_containing(id, 50).unwrap();
+    assert_eq!(page.offset, 50);
+    assert!(page.rows.iter().any(|row| &row.change.id == id));
+    let other = ReadablePair::prepare(
+        Some(&before),
+        Some(&format!("{after}\nNew final paragraph.\n")),
+    );
+    assert!(matches!(
+        other.page_containing(id, 50),
+        Err(ReadableWindowError::UnknownRow)
+    ));
+    assert!(matches!(
+        pair.page_containing(id, 0),
+        Err(ReadableWindowError::InvalidLimit)
+    ));
+}

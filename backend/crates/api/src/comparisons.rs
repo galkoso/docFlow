@@ -41,6 +41,8 @@ pub struct DiffQuery {
     pub request_id: Option<Uuid>,
     /// Durable snapshot returned by the initial request. Pages never reselect refs.
     pub snapshot: Option<Uuid>,
+    /// Select the page containing this immutable file ID; excludes offset.
+    pub file: Option<String>,
     pub head: Option<String>,
     pub target: Option<String>,
     pub offset: Option<usize>,
@@ -111,7 +113,16 @@ pub(crate) async fn read(
         }
         let offset = query.offset.unwrap_or(0);
         let limit = query.limit.unwrap_or(50);
-        if offset > 40000 || !(1..=100).contains(&limit) {
+        if offset > 40000
+            || !(1..=100).contains(&limit)
+            || query.file.as_ref().is_some_and(|file| {
+                query.offset.is_some()
+                    || file.len() != 64
+                    || !file
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            })
+        {
             return invalid();
         }
         (snapshot, offset, limit)
@@ -119,7 +130,7 @@ pub(crate) async fn read(
         let Some(request) = query.request_id.filter(|id| !id.is_nil()) else {
             return invalid();
         };
-        if query.offset.is_some() || query.limit.is_some() {
+        if query.offset.is_some() || query.limit.is_some() || query.file.is_some() {
             return invalid();
         }
         let parse = |text: Option<String>| text.map(CommitSha::parse).transpose();
@@ -146,11 +157,18 @@ pub(crate) async fn read(
         Err(error) => return failure(error),
     };
     let page = if status.state == "READY" {
-        let page = match state
-            .comparison_jobs
-            .page(actor.user_id, proposal, snapshot, offset, limit)
-            .await
-        {
+        let selected = if let Some(file) = &query.file {
+            state
+                .comparison_jobs
+                .page_containing(actor.user_id, proposal, snapshot, file, limit)
+                .await
+        } else {
+            state
+                .comparison_jobs
+                .page(actor.user_id, proposal, snapshot, offset, limit)
+                .await
+        };
+        let page = match selected {
             Ok(page) => page,
             Err(error) => return failure(error),
         };

@@ -133,4 +133,17 @@ describe('Pinned comparison requests', () => {
     expect(retry.request.params.toString()).toBe(first.request.params.toString()); retry.flush(new Blob([], { type: 'image/png' })); http.verify();
   });
 
+  it('resolves file and unit locations using immutable IDs and captured actor with no ordinal or fresh preparation', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ComparisonApi), http = TestBed.inject(HttpTestingController);
+    api.filePage('captured', 'proposal', 'snapshot', 'file').subscribe();
+    const file = http.expectOne(req => req.url.endsWith('/diff'));
+    expect(file.request.params.keys().sort()).toEqual(['file', 'limit', 'snapshot']);
+    expect(file.request.headers.get('X-Expected-Actor')).toBe('captured'); file.flush({});
+    api.readableRow('captured', 'proposal', 'snapshot', 'file', 'row').subscribe();
+    const row = http.expectOne(req => req.url.endsWith('/readable'));
+    expect(row.request.params.keys().sort()).toEqual(['limit', 'row', 'snapshot']);
+    expect(row.request.params.get('row')).toBe('row'); expect(row.request.headers.get('X-Expected-Actor')).toBe('captured'); row.flush({}); http.verify();
+  });
+
 });

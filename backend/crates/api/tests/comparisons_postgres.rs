@@ -1533,3 +1533,123 @@ async fn comparison_image_final_authorization_occurs_after_decode_before_respons
     assert!(!body.starts_with(b"\x89PNG"));
     assert_eq!(f.file_resolves.load(Ordering::SeqCst), 5);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn file_locator_uses_private_snapshot_identity_and_excludes_offset_or_preparation_queries(
+    pool: PgPool,
+) {
+    let f = fixture(&pool, true).await;
+    let (ticket, _) = ready_file(&f).await;
+    let snapshot = ticket["snapshot_id"].as_str().unwrap();
+    let root = format!("/api/v1/proposals/{}/diff?snapshot={snapshot}", f.proposal);
+    let (_, ready, _, _) = get(&f.app, &f.actor, &root, true).await;
+    let file = ready["page"]["files"][2]["id"].as_str().unwrap();
+    let path = format!("{root}&file={file}&limit=1");
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let (status, response, _, _) = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(response["page"]["offset"], 2);
+    assert_eq!(response["page"]["files"][0]["id"], file);
+    assert_eq!(
+        get(&f.app, &f.owner, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        get(&f.app, &f.actor, &format!("{path}&offset=0"), true)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(&f.app, &f.actor, &format!("{path}&file={file}"), true)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(
+            &f.app,
+            &f.actor,
+            &format!("{root}&file={}", "9".repeat(64)),
+            true
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    let prepare = format!("{}&file={file}", prepare(&f, Uuid::new_v4()));
+    assert_eq!(
+        get(&f.app, &f.actor, &prepare, true).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn named_readable_row_restores_a_later_page_and_cannot_follow_another_file_or_source_pair(
+    pool: PgPool,
+) {
+    let body = (0..80)
+        .map(|n| format!("Paragraph {n} before.\n\n"))
+        .collect::<String>();
+    let f = fixture_source(&pool, true, &body, false).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = readable_path(&f, &ticket, &file);
+    let (status, page, _, _) = get(&f.app, &f.actor, &format!("{path}&offset=50"), true).await;
+    assert_eq!(status, StatusCode::OK);
+    let row = page["page"]["rows"][10]["change"]["id"].as_str().unwrap();
+    let target = format!("{path}&row={row}&limit=10");
+    let (status, located, _, _) = get(&f.app, &f.actor, &target, true).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(located["page"]["offset"], 60);
+    assert!(
+        located["page"]["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["change"]["id"] == row)
+    );
+    assert_eq!(
+        get(&f.app, &f.actor, &format!("{target}&offset=0"), true)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(&f.app, &f.actor, &format!("{target}&row={row}"), true)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(
+            &f.app,
+            &f.actor,
+            &format!("{path}&row={}", "9".repeat(64)),
+            true
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        get(&f.app, &f.owner, &target, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let root = format!(
+        "/api/v1/proposals/{}/diff?snapshot={}",
+        f.proposal,
+        ticket["snapshot_id"].as_str().unwrap()
+    );
+    let (_, ready, _, _) = get(&f.app, &f.actor, &root, true).await;
+    let other = ready["page"]["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["id"] != file["id"])
+        .unwrap();
+    let other_path = format!("{}&row={row}", readable_path(&f, &ticket, other));
+    assert_eq!(
+        get(&f.app, &f.actor, &other_path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+}

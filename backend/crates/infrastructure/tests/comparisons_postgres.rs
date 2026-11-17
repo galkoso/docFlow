@@ -905,3 +905,60 @@ async fn file_reader_discards_source_when_access_is_revoked_during_provider_io(p
     ));
     assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 1);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn file_identity_locates_a_private_durable_page_without_git_and_rechecks_current_scope(
+    pool: PgPool,
+) {
+    let f = fixture_count(&pool, 120).await;
+    let ticket = reserve(&f, "file-location").await;
+    f.worker.run_once().await.unwrap();
+    let file = f
+        .store
+        .page(f.actor, f.proposal, ticket.snapshot_id, 75, 1)
+        .await
+        .unwrap()
+        .files[0]
+        .id
+        .clone();
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let restarted = PgComparisons::new(pool.clone());
+    sqlx::query("UPDATE proposals SET state='CLOSED',head_sha=$2,version=version+1 WHERE id=$1")
+        .bind(f.proposal)
+        .bind("4".repeat(40))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let page = restarted
+        .page_containing(f.actor, f.proposal, ticket.snapshot_id, &file, 50)
+        .await
+        .unwrap();
+    assert_eq!(page.offset, 50);
+    assert!(page.files.iter().any(|change| change.id == file));
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+    assert!(matches!(
+        restarted
+            .page_containing(f.owner, f.proposal, ticket.snapshot_id, &file, 50)
+            .await,
+        Err(ComparisonStoreError::NotFound)
+    ));
+    assert!(matches!(
+        restarted
+            .page_containing(f.actor, f.proposal, ticket.snapshot_id, &"9".repeat(64), 50)
+            .await,
+        Err(ComparisonStoreError::NotFound)
+    ));
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1 AND organization_id=$2")
+        .bind(f.actor)
+        .bind(f.organization)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        restarted
+            .page_containing(f.actor, f.proposal, ticket.snapshot_id, &file, 50)
+            .await
+            .is_err()
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+}

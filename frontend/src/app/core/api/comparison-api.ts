@@ -35,6 +35,14 @@ export class ComparisonApi {
       params: { snapshot, offset, limit }, headers: this.actor(actor),
     });
   }
+  filePage(actor: string, proposal: string, snapshot: string, file: string) {
+    return this.http.get<DiffResponse>(this.path(proposal), { params: { snapshot, file, limit: 50 }, headers: this.actor(actor) });
+  }
+  readableRow(actor: string, proposal: string, snapshot: string, file: string, row: string) {
+    return this.http.get<ReadableFileResponse>(`${this.path(proposal)}/files/${encodeURIComponent(file)}/readable`, {
+      params: { snapshot, row, limit: 50 }, headers: this.actor(actor),
+    });
+  }
   raw(actor: string, proposal: string, snapshot: string, file: string, cursor: RawCursor = { chunk: 0, offset: 0 }, maxBytes = 32768) {
     return this.http.get<RawFileResponse>(`${this.path(proposal)}/files/${encodeURIComponent(file)}`, {
       params: { snapshot, chunk: cursor.chunk, offset: cursor.offset, max_bytes: maxBytes }, headers: this.actor(actor),

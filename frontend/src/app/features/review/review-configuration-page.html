@@ -1,0 +1,86 @@
+<a [routerLink]="['/changes', proposal()]">לפרטי ההצעה</a>
+@if (!session.profile()) {
+  <h1>הגדרת סקירה</h1>
+  @if (session.status() === 'loading') {<p role="status">בודקים התחברות…</p>}
+  @else if (session.status() === 'unconfigured') {<p>נדרשת הגדרת התחברות ארגונית.</p><a routerLink="/settings">הגדרות</a>}
+  @else if (session.status() === 'error') {<button (click)="session.refresh()">בדיקת התחברות מחדש</button>}
+  @else {<p>יש להתחבר כדי לצפות בהגדרת הסקירה.</p><a href="/api/v1/auth/login">התחברות ארגונית</a>}
+} @else if (blocked()) {
+  <h1>החשבון השתנה</h1><p>הבחירה הקודמת נמחקה מהמסך. אפשר לטעון את ההגדרה עבור החשבון הנוכחי.</p>
+  <button (click)="reload()">טעינה עבור החשבון הנוכחי</button>
+} @else {
+  @if (!state.data()) {<h1>הגדרת סקירה</h1>}
+  @if (state.phase() === 'loading') {<p role="status">טוענים את הגדרת הסקירה…</p>}
+  @if (state.error(); as error) {<p class="notice" role="alert">{{ error }}</p>}
+  @if (state.notice(); as notice) {<p class="notice" role="status">{{ notice }}</p>}
+  @if (visible() && state.data(); as data) {
+    <header><p>הצעה #{{ data.number }}</p><h1>{{ data.title }} — הגדרת סקירה</h1></header>
+    <div class="branch-bar"><span>ענף: <bdi>{{ data.branch }}</bdi></span><span>יעד: <bdi>{{ data.target_branch }}</bdi></span></div>
+    <p>גרסת ההגדרה: {{ data.configuration_version }} · גרסת ההצעה: {{ data.proposal_version }}</p>
+    <p>מצב ההצעה: {{ stateLabel(data.state) }}</p>
+    <p>שמירת ההגדרה קובעת את הסוקרים ואת השפעת השינוי על הממשק. שליחה לסקירה ואישורים יופיעו כאן בהמשך.</p>
+    <p>נדרשים סוקרי מוצר ופיתוח נפרדים שאינם המחבר. כשיש השפעת ממשק נדרשת גם סקירת עיצוב. אפשר לשמור בינתיים הגדרה חלקית.</p>
+    @if (!data.can_edit) {<p class="notice" role="status">ההגדרה מוצגת לקריאה בלבד. ייתכן שאין הרשאת עריכה, שההצעה במצב סופי או שפעולה קודמת טרם הסתיימה.</p>}
+    @if (state.phase() === 'uncertain') {<button (click)="state.retry()">בדיקת תוצאת בקשת השמירה</button>}
+    @if (state.phase() === 'saving') {<p role="status">שומרים את ההגדרה ובודקים את התוצאה…</p>}
+    <form (ngSubmit)="state.save()" [attr.aria-busy]="state.phase() === 'saving'">
+      <fieldset [disabled]="!state.editable()"><legend>השפעה על הממשק</legend>
+        <label for="ui-impact">האם השינוי משפיע על הממשק?</label>
+        <select id="ui-impact" name="ui-impact" [ngModel]="state.settings().ui_impact" (ngModelChange)="state.setImpact($event)">
+          <option value="undecided">טרם הוכרעה</option><option value="yes">כן</option><option value="no">לא</option>
+        </select>
+        <label for="ui-reason">נימוק {{ state.settings().ui_impact === 'no' ? '(חובה כשאין השפעת ממשק)' : '(רשות)' }}</label>
+        <textarea id="ui-reason" name="ui-reason" rows="4" maxlength="20000" [ngModel]="state.settings().ui_impact_reason ?? ''"
+          (ngModelChange)="state.setReason($event)" [required]="state.settings().ui_impact === 'no'"
+          [attr.aria-invalid]="state.validation() ? 'true' : null" aria-describedby="reason-help"></textarea>
+        <p id="reason-help">עד 10,000 תווים. ניתן לבחון את ההחלטה מחדש בסקירה.</p>
+      </fieldset>
+      <h2>סוקרים שנבחרו</h2>
+      @if (!state.settings().assignments.length) {<p>טרם נבחרו סוקרים.</p>}
+      <ul class="assignments">@for (item of state.settings().assignments; track item.reviewer_id + ':' + item.domain) {
+        <li><span>{{ state.names()[item.reviewer_id] }} · {{ areaLabel(item.domain) }}</span>
+          @if (state.ineligible(item)) {<strong>אינו כשיר כעת — יש לעדכן את הבחירה</strong>}
+          <label><input type="checkbox" [name]="item.reviewer_id + item.domain" [ngModel]="item.required"
+            (ngModelChange)="state.required(item, $event)" [disabled]="!state.editable()">נדרש בסקירה</label>
+          <button type="button" (click)="state.remove(item)" [disabled]="!state.editable()"
+            [attr.aria-label]="'הסרת ' + state.names()[item.reviewer_id] + ' מסקירת ' + areaLabel(item.domain)">הסרה</button>
+        </li>
+      }</ul>
+      @if (data.can_edit) {
+        <fieldset [disabled]="!state.editable()"><legend>הוספת סוקרים</legend>
+          @for (area of areas; track area) {
+            @let choices = state.choices()[area];
+            <section class="picker" [attr.aria-label]="'בחירת סוקרי ' + areaLabel(area)">
+              <h3>{{ areaLabel(area) }}</h3>
+              @if (choices.loading) {<p role="status">טוענים סוקרים כשירים…</p>}
+              @if (choices.error) {<p role="alert">{{ choices.error }}</p>}
+              @if (!choices.loading && (!choices.loaded || choices.error)) {<button type="button" (click)="candidates(area, 'retry')">טעינת הרשימה מחדש</button>}
+              @if (choices.loaded) {
+                @if (!choices.items.length) {<p>אין סוקרים כשירים נוספים בתחום זה.</p>}
+                @else {
+                  <label [for]="'candidate-' + area">בחירת סוקר {{ areaLabel(area) }}</label>
+                  <select [id]="'candidate-' + area" [name]="'candidate-' + area" [ngModel]="picked()[area]" (ngModelChange)="choose(area, $event)" [disabled]="choices.loading">
+                    <option value="">בחרו מהרשימה</option>
+                    @for (candidate of choices.items; track candidate.reviewer_id) {
+                      <option [value]="candidate.reviewer_id" [disabled]="state.selected(area, candidate.reviewer_id)">{{ candidate.display_name }}</option>
+                    }
+                  </select>
+                  <button type="button" (click)="add(area)" [disabled]="!picked()[area] || choices.loading || state.settings().assignments.length >= 200">הוספת סוקר {{ areaLabel(area) }}</button>
+                }
+                <div class="pages">
+                  @if (choices.previous.length) {<button type="button" (click)="candidates(area, 'previous')" [disabled]="choices.loading">סוקרים קודמים</button>}
+                  @if (choices.next) {<button type="button" (click)="candidates(area, 'next')" [disabled]="choices.loading">סוקרים נוספים</button>}
+                </div>
+              }
+            </section>
+          }
+        </fieldset>
+      }
+      @if (state.validation(); as validation) {<p role="status">{{ validation }}</p>}
+      <button type="submit" [disabled]="!state.editable() || !state.dirty() || !!state.validation()">שמירת הגדרת סקירה</button>
+    </form>
+    @if (state.dirty()) {<p role="status">יש שינויים מקומיים שטרם אושרו כשמורים.</p>}
+    <p><a [routerLink]="['/changes', data.proposal_id, 'diff']">השוואת לפני ואחרי</a></p>
+  }
+  <button type="button" (click)="reload()" [disabled]="state.pending() || state.phase() === 'loading'">טעינת המצב השמור מחדש</button>
+}

@@ -136,6 +136,10 @@ async fn configuration_saves_immutable_revisions_audit_and_outbox_without_submit
     assert_eq!(status, StatusCode::OK, "{initial}");
     assert_eq!(initial["configuration_version"], 1);
     assert_eq!(initial["can_edit"], true);
+    assert_eq!(initial["title"], "Review configuration");
+    assert_eq!(initial["branch"], "change/review");
+    assert_eq!(initial["target_branch"], "main");
+    assert!(initial["number"].as_i64().unwrap() > 0);
     let (status, saved) = request(&f.app, &f.owner, &path(&f), Some(&input(&f)), true, true).await;
     assert_eq!(status, StatusCode::OK, "{saved}");
     assert_eq!(saved["current"]["configuration_version"], 2);

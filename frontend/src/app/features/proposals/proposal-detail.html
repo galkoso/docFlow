@@ -12,6 +12,7 @@
   <div class="branch-bar"><span>ענף: <bdi>{{ proposal.branch }}</bdi></span><span>יעד: <bdi>{{ proposal.target_branch }}</bdi></span><span>עדכון: {{ proposal.updated_at | date:'dd/MM/yyyy HH:mm' }}</span><button (click)="refresh()">בדיקת מצב</button></div>
   @if (proposal.head_sha) {<p><a class="button" [routerLink]="['/changes', proposal.proposal_id, 'book']" [queryParams]="{ commit: proposal.head_sha }">קריאת תוכן ההצעה</a></p>}
   @if (proposal.head_sha) {<p><a [routerLink]="['/changes', proposal.proposal_id, 'diff']">השוואת לפני ואחרי</a></p>}
+  <p><a [routerLink]="['/changes', proposal.proposal_id, 'review']">הגדרת סוקרים והשפעת ממשק</a></p>
   @if (proposal.state === 'CLOSED' || proposal.state === 'MERGED') {<p class="notice" role="status">ההצעה {{ proposal.state === 'MERGED' ? 'מוזגה' : 'סגורה' }} ומוצגת לקריאה בלבד.</p>}
   @switch (proposal.synchronization.state) {
     @case ('provisioning') {

@@ -7239,6 +7239,10 @@
         "type": "object",
         "required": [
           "proposal_id",
+          "number",
+          "title",
+          "branch",
+          "target_branch",
           "proposal_version",
           "configuration_version",
           "policy_version",
@@ -7248,6 +7252,9 @@
           "reviewers"
         ],
         "properties": {
+          "branch": {
+            "type": "string"
+          },
           "can_edit": {
             "type": "boolean"
           },
@@ -7260,6 +7267,10 @@
               "string",
               "null"
             ]
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64"
           },
           "policy_version": {
             "type": "integer",
@@ -7283,6 +7294,12 @@
             "$ref": "#/components/schemas/ReviewSettings"
           },
           "state": {
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "title": {
             "type": "string"
           }
         }

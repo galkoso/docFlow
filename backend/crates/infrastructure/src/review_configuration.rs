@@ -27,6 +27,10 @@ pub struct PgReviewConfiguration {
 #[derive(FromRow)]
 struct Current {
     proposal_id: Uuid,
+    number: i64,
+    title: String,
+    branch: String,
+    target_branch: String,
     organization_id: Uuid,
     author_id: Uuid,
     owner_id: Uuid,
@@ -231,7 +235,7 @@ async fn current(
     } else {
         "FOR SHARE OF p,r,m,u,o"
     };
-    let mut row = sqlx::query_as::<_,Current>(&format!("SELECT p.id AS proposal_id,p.organization_id,p.author_id,p.owner_id,m.role,p.state,p.head_sha,p.version,p.review_configuration_version,o.policy_version,p.ui_impact,p.ui_impact_reason,'[]'::jsonb AS assignments FROM proposals p JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id JOIN organizations o ON o.id=p.organization_id JOIN memberships m ON m.organization_id=p.organization_id JOIN users u ON u.id=m.user_id WHERE p.id=$1 AND u.id=$2 AND u.status='ACTIVE' {lock}"))
+    let mut row = sqlx::query_as::<_,Current>(&format!("SELECT p.id AS proposal_id,p.number,p.title,p.branch,r.default_branch AS target_branch,p.organization_id,p.author_id,p.owner_id,m.role,p.state,p.head_sha,p.version,p.review_configuration_version,o.policy_version,p.ui_impact,p.ui_impact_reason,'[]'::jsonb AS assignments FROM proposals p JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id JOIN organizations o ON o.id=p.organization_id JOIN memberships m ON m.organization_id=p.organization_id JOIN users u ON u.id=m.user_id WHERE p.id=$1 AND u.id=$2 AND u.status='ACTIVE' {lock}"))
         .bind(proposal).bind(actor).fetch_optional(&mut **tx).await?.ok_or(ConfigurationError::NotFound)?;
     // Lock the proposal before reading its immutable revision. A joined header
     // lookup can use a pre-wait statement snapshot and miss the revision just
@@ -296,6 +300,10 @@ async fn read_in(
         && !busy(tx, row.organization_id, proposal).await?;
     Ok(ReviewConfiguration {
         proposal_id: proposal,
+        number: row.number,
+        title: row.title,
+        branch: row.branch,
+        target_branch: row.target_branch,
         proposal_version: row.version,
         configuration_version: row.review_configuration_version,
         policy_version: row.policy_version,

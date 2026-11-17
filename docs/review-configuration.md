@@ -7,8 +7,41 @@ Responses are private and `no-store`.
 
 Saving configuration does not submit a review, create a PR, or approve content.
 Partial assignments and undecided UI impact can be saved; formal submission and
-approval have additional requirements. The reviewer picker and review page remain
-to be implemented.
+approval have additional requirements. `/changes/:id/review` provides the
+configuration form; formal submission, decisions and discussions remain to be
+implemented.
+
+## Configuration page
+
+The proposal-detail page links to `/changes/:id/review`. This page displays the
+proposal number/title, branch/target, state, and configuration/proposal versions
+from the same database-scoped configuration read, without requiring Git access.
+Each domain has a paged named reviewer picker; selected reviewers remain visible
+outside the current page. Assignments can be removed or marked required.
+Previously selected reviewers who lost eligibility are retained and labeled.
+Read-only configurations do not request candidate lists.
+
+The form allows partial configuration, explains independent product/development
+and conditional design requirements, and requires a reason for no UI impact.
+It locks edits while saving. A network failure, timeout, or unverifiable receipt
+retains the captured intent for a manual exact retry; it does not automatically
+resubmit or create a new key. A version conflict retains local edits and requires
+an explicit reload before another save. Definite validation failures allow a
+corrected intent with a new key. Later current configurations returned by a replay
+are displayed explicitly.
+
+The client validates proposal, key, version, assignment/status and cursor evidence
+before accepting responses. Reason trimming matches Rust's Unicode White_Space
+behavior, which differs from JavaScript's built-in `trim`. Navigation, logout,
+reload and unload guard pending local work. Session refresh hides private state;
+the same actor can resume it. A different actor or completed logout purges the
+form, choices and captured request, and requires explicit loading for the current
+account. Access-denied responses also purge private state. No form data or retry
+payload is stored in browser storage or URL parameters.
+
+Rendered-form and actual-router tests cover these flows. Visual, physical
+keyboard, RTL and narrow-screen acceptance are unverified because no browser is
+connected in this environment.
 
 ## Write intent and retries
 

@@ -1,0 +1,19 @@
+:host { display: block; max-width: 68rem; margin-inline: auto; line-height: 1.65; }
+h1 { overflow-wrap: anywhere; }
+.branch-bar, .pages { display: flex; flex-wrap: wrap; gap: 1rem; }
+.branch-bar { padding-block: .8rem; border-block: 1px solid #cad6de; }
+bdi { direction: ltr; unicode-bidi: isolate; overflow-wrap: anywhere; }
+fieldset { min-inline-size: 0; border: 1px solid #cad6de; border-radius: .4rem; padding: 1rem; margin-block: 1.2rem; }
+label { display: block; margin-block: .5rem; }
+select, textarea { box-sizing: border-box; max-width: 100%; font: inherit; color: inherit; }
+select { min-height: 2.75rem; width: min(100%, 28rem); }
+textarea { width: 100%; resize: vertical; }
+button { font: inherit; min-height: 2.75rem; margin: .3rem; padding: .4rem .8rem; cursor: pointer; }
+button:disabled { cursor: default; }
+:is(button, select, textarea, input, a):focus-visible { outline: 3px solid #176ba0; outline-offset: 3px; }
+.notice { padding: .8rem; background: #edf4f7; border-inline-start: 4px solid #276787; overflow-wrap: anywhere; }
+.assignments { padding-inline-start: 1.4rem; }
+.assignments li { padding-block: .7rem; border-bottom: 1px solid #cad6de; overflow-wrap: anywhere; }
+.assignments strong { display: block; color: #9b341b; }
+.picker { padding-block: .7rem; border-bottom: 1px solid #cad6de; }
+@media (max-width: 420px) { fieldset { padding: .6rem; } button { margin-inline: 0; } .branch-bar { display: block; } .branch-bar span { display: block; } }

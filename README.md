@@ -154,5 +154,7 @@ See [comparison boundaries and evidence](docs/diffs.md).
 Review metadata uses migration 009 and actor-bound GET/PUT configuration routes.
 Assignments and UI-impact decisions have immutable revisions, optimistic version
 checks and durable replay receipts. See [review configuration](docs/review-configuration.md)
-for the contract and invalidation behavior. The reviewer picker, formal submission,
-decisions, discussions and PR/check orchestration remain in progress.
+for the contract and invalidation behavior. `/changes/:id/review` provides named
+reviewer selection and UI-impact editing, with exact retries for uncertain saves
+and guards for unsaved changes. Formal submission, decisions, discussions and
+PR/check orchestration remain in progress.

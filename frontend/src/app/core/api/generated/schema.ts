@@ -1315,10 +1315,13 @@ export interface components {
         /** @enum {string} */
         ReviewArea: "PRODUCT" | "DEVELOPMENT" | "DESIGN";
         ReviewConfiguration: {
+            branch: string;
             can_edit: boolean;
             /** Format: int64 */
             configuration_version: number;
             head_sha?: string | null;
+            /** Format: int64 */
+            number: number;
             /** Format: int64 */
             policy_version: number;
             /** Format: uuid */
@@ -1328,6 +1331,8 @@ export interface components {
             reviewers: components["schemas"]["ReviewerStatus"][];
             settings: components["schemas"]["ReviewSettings"];
             state: string;
+            target_branch: string;
+            title: string;
         };
         ReviewConfigurationRequest: {
             /** Format: int64 */

@@ -132,6 +132,10 @@ pub struct ReviewerCandidates {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewConfiguration {
     pub proposal_id: Uuid,
+    pub number: i64,
+    pub title: String,
+    pub branch: String,
+    pub target_branch: String,
     pub proposal_version: i64,
     pub configuration_version: i64,
     pub policy_version: i64,

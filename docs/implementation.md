@@ -1369,3 +1369,24 @@ Checkboxes represent verified work only.
   frontend tests pass. A typed-client continuation case preserves actor/domain
   identity. This supplies the future picker; the review UI and formal workflow
   remain open.
+
+- Review configuration UI: `/changes/:id/review` now displays proposal/branch/
+  target/state/version context and edits UI impact/reason plus paged named
+  reviewer assignments and required flags. It retains selected/revoked reviewers,
+  preserves names across pages, explains independence/design requirements and
+  permits partial metadata without claiming formal submission or approval.
+  Configuration responses include the header context without Git IO. Private
+  page state validates response identities, versions, assignments, statuses and
+  continuation cursors. An uncertain write retains its exact key/actor/body for
+  manual retry, freezes edits and never automatically resubmits. Definite
+  validation failures allow correction; stale versions require explicit reload.
+  Reason canonicalization matches Rust Unicode White_Space, including U+0085
+  and excluding U+FEFF. Router/logout/reload/unload guards protect local work;
+  refresh hides it, and actor changes, logout or denied access purge it.
+  Ten state, five rendered/router and eighteen evidence cases bring the frontend
+  suite to 240 passing tests; production build, the API suite and workspace
+  Clippy pass. OpenAPI/client are regenerated. Both CI workflows for the prior
+  reviewer-list commit passed. Browser discovery again returned no connections;
+  physical keyboard/layout/RTL/narrow-screen acceptance remains open, as do
+  formal snapshots, submission/media workers, decisions/discussions, PR/checks,
+  merge/base/rollback, bundles and the remaining operational/pilot requirements.

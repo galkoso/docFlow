@@ -148,4 +148,5 @@ pages survive restart and recheck current access without reloading Git source;
 Markdown and binaries stay in Git. Authenticated diff preparation/progress and
 snapshot-pinned metadata pages and bounded raw text-file windows are available;
 a bounded private memory cache avoids repeated file fetches across windows.
-Readable/media views and the comparison UI remain in progress. See [comparison boundaries and evidence](docs/diffs.md).
+Authenticated readable metadata and AST event windows are also available.
+Media views and the comparison UI remain in progress. See [comparison boundaries and evidence](docs/diffs.md).

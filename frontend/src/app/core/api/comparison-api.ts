@@ -11,6 +11,14 @@ export type RawFileResponse = components['schemas']['RawFileResponse'];
 export type RawCursor = components['schemas']['RawCursor'];
 export type RawWindow = components['schemas']['RawWindow'];
 export type RawSegment = components['schemas']['RawSegment'];
+export type ReadableFileResponse = components['schemas']['ReadableFileResponse'];
+export type ReadableUnitResponse = components['schemas']['ReadableUnitResponse'];
+export type ReadablePage = components['schemas']['ReadablePage'];
+export type ReadableRow = components['schemas']['ReadableRow'];
+export type ReadableUnitSummary = components['schemas']['UnitSummary'];
+export type ComparisonSide = components['schemas']['ReadableComparisonSide'];
+export type EventCursor = components['schemas']['EventCursor'];
+export type EventWindow = components['schemas']['EventWindow'];
 export interface ComparisonRequest { readonly request_id: string; readonly head?: string; readonly target?: string; }
 
 @Injectable({ providedIn: 'root' })
@@ -28,6 +36,17 @@ export class ComparisonApi {
   raw(actor: string, proposal: string, snapshot: string, file: string, cursor: RawCursor = { chunk: 0, offset: 0 }, maxBytes = 32768) {
     return this.http.get<RawFileResponse>(`${this.path(proposal)}/files/${encodeURIComponent(file)}`, {
       params: { snapshot, chunk: cursor.chunk, offset: cursor.offset, max_bytes: maxBytes }, headers: this.actor(actor),
+    });
+  }
+  readable(actor: string, proposal: string, snapshot: string, file: string, offset = 0, limit = 50) {
+    return this.http.get<ReadableFileResponse>(`${this.path(proposal)}/files/${encodeURIComponent(file)}/readable`, {
+      params: { snapshot, offset, limit }, headers: this.actor(actor),
+    });
+  }
+  readableUnit(actor: string, proposal: string, snapshot: string, file: string, side: ComparisonSide, unit: number,
+    cursor: EventCursor = { event: 0, offset: 0 }, maxBytes = 32768) {
+    return this.http.get<ReadableUnitResponse>(`${this.path(proposal)}/files/${encodeURIComponent(file)}/readable/units/${unit}`, {
+      params: { snapshot, side, event: cursor.event, offset: cursor.offset, max_bytes: maxBytes }, headers: this.actor(actor),
     });
   }
   job(actor: string, job: string) {

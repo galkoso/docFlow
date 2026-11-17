@@ -1,4 +1,5 @@
 pub(crate) mod raw;
+pub(crate) mod readable;
 
 use crate::{
     AppState, ErrorBody, auth,
@@ -28,6 +29,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/v1/proposals/{proposal}/diff", get(read))
         .merge(raw::routes())
+        .merge(readable::routes())
 }
 #[derive(Deserialize, utoipa::IntoParams)]
 #[serde(deny_unknown_fields)]

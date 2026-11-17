@@ -1,7 +1,7 @@
 //! Bounded readable DTOs. Window coordinates and container state refer to one
 //! immutable unit; a serving layer must bind file/snapshot and current access.
 use super::{
-    ReadableDocument, ReadableError, ReadableUnit, UnitKind,
+    ReadableDocument, ReadableUnit, UnitKind,
     pair::{ReadablePair, ReadableSide, UnitChange},
 };
 use crate::render::{RenderEvent, RenderKind, RenderTag};
@@ -51,7 +51,7 @@ pub struct UnitSummary {
     pub events_total: usize,
 }
 impl UnitSummary {
-    fn new(index: usize, unit: &ReadableUnit) -> Self {
+    pub fn from_unit(index: usize, unit: &ReadableUnit) -> Self {
         Self {
             index,
             kind: unit.kind,
@@ -94,11 +94,7 @@ impl ReadableSideSummary {
                 source_bytes,
                 error,
                 ..
-            } => (
-                "RAW_REQUIRED",
-                *source_bytes,
-                Some(error_code(error).into()),
-            ),
+            } => ("RAW_REQUIRED", *source_bytes, Some(error.code().into())),
         };
         Self {
             state: state.into(),
@@ -138,7 +134,7 @@ impl ReadablePair {
                         .map(|index| {
                             side.document()
                                 .and_then(|doc| doc.units.get(index))
-                                .map(|unit| UnitSummary::new(index, unit))
+                                .map(|unit| UnitSummary::from_unit(index, unit))
                                 .ok_or(ReadableWindowError::InvalidEvidence)
                         })
                         .transpose()
@@ -388,7 +384,7 @@ impl ReadableDocument {
         }
         let result = EventWindow {
             document_sha256: self.sha256.clone(),
-            unit: UnitSummary::new(unit_index, unit),
+            unit: UnitSummary::from_unit(unit_index, unit),
             cursor,
             next: (position.event < unit.events.len()).then_some(position),
             start_stack,
@@ -501,15 +497,6 @@ fn copy_event(event: &RenderEvent, text: Option<&str>) -> RenderEvent {
         hard_break: event.hard_break,
         source_start_byte: event.source_start_byte,
         source_end_byte: event.source_end_byte,
-    }
-}
-fn error_code(error: &ReadableError) -> &'static str {
-    match error {
-        ReadableError::Source(code) => code,
-        ReadableError::EventLimit => "READABLE_EVENT_LIMIT",
-        ReadableError::ExpansionLimit => "READABLE_EXPANSION_LIMIT",
-        ReadableError::DepthLimit => "READABLE_DEPTH_LIMIT",
-        ReadableError::InvalidRange => "READABLE_RANGE_INVALID",
     }
 }
 fn encoded_len(value: &impl Serialize, limit: usize) -> Option<usize> {

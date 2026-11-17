@@ -1533,6 +1533,319 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/diff/files/{file}/readable": {
+      "get": {
+        "tags": [
+          "crate::comparisons::readable"
+        ],
+        "operationId": "proposalReadableDiffFile",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded readable metadata or explicit RAW_REQUIRED side state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadableFileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/diff/files/{file}/readable/units/{unit}": {
+      "get": {
+        "tags": [
+          "crate::comparisons::readable"
+        ],
+        "operationId": "proposalReadableDiffUnit",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unit",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ReadableComparisonSide"
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "UTF-8 offset in decoded event text, not original Markdown source.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "max_bytes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded event window, explicit absence or RAW_REQUIRED fallback; no approval is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadableUnitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/documents/{document}": {
       "get": {
         "tags": [
@@ -4814,6 +5127,145 @@
           }
         }
       },
+      "EventCodeInfo": {
+        "type": "object",
+        "required": [
+          "event_index",
+          "info"
+        ],
+        "properties": {
+          "event_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "info": {
+            "type": "string"
+          }
+        }
+      },
+      "EventCursor": {
+        "type": "object",
+        "required": [
+          "event",
+          "offset"
+        ],
+        "properties": {
+          "event": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "description": "UTF-8 offset in decoded text, not an offset in the original Markdown.",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "EventFragment": {
+        "type": "object",
+        "required": [
+          "event_index",
+          "text_start_byte",
+          "text_end_byte",
+          "event"
+        ],
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/RenderEvent"
+          },
+          "event_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "text_end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "text_start_byte": {
+            "type": "integer",
+            "description": "Decoded-event text coordinates. Original source coordinates remain on\nevent and can cover entities/escapes wider than this decoded fragment.",
+            "minimum": 0
+          }
+        }
+      },
+      "EventWindow": {
+        "type": "object",
+        "required": [
+          "document_sha256",
+          "unit",
+          "cursor",
+          "start_stack",
+          "end_stack",
+          "start_ordered_lists",
+          "end_ordered_lists",
+          "returned_text_bytes",
+          "code_info",
+          "fragments"
+        ],
+        "properties": {
+          "code_info": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventCodeInfo"
+            }
+          },
+          "cursor": {
+            "$ref": "#/components/schemas/EventCursor"
+          },
+          "document_sha256": {
+            "type": "string"
+          },
+          "end_ordered_lists": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderedListResume"
+            }
+          },
+          "end_stack": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderEvent"
+            }
+          },
+          "fragments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventFragment"
+            }
+          },
+          "next": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EventCursor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returned_text_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "start_ordered_lists": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderedListResume"
+            }
+          },
+          "start_stack": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderEvent"
+            },
+            "description": "Original known Open events, outermost first. Consumers reopen these for\na standalone page and close end_stack in reverse without injecting HTML."
+          },
+          "unit": {
+            "$ref": "#/components/schemas/UnitSummary"
+          }
+        }
+      },
       "Finding": {
         "type": "object",
         "required": [
@@ -4985,9 +5437,10 @@
       "Kind": {
         "type": "string",
         "enum": [
-          "equal",
-          "delete",
-          "insert"
+          "document",
+          "asset",
+          "catalog",
+          "other"
         ]
       },
       "LinkKind": {
@@ -5051,6 +5504,25 @@
           },
           "role": {
             "type": "string"
+          }
+        }
+      },
+      "OrderedListResume": {
+        "type": "object",
+        "required": [
+          "stack_depth",
+          "item_start"
+        ],
+        "properties": {
+          "item_start": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Starting item number when reopening this list at the window boundary.",
+            "minimum": 0
+          },
+          "stack_depth": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       },
@@ -5696,6 +6168,247 @@
             "minimum": 0
           }
         }
+      },
+      "ReadableComparisonSide": {
+        "type": "string",
+        "enum": [
+          "before",
+          "after"
+        ]
+      },
+      "ReadableFileResponse": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "snapshot_id",
+          "content_id",
+          "merge_base_sha",
+          "head_sha",
+          "file",
+          "page"
+        ],
+        "properties": {
+          "content_id": {
+            "type": "string"
+          },
+          "file": {
+            "$ref": "#/components/schemas/Change"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "merge_base_sha": {
+            "type": "string"
+          },
+          "page": {
+            "$ref": "#/components/schemas/ReadablePage"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ReadablePage": {
+        "type": "object",
+        "required": [
+          "ready",
+          "raw_changed",
+          "before",
+          "after",
+          "offset",
+          "total",
+          "rows"
+        ],
+        "properties": {
+          "after": {
+            "$ref": "#/components/schemas/ReadableSideSummary"
+          },
+          "before": {
+            "$ref": "#/components/schemas/ReadableSideSummary"
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "raw_changed": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadableRow"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ReadableRow": {
+        "type": "object",
+        "required": [
+          "change"
+        ],
+        "properties": {
+          "after": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnitSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnitSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change": {
+            "$ref": "#/components/schemas/UnitChange"
+          }
+        }
+      },
+      "ReadableSideSummary": {
+        "type": "object",
+        "required": [
+          "state",
+          "source_bytes",
+          "units_total"
+        ],
+        "properties": {
+          "document_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "state": {
+            "type": "string"
+          },
+          "units_total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ReadableUnitResponse": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "snapshot_id",
+          "content_id",
+          "merge_base_sha",
+          "head_sha",
+          "file",
+          "side",
+          "unit_index",
+          "state"
+        ],
+        "properties": {
+          "content_id": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file": {
+            "$ref": "#/components/schemas/Change"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "merge_base_sha": {
+            "type": "string"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "side": {
+            "$ref": "#/components/schemas/ReadableComparisonSide"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReadableUnitState"
+          },
+          "unit": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnitSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "window": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EventWindow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ReadableUnitState": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "ABSENT",
+          "RAW_REQUIRED"
+        ]
       },
       "RenderEvent": {
         "type": "object",
@@ -6447,6 +7160,163 @@
           "no",
           "undecided"
         ]
+      },
+      "UnitChange": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "raw_changed",
+          "position_changed"
+        ],
+        "properties": {
+          "after_index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "before_index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "id": {
+            "type": "string",
+            "description": "Versioned derived identity binds both complete source hashes and units.\nA serving/review layer must additionally bind file/snapshot and scope."
+          },
+          "matched_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnitMatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position_changed": {
+            "type": "boolean",
+            "description": "Absolute ordinal difference, not a claim about which move was intended."
+          },
+          "raw_changed": {
+            "type": "boolean"
+          },
+          "render_changed": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "None means render equivalence is unknown (e.g. protected source)."
+          },
+          "status": {
+            "$ref": "#/components/schemas/UnitStatus"
+          }
+        }
+      },
+      "UnitKind": {
+        "type": "string",
+        "enum": [
+          "metadata",
+          "heading",
+          "paragraph",
+          "list",
+          "quote",
+          "code",
+          "table",
+          "protected",
+          "trailing"
+        ]
+      },
+      "UnitMatch": {
+        "type": "string",
+        "enum": [
+          "structural",
+          "heading_id",
+          "exact_source",
+          "rendered_content",
+          "section_position"
+        ]
+      },
+      "UnitStatus": {
+        "type": "string",
+        "enum": [
+          "unchanged",
+          "modified",
+          "added",
+          "deleted"
+        ]
+      },
+      "UnitSummary": {
+        "type": "object",
+        "required": [
+          "index",
+          "kind",
+          "source_start_byte",
+          "body_start_byte",
+          "source_end_byte",
+          "raw_sha256",
+          "section_ids_total",
+          "code_blocks_total",
+          "events_total"
+        ],
+        "properties": {
+          "body_start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "code_blocks_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "events_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "heading_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "kind": {
+            "$ref": "#/components/schemas/UnitKind"
+          },
+          "protected_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "raw_sha256": {
+            "type": "string"
+          },
+          "section_ids_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "semantic_sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source_start_byte": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
       }
     },
     "securitySchemes": {

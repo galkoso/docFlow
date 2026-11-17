@@ -2,8 +2,8 @@
 
 The raw engine, complete inventory preparation and authorized comparison loader
 and durable metadata jobs/pages are implemented, with authenticated HTTP progress
-and paged inventories, plus bounded raw text-file windows. The UI, readable/media
-views and review anchors remain required work.
+and paged inventories, plus authenticated bounded raw/readable file windows.
+Browser UI, media views and review anchors remain required work.
 
 ## Provider graph boundary
 
@@ -253,7 +253,7 @@ PostgreSQL scenarios prove READY/private scope, exact pinned bodies, later closu
 and configuration changes, plus access revocation during a provider fetch. The
 runtime source configuration wires this capability alongside the inventory
 worker. The raw HTTP/window and bounded payload cache contracts are described
-below; readable AST views remain subsequent work. This loader alone completes no diff UI or
+below; readable HTTP serving is described later. This loader alone completes no diff UI or
 review acceptance requirement.
 
 ## Implemented: bounded raw-file HTTP windows
@@ -373,9 +373,8 @@ quotes/tables/code, Hebrew/emoji, protected definitions/HTML, semantic versus ra
 identity, duplicate/missing markers, empty and unterminated/CRLF source, nested
 code-language changes and adversarial limits. Projection types deliberately are
 not serializable whole-response DTOs. This is pure processing without scope or
-provider I/O. Before/after pairing is described below. Bounded readable windows,
-authenticated serving and UI remain required; this foundation does not complete
-DIFF-04 or review acceptance.
+provider I/O. Pairing, bounded windows and authenticated serving are described
+below. Browser UI and review acceptance remain required.
 
 ## Implemented: conservative before/after readable pairing
 
@@ -413,7 +412,7 @@ whole-pair identity. Every short binary block sequence through length three is
 paired against every other sequence, checking complete one-to-one coverage,
 determinism, unique rows and visible reordering. Pair objects remain private
 processing models rather than serializable whole-file responses. Authenticated
-bounded readable serving and UI remain required.
+bounded windows and authenticated serving are described below; UI remains required.
 
 ## Implemented: bounded readable row and event windows
 
@@ -422,7 +421,7 @@ source hashes, unit totals and explicit raw-required errors. Rows include bounde
 unit summaries and their before/after matching evidence. Each row is capped at
 4KiB encoded JSON and a complete page at 512KiB. Large nested section/code lists
 are represented by complete counts, rather than copying them into every row.
-These are pure DTO builders; authenticated serving remains required.
+These are pure DTO builders; authenticated serving is described below.
 
 A readable unit can materialize a stream of inert event fragments, capped at
 128 fragments and 1–64KiB decoded text per window. The complete encoded JSON
@@ -457,12 +456,62 @@ check giant code lines/control-character escaping, complete row paging and raw
 fallback; validate code-language resumption, terminal/malformed cursors, metadata
 bounds and damaged evidence. The existing projection/pair tests continue to
 cover source preservation and matching semantics. Application integration,
-authenticated routes, typed client and browser rendering remain required.
+authenticated routes and typed client are described below; browser rendering
+remains required.
+
+## Implemented: authenticated readable HTTP contract
+
+`GET /api/v1/proposals/:id/diff/files/:file/readable?snapshot=<uuid>` serves
+bounded readable metadata pages (`offset=0`, `limit=50` by default; 1–100 rows).
+The snapshot/file identities come from the durable inventory. The response binds
+proposal, snapshot/content identity, complete file descriptor, exact merge-base
+and head, source hashes and unit summaries. `page.ready=false` with a side state
+`RAW_REQUIRED` explicitly selects raw fallback when projection cannot complete;
+empty rows in that state never mean no change or approval.
+
+`GET /api/v1/proposals/:id/diff/files/:file/readable/units/:unit` requires the
+same snapshot and a `side=before|after`. Optional `event`, decoded-text `offset`
+and `max_bytes` use the event-window protocol above; initial coordinates are zero
+and text budget defaults to 32KiB. The response is explicitly `READY` with a
+window, `ABSENT` with no unit/window, or `RAW_REQUIRED` with an error code and no
+window. Protected metadata/source and oversized indivisible attributes return
+raw-required state with their bounded unit summary; unavailable projections
+retain their precise parser/limit code. Invalid coordinates/combinations return
+400. Current access remains required for fallback/absence responses too.
+
+Both routes authenticate and require the captured `X-Expected-Actor`. A private
+READY file row resolves exact paths/refs and frozen connection settings; the
+file reader verifies length, Git blob and SHA-256 evidence. Readable-side source
+hashes must match that verified pair. Source caching avoids repeated Git reads,
+including later historical closure. Current scope is checked again after AST
+processing and response construction, before any body is exposed. Other actors,
+revoked membership and changed repository connections cannot use warmed data.
+Pending comparisons return 409 and opaque assets return 422 without media reads.
+
+AST projection/pairing and window construction run on the shared two-slot
+blocking-CPU pool. There is no unbounded waiter queue. A 30-second processing
+deadline returns explicit 503 timeout; cancelled/timed-out tasks retain their
+permit until CPU exits. Busy/source failures preserve explicit errors and
+provider backoff. Each request currently recomputes its bounded AST pair from
+cached verified text; an AST payload cache/performance acceptance remains work.
+No raw source, AST or response is persisted or seeded into main indexes/caches.
+Responses are `no-store`; source HTML remains inert data and raw fallback stays
+available through the existing exact raw-file route.
+
+OpenAPI and the Angular typed client include both routes. Client methods capture
+actor, snapshot, side and cursor before subscription and never retry/retarget
+implicitly. Seven additional PostgreSQL HTTP scenarios cover exact code-window
+reconstruction and metadata paging after closure, protected/limit/attribute
+fallback, creation/deletion, query/privacy/binding checks, final post-CPU
+revocation, CPU saturation and provider failures. Existing pending/media tests
+also cover the readable routes. Two client scenarios cover metadata paging and
+frozen manual replay after another actor polls. Browser diff UI, media views,
+formal review anchors and review/merge acceptance remain required.
 
 ## Remaining workflow
 
-Readable AST comparisons still need authenticated serving and application integration;
-media views still need verified pinned materialization. Both require access
+Readable AST comparisons still need browser/controller integration and performance
+acceptance; media views still need verified pinned materialization. Both require access
 rechecks after rendering. Retention/operational
 pruning and cold-load performance still need hardening. Raw windows reuse their
 private bounded verified-payload cache; each window still validates and

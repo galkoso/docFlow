@@ -117,7 +117,7 @@ fn invalid_window() -> Response {
         None,
     )
 }
-fn file_failure(error: FileReadError) -> Response {
+pub(super) fn file_failure(error: FileReadError) -> Response {
     let (status, code, message, retryable, delay) = match error {
         FileReadError::Access(error) => return failure(ComparisonStoreError::Read(error)),
         FileReadError::NotFound => return failure(ComparisonStoreError::NotFound),

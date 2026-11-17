@@ -264,6 +264,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/diff/files/{file}/readable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalReadableDiffFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}/diff/files/{file}/readable/units/{unit}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalReadableDiffUnit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/documents/{document}": {
         parameters: {
             query?: never;
@@ -824,6 +856,42 @@ export interface components {
         ErrorBody: {
             error: components["schemas"]["ApiError"];
         };
+        EventCodeInfo: {
+            event_index: number;
+            info: string;
+        };
+        EventCursor: {
+            event: number;
+            /** @description UTF-8 offset in decoded text, not an offset in the original Markdown. */
+            offset: number;
+        };
+        EventFragment: {
+            event: components["schemas"]["RenderEvent"];
+            event_index: number;
+            text_end_byte: number;
+            /**
+             * @description Decoded-event text coordinates. Original source coordinates remain on
+             *     event and can cover entities/escapes wider than this decoded fragment.
+             */
+            text_start_byte: number;
+        };
+        EventWindow: {
+            code_info: components["schemas"]["EventCodeInfo"][];
+            cursor: components["schemas"]["EventCursor"];
+            document_sha256: string;
+            end_ordered_lists: components["schemas"]["OrderedListResume"][];
+            end_stack: components["schemas"]["RenderEvent"][];
+            fragments: components["schemas"]["EventFragment"][];
+            next?: components["schemas"]["EventCursor"] | null;
+            returned_text_bytes: number;
+            start_ordered_lists: components["schemas"]["OrderedListResume"][];
+            /**
+             * @description Original known Open events, outermost first. Consumers reopen these for
+             *     a standalone page and close end_stack in reverse without injecting HTML.
+             */
+            start_stack: components["schemas"]["RenderEvent"][];
+            unit: components["schemas"]["UnitSummary"];
+        };
         Finding: {
             code: string;
             path: string;
@@ -864,7 +932,7 @@ export interface components {
             state: string;
         };
         /** @enum {string} */
-        Kind: "equal" | "delete" | "insert";
+        Kind: "document" | "asset" | "catalog" | "other";
         /** @enum {string} */
         LinkKind: "figma" | "ticket" | "development_pr";
         /** @enum {string} */
@@ -885,6 +953,14 @@ export interface components {
             organization_id: string;
             review_domains: string[];
             role: string;
+        };
+        OrderedListResume: {
+            /**
+             * Format: int64
+             * @description Starting item number when reopening this list at the window boundary.
+             */
+            item_start: number;
+            stack_depth: number;
         };
         OwnerChoice: {
             display_name: string;
@@ -1051,6 +1127,60 @@ export interface components {
             source_end_byte?: number | null;
             source_start_byte?: number | null;
         };
+        /** @enum {string} */
+        ReadableComparisonSide: "before" | "after";
+        ReadableFileResponse: {
+            content_id: string;
+            file: components["schemas"]["Change"];
+            head_sha: string;
+            merge_base_sha: string;
+            page: components["schemas"]["ReadablePage"];
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: uuid */
+            snapshot_id: string;
+        };
+        ReadablePage: {
+            after: components["schemas"]["ReadableSideSummary"];
+            before: components["schemas"]["ReadableSideSummary"];
+            next_offset?: number | null;
+            offset: number;
+            raw_changed: boolean;
+            ready: boolean;
+            rows: components["schemas"]["ReadableRow"][];
+            total: number;
+        };
+        ReadableRow: {
+            after?: components["schemas"]["UnitSummary"] | null;
+            before?: components["schemas"]["UnitSummary"] | null;
+            change: components["schemas"]["UnitChange"];
+        };
+        ReadableSideSummary: {
+            document_id?: string | null;
+            error_code?: string | null;
+            sha256?: string | null;
+            source_bytes: number;
+            state: string;
+            units_total: number;
+        };
+        ReadableUnitResponse: {
+            content_id: string;
+            error_code?: string | null;
+            file: components["schemas"]["Change"];
+            head_sha: string;
+            merge_base_sha: string;
+            /** Format: uuid */
+            proposal_id: string;
+            side: components["schemas"]["ReadableComparisonSide"];
+            /** Format: uuid */
+            snapshot_id: string;
+            state: components["schemas"]["ReadableUnitState"];
+            unit?: components["schemas"]["UnitSummary"] | null;
+            unit_index: number;
+            window?: components["schemas"]["EventWindow"] | null;
+        };
+        /** @enum {string} */
+        ReadableUnitState: "READY" | "ABSENT" | "RAW_REQUIRED";
         RenderEvent: {
             alignments?: string[];
             block_id?: string | null;
@@ -1233,6 +1363,42 @@ export interface components {
         };
         /** @enum {string} */
         UiImpact: "yes" | "no" | "undecided";
+        UnitChange: {
+            after_index?: number | null;
+            before_index?: number | null;
+            /**
+             * @description Versioned derived identity binds both complete source hashes and units.
+             *     A serving/review layer must additionally bind file/snapshot and scope.
+             */
+            id: string;
+            matched_by?: components["schemas"]["UnitMatch"] | null;
+            /** @description Absolute ordinal difference, not a claim about which move was intended. */
+            position_changed: boolean;
+            raw_changed: boolean;
+            /** @description None means render equivalence is unknown (e.g. protected source). */
+            render_changed?: boolean | null;
+            status: components["schemas"]["UnitStatus"];
+        };
+        /** @enum {string} */
+        UnitKind: "metadata" | "heading" | "paragraph" | "list" | "quote" | "code" | "table" | "protected" | "trailing";
+        /** @enum {string} */
+        UnitMatch: "structural" | "heading_id" | "exact_source" | "rendered_content" | "section_position";
+        /** @enum {string} */
+        UnitStatus: "unchanged" | "modified" | "added" | "deleted";
+        UnitSummary: {
+            body_start_byte: number;
+            code_blocks_total: number;
+            events_total: number;
+            heading_id?: string | null;
+            index: number;
+            kind: components["schemas"]["UnitKind"];
+            protected_reason?: string | null;
+            raw_sha256: string;
+            section_ids_total: number;
+            semantic_sha256?: string | null;
+            source_end_byte: number;
+            source_start_byte: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -2207,6 +2373,180 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RawFileResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalReadableDiffFile: {
+        parameters: {
+            query: {
+                snapshot: string;
+                offset?: number;
+                limit?: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded readable metadata or explicit RAW_REQUIRED side state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadableFileResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalReadableDiffUnit: {
+        parameters: {
+            query: {
+                snapshot: string;
+                side: components["schemas"]["ReadableComparisonSide"];
+                event?: number;
+                /** @description UTF-8 offset in decoded event text, not original Markdown source. */
+                offset?: number;
+                max_bytes?: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                file: string;
+                unit: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded event window, explicit absence or RAW_REQUIRED fallback; no approval is implied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadableUnitResponse"];
                 };
             };
             400: {

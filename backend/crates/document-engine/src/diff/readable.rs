@@ -24,6 +24,17 @@ pub enum ReadableError {
     DepthLimit,
     InvalidRange,
 }
+impl ReadableError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Source(code) => code,
+            Self::EventLimit => "READABLE_EVENT_LIMIT",
+            Self::ExpansionLimit => "READABLE_EXPANSION_LIMIT",
+            Self::DepthLimit => "READABLE_DEPTH_LIMIT",
+            Self::InvalidRange => "READABLE_RANGE_INVALID",
+        }
+    }
+}
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

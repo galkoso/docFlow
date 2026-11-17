@@ -1141,3 +1141,26 @@ Checkboxes represent verified work only.
   formatting pass; OpenAPI and editor fixtures regenerate without drift. The
   previously network-blocked pairing commit was pushed successfully and both
   CI workflows completed successfully.
+
+
+- Authenticated readable HTTP contract: actor-bound snapshot/file routes expose
+  paged unit metadata and decoded event windows, with explicit READY/ABSENT/
+  RAW_REQUIRED outcomes. Exact source hashes are checked against the verified
+  file pair; scope is rechecked after bounded CPU before any response body.
+  Two-slot processing, a 30-second deadline and permit ownership through
+  cancellation bound work. Parser/attribute/protected-source fallback cannot
+  masquerade as no change. Current private access and provider binding remain
+  authoritative for warmed data and historical closure. OpenAPI and the typed
+  Angular client capture exact side/cursor/snapshot intent without auto retries.
+  Seven HTTP scenarios cover reconstruction, paging, absence/fallback, query/
+  scope changes, post-CPU revocation, saturation/backoff and corrupted evidence;
+  pending/media tests also cover both routes. Two client scenarios cover captured
+  paging and manual replay. AST work is recomputed from bounded cached text;
+  AST caching/performance, browser UI, media, review anchors and remaining
+  review/merge lifecycle still require implementation/acceptance.
+  Workspace regressions pass; the final error-typing refinement passes all 18
+  comparison HTTP tests and workspace Clippy. Formatting, frontend production
+  build and all 118 frontend tests pass. OpenAPI regenerates consistently and
+  the editor fixture has no drift. The restarted API reports ready and both new
+  routes require authentication. Both CI workflows for the preceding bounded
+  readable-window commit completed successfully.

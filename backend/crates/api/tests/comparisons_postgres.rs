@@ -7,6 +7,9 @@ use axum::{
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use specspace_api::{AppState, auth::CookiePolicy, router};
+use specspace_application::comparison_file::{
+    ComparisonFileAuthorization, ComparisonFileReader, FileReadContext, FileReadError,
+};
 use specspace_application::comparison_reader::{
     BoundProviderFactory, ComparisonReadError, RepositoryBinding,
 };
@@ -17,6 +20,7 @@ use specspace_git_adapter::{
 };
 use specspace_infrastructure::{
     comparison_worker::{ComparisonWork, ComparisonWorker},
+    comparisons::PgComparisons,
     sessions::SessionStore,
 };
 use sqlx::PgPool;
@@ -113,6 +117,10 @@ impl GitProvider for Provider {
         Ok(self
             .files
             .keys()
+            .filter(|path| {
+                !(path.as_str() == "docs/added.md" && commit.as_str() != HEAD
+                    || path.as_str() == "docs/deleted.md" && commit.as_str() == HEAD)
+            })
             .map(|path| {
                 let text = self.text(commit, path);
                 FileEntry {
@@ -166,6 +174,36 @@ struct Fixture {
     app: Router,
     worker: ComparisonWorker,
     provider: Arc<Provider>,
+    slots: Arc<tokio::sync::Semaphore>,
+    file_resolves: Arc<AtomicUsize>,
+}
+struct RevokingFileAuthorization {
+    store: Arc<PgComparisons>,
+    pool: PgPool,
+    actor: Uuid,
+    calls: Arc<AtomicUsize>,
+    fail_at: usize,
+}
+#[async_trait]
+impl ComparisonFileAuthorization for RevokingFileAuthorization {
+    async fn resolve_file(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        file: &str,
+    ) -> Result<FileReadContext, FileReadError> {
+        if self.calls.fetch_add(1, Ordering::SeqCst) + 1 == self.fail_at {
+            sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
+                .bind(self.actor)
+                .execute(&self.pool)
+                .await
+                .unwrap();
+        }
+        self.store
+            .resolve_file(actor, proposal, snapshot, file)
+            .await
+    }
 }
 async fn user(pool: &PgPool, organization: Uuid, role: &str) -> User {
     let id = Uuid::new_v4();
@@ -189,6 +227,16 @@ async fn fixture(pool: &PgPool, configured: bool) -> Fixture {
     fixture_source(pool, configured, "PRIVATE SOURCE SENTINEL before", false).await
 }
 async fn fixture_source(pool: &PgPool, configured: bool, body: &str, asset: bool) -> Fixture {
+    fixture_options(pool, configured, body, asset, None, false).await
+}
+async fn fixture_options(
+    pool: &PgPool,
+    configured: bool,
+    body: &str,
+    asset: bool,
+    revoke_at: Option<usize>,
+    presence: bool,
+) -> Fixture {
     let organization = Uuid::new_v4();
     let repository = Uuid::new_v4();
     let proposal = Uuid::new_v4();
@@ -223,6 +271,14 @@ async fn fixture_source(pool: &PgPool, configured: bool, body: &str, asset: bool
             "opaque fixture bytes before".into(),
         );
     }
+    if presence {
+        for (path, id) in [
+            ("docs/added.md", "DOC-ADDED"),
+            ("docs/deleted.md", "DOC-DELETED"),
+        ] {
+            files.insert(path.into(), format!("---\ndocument_id: {id}\ntitle: Presence\nowner_team: fixture\nschema_version: 1\n---\n{body}\n"));
+        }
+    }
     let provider = Arc::new(Provider {
         files,
         reads: AtomicUsize::new(0),
@@ -231,12 +287,31 @@ async fn fixture_source(pool: &PgPool, configured: bool, body: &str, asset: bool
     });
     let mut state = AppState::new(pool.clone());
     state.cookies = CookiePolicy::new("http://localhost:4200", true).unwrap();
+    let file_resolves = Arc::new(AtomicUsize::new(0));
     if configured {
-        state.configure_comparison_source(Arc::new(Factory {
+        let source = Arc::new(Factory {
             provider: provider.clone(),
             repository,
-        }));
+        });
+        state.configure_comparison_source(source.clone());
+        if let Some(fail_at) = revoke_at {
+            state.comparison_files = Arc::new(
+                ComparisonFileReader::new(
+                    Arc::new(RevokingFileAuthorization {
+                        store: state.comparison_jobs.clone(),
+                        pool: pool.clone(),
+                        actor: actor.id,
+                        calls: file_resolves.clone(),
+                        fail_at,
+                    }),
+                    source,
+                    Duration::from_secs(60),
+                )
+                .unwrap(),
+            );
+        }
     }
+    let slots = state.render_slots.clone();
     let worker = state.comparison_worker(Duration::from_secs(900)).unwrap();
     Fixture {
         actor,
@@ -246,6 +321,8 @@ async fn fixture_source(pool: &PgPool, configured: bool, body: &str, asset: bool
         app: router(state),
         worker,
         provider,
+        slots,
+        file_resolves,
     }
 }
 async fn get(
@@ -750,6 +827,24 @@ async fn raw_reads_keep_pending_states_and_nontext_assets_explicit_without_fetch
     assert_eq!(response.0, StatusCode::CONFLICT);
     assert_eq!(response.1["error"]["code"], "COMPARISON_NOT_READY");
     assert_eq!(f.provider.reads.load(Ordering::SeqCst), 0);
+    let (base, query) = pending.split_once('?').unwrap();
+    assert_eq!(
+        get(&f.app, &f.actor, &format!("{base}/readable?{query}"), true)
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        get(
+            &f.app,
+            &f.actor,
+            &format!("{base}/readable/units/0?{query}&side=after"),
+            true
+        )
+        .await
+        .0,
+        StatusCode::CONFLICT
+    );
     f.worker.run_once().await.unwrap();
     let ready = get(&f.app, &f.actor, &location.unwrap(), true).await.1;
     let asset = ready["page"]["files"]
@@ -762,6 +857,17 @@ async fn raw_reads_keep_pending_states_and_nontext_assets_explicit_without_fetch
     let (status, response, _, _) = get(&f.app, &f.actor, &raw_path(&f, &ticket, asset), true).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(response["error"]["code"], "COMPARISON_FILE_NOT_TEXT");
+    let path = readable_path(&f, &ticket, asset);
+    assert_eq!(
+        get(&f.app, &f.actor, &path, true).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        get(&f.app, &f.actor, &unit_path(&path, 0, "after"), true)
+            .await
+            .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
     assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
 }
 
@@ -807,4 +913,401 @@ async fn warm_raw_windows_never_bypass_current_actor_membership_or_repository_bi
     assert_eq!(revoked.0, StatusCode::UNAUTHORIZED);
     assert!(revoked.1.get("raw").is_none());
     assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 2);
+}
+
+fn readable_path(f: &Fixture, ticket: &Value, file: &Value) -> String {
+    let raw = raw_path(f, ticket, file);
+    let (base, query) = raw.split_once('?').unwrap();
+    format!("{base}/readable?{query}")
+}
+fn unit_path(page: &str, unit: usize, side: &str) -> String {
+    let (base, query) = page.split_once('?').unwrap();
+    format!("{base}/units/{unit}?{query}&side={side}")
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn readable_http_pages_and_code_windows_keep_exact_frozen_identity_after_closure(
+    pool: PgPool,
+) {
+    let code = "before שָׁלוֹם 👩🏽‍💻 \t".repeat(250);
+    let body = format!("<!-- ss:section:SEC-ONE -->\n# Heading\n\n```rust\n{code}\n```\n");
+    let f = fixture_source(&pool, true, &body, false).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = readable_path(&f, &ticket, &file);
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let (status, metadata, _, _) = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::OK, "{metadata}");
+    assert_eq!(metadata["snapshot_id"], ticket["snapshot_id"]);
+    assert_eq!(metadata["file"], file);
+    assert_eq!(metadata["head_sha"], HEAD);
+    assert_eq!(metadata["merge_base_sha"], OLD);
+    assert_eq!(
+        metadata["page"]["before"]["sha256"],
+        file["before"]["sha256"]
+    );
+    assert_eq!(metadata["page"]["after"]["sha256"], file["after"]["sha256"]);
+    assert_eq!(metadata["page"]["ready"], true);
+    assert!(!metadata.to_string().contains("שָׁלוֹם"));
+    let expected: Vec<_> = metadata["page"]["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["change"]["id"].clone())
+        .collect();
+    let mut ids = vec![];
+    let mut offset = 0;
+    loop {
+        let (status, page, _, _) = get(
+            &f.app,
+            &f.actor,
+            &format!("{path}&offset={offset}&limit=1"),
+            true,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(page["content_id"], metadata["content_id"]);
+        ids.extend(
+            page["page"]["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| r["change"]["id"].clone()),
+        );
+        if let Some(next) = page["page"]["next_offset"].as_u64() {
+            offset = next;
+        } else {
+            break;
+        }
+    }
+    assert_eq!(ids, expected);
+    let code_unit = metadata["page"]["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["after"]["kind"] == "code")
+        .unwrap()["after"]
+        .clone();
+    let index = code_unit["index"].as_u64().unwrap() as usize;
+    let target = unit_path(&path, index, "after");
+    let mut cursor = json!({"event":0,"offset":0});
+    let mut text = String::new();
+    let mut pages = 0;
+    loop {
+        let uri = format!(
+            "{target}&event={}&offset={}&max_bytes=1025",
+            cursor["event"], cursor["offset"]
+        );
+        let (status, response, _, _) = get(&f.app, &f.actor, &uri, true).await;
+        assert_eq!(status, StatusCode::OK, "{response}");
+        assert_eq!(response["state"], "READY");
+        assert_eq!(response["file"], file);
+        assert_eq!(response["head_sha"], HEAD);
+        assert_eq!(response["snapshot_id"], ticket["snapshot_id"]);
+        assert_eq!(
+            response["window"]["unit"]["raw_sha256"],
+            code_unit["raw_sha256"]
+        );
+        assert_eq!(
+            response["window"]["document_sha256"],
+            file["after"]["sha256"]
+        );
+        assert!(response["window"]["returned_text_bytes"].as_u64().unwrap() <= 1025);
+        for fragment in response["window"]["fragments"].as_array().unwrap() {
+            if fragment["event"]["kind"] == "text" {
+                text.push_str(fragment["event"]["text"].as_str().unwrap());
+            }
+        }
+        pages += 1;
+        if pages == 1 {
+            sqlx::query(
+                "UPDATE proposals SET head_sha=$2,version=version+1,state='CLOSED' WHERE id=$1",
+            )
+            .bind(f.proposal)
+            .bind("4".repeat(40))
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        if response["window"]["next"].is_null() {
+            break;
+        }
+        cursor = response["window"]["next"].clone();
+        assert!(pages < 100);
+    }
+    assert!(pages > 1);
+    assert_eq!(text, format!("{}\n", code.replace("before", "edited")));
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 2);
+    assert_eq!(get(&f.app, &f.actor, &path, true).await.1, metadata);
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn readable_raw_fallback_keeps_protected_source_and_parser_limits_explicit(pool: PgPool) {
+    let f = fixture_source(&pool, true, "<script>alert(1)</script>\n\nbefore", false).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = readable_path(&f, &ticket, &file);
+    let metadata = get(&f.app, &f.actor, &path, true).await.1;
+    let protected = metadata["page"]["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| {
+            row["after"]["protected_reason"]
+                .as_str()
+                .is_some_and(|r| r != "FRONT_MATTER")
+        })
+        .unwrap()["after"]["index"]
+        .as_u64()
+        .unwrap() as usize;
+    for index in [0, protected] {
+        let (status, response, _, _) =
+            get(&f.app, &f.actor, &unit_path(&path, index, "after"), true).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(response["state"], "RAW_REQUIRED");
+        assert_eq!(response["error_code"], "READABLE_PROTECTED_SOURCE");
+        assert!(response["window"].is_null());
+        assert!(!response.to_string().contains("alert(1)"));
+    }
+    let body = format!("{}before\n", "a\n\n".repeat(11_000));
+    let limited = fixture_source(&pool, true, &body, false).await;
+    let (ticket, file) = ready_file(&limited).await;
+    let path = readable_path(&limited, &ticket, &file);
+    let (status, response, _, _) = get(&limited.app, &limited.actor, &path, true).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(response["page"]["ready"], false);
+    assert_eq!(response["page"]["before"]["state"], "RAW_REQUIRED");
+    assert_eq!(
+        response["page"]["after"]["error_code"],
+        "READABLE_EVENT_LIMIT"
+    );
+    assert!(response["page"]["rows"].as_array().unwrap().is_empty());
+    let response = get(
+        &limited.app,
+        &limited.actor,
+        &unit_path(&path, 0, "after"),
+        true,
+    )
+    .await
+    .1;
+    assert_eq!(response["state"], "RAW_REQUIRED");
+    assert_eq!(response["error_code"], "READABLE_EVENT_LIMIT");
+    assert!(response["unit"].is_null() && response["window"].is_null());
+    assert_eq!(
+        get(
+            &limited.app,
+            &limited.actor,
+            &raw_path(&limited, &ticket, &file),
+            true
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn readable_atomic_attribute_limits_fall_back_without_silent_truncation(pool: PgPool) {
+    let body = format!(
+        "before [link](https://example.com/{})\n",
+        "x".repeat(40_000)
+    );
+    let f = fixture_source(&pool, true, &body, false).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = unit_path(&readable_path(&f, &ticket, &file), 1, "after");
+    let mut cursor = json!({"event":0,"offset":0});
+    loop {
+        let (status, response, _, _) = get(
+            &f.app,
+            &f.actor,
+            &format!(
+                "{path}&event={}&offset={}",
+                cursor["event"], cursor["offset"]
+            ),
+            true,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{response}");
+        if response["state"] == "RAW_REQUIRED" {
+            assert_eq!(response["error_code"], "READABLE_WINDOW_TOO_LARGE");
+            assert!(response["window"].is_null());
+            break;
+        }
+        let next = response["window"]["next"].clone();
+        assert!(next.is_object() && next != cursor);
+        cursor = next;
+    }
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn readable_creation_and_deletion_keep_absent_sides_distinct_from_raw_required(pool: PgPool) {
+    let f = fixture_options(&pool, true, "before", false, None, true).await;
+    let (_, ticket, location, _) = get(&f.app, &f.actor, &prepare(&f, Uuid::new_v4()), true).await;
+    f.worker.run_once().await.unwrap();
+    let ready = get(&f.app, &f.actor, &location.unwrap(), true).await.1;
+    for (name, absent, present) in [
+        ("docs/added.md", "before", "after"),
+        ("docs/deleted.md", "after", "before"),
+    ] {
+        let file = ready["page"]["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|file| file["before"]["path"] == name || file["after"]["path"] == name)
+            .unwrap();
+        let path = readable_path(&f, &ticket, file);
+        let (status, metadata, _, _) = get(&f.app, &f.actor, &path, true).await;
+        assert_eq!(status, StatusCode::OK, "{metadata}");
+        assert_eq!(metadata["page"][absent]["state"], "ABSENT");
+        assert_eq!(metadata["page"][present]["state"], "READY");
+        let response = get(&f.app, &f.actor, &unit_path(&path, 0, absent), true)
+            .await
+            .1;
+        assert_eq!(response["state"], "ABSENT");
+        assert!(response["window"].is_null() && response["unit"].is_null());
+        let response = get(&f.app, &f.actor, &unit_path(&path, 1, present), true)
+            .await
+            .1;
+        assert_eq!(response["state"], "READY", "{response}");
+        assert!(response["window"].is_object());
+    }
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn readable_queries_and_warm_results_require_current_private_actor_and_binding(pool: PgPool) {
+    let f = fixture(&pool, true).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = readable_path(&f, &ticket, &file);
+    let unit = unit_path(&path, 1, "after");
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    for suffix in [
+        "&offset=20005",
+        "&limit=101",
+        "&limit=0",
+        "&head=other",
+        "&offset=0&offset=1",
+    ] {
+        assert_eq!(
+            get(&f.app, &f.actor, &format!("{path}{suffix}"), true)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    for suffix in [
+        "&event=96001",
+        "&offset=8388609",
+        "&offset=-1",
+        "&event=0&event=1",
+        "&max_bytes=1023",
+        "&commit=other",
+    ] {
+        assert_eq!(
+            get(&f.app, &f.actor, &format!("{unit}{suffix}"), true)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    assert_eq!(
+        get(
+            &f.app,
+            &f.actor,
+            &unit.replace("side=after", "side=AFTER"),
+            true
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(&f.app, &f.actor, &unit.replace("&side=after", ""), true)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    for url in [&path, &unit] {
+        assert_eq!(
+            get(&f.app, &f.actor, url, false).await.0,
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            get(&f.app, &f.owner, url, true).await.0,
+            StatusCode::NOT_FOUND
+        );
+    }
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+    assert_eq!(get(&f.app, &f.actor, &path, true).await.0, StatusCode::OK);
+    assert_eq!(get(&f.app, &f.actor, &unit, true).await.0, StatusCode::OK);
+    sqlx::query("UPDATE repositories SET installation_id='8' WHERE id=(SELECT repository_id FROM proposals WHERE id=$1)")
+        .bind(f.proposal).execute(&pool).await.unwrap();
+    for url in [&path, &unit] {
+        assert_eq!(
+            get(&f.app, &f.actor, url, true).await.0,
+            StatusCode::CONFLICT
+        );
+    }
+    sqlx::query("UPDATE repositories SET installation_id='7' WHERE id=(SELECT repository_id FROM proposals WHERE id=$1)")
+        .bind(f.proposal).execute(&pool).await.unwrap();
+    sqlx::query("DELETE FROM memberships WHERE organization_id=$1 AND user_id=$2")
+        .bind(f.organization)
+        .bind(f.actor.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    for url in [&path, &unit] {
+        assert_eq!(
+            get(&f.app, &f.actor, url, true).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads + 2);
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn readable_processing_rechecks_authorization_after_cpu_before_exposing_any_response(
+    pool: PgPool,
+) {
+    for unit in [false, true] {
+        let f = fixture_options(
+            &pool,
+            true,
+            "PRIVATE SOURCE SENTINEL before",
+            false,
+            Some(6),
+            false,
+        )
+        .await;
+        let (ticket, file) = ready_file(&f).await;
+        let path = readable_path(&f, &ticket, &file);
+        let path = if unit {
+            unit_path(&path, 1, "after")
+        } else {
+            path
+        };
+        let (status, response, _, _) = get(&f.app, &f.actor, &path, true).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{response}");
+        assert_eq!(f.file_resolves.load(Ordering::SeqCst), 6);
+        assert!(!response.to_string().contains("PRIVATE SOURCE SENTINEL"));
+        assert!(response.get("page").is_none() && response.get("window").is_none());
+    }
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn readable_cpu_capacity_and_source_failures_keep_retry_and_failure_states_explicit(
+    pool: PgPool,
+) {
+    let f = fixture(&pool, true).await;
+    let (ticket, file) = ready_file(&f).await;
+    let path = readable_path(&f, &ticket, &file);
+    f.provider.backoff.store(2, Ordering::SeqCst);
+    let (status, response, _, retry) = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response["error"]["code"], "COMPARISON_SOURCE_BACKOFF");
+    assert_eq!(retry.as_deref(), Some("13"));
+    f.provider.backoff.store(3, Ordering::SeqCst);
+    let (status, response, _, _) = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response["error"]["code"], "COMPARISON_EVIDENCE_INVALID");
+    f.provider.backoff.store(0, Ordering::SeqCst);
+    let held = f.slots.clone().acquire_many_owned(2).await.unwrap();
+    let (status, response, _, retry) = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response["error"]["code"], "COMPARISON_BUSY");
+    assert_eq!(retry.as_deref(), Some("2"));
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    drop(held);
+    assert_eq!(get(&f.app, &f.actor, &path, true).await.0, StatusCode::OK);
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
 }

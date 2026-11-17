@@ -75,4 +75,50 @@ describe('Pinned comparison requests', () => {
     http.verify();
   });
 
+
+  it('pages readable rows using only the accepted snapshot and captured actor', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ComparisonApi);
+    const http = TestBed.inject(HttpTestingController);
+    api.readable('captured', 'proposal/one', 'snapshot', 'file', 25, 25).subscribe();
+    const page = http.expectOne(request => request.url === '/api/v1/proposals/proposal%2Fone/diff/files/file/readable');
+    expect(page.request.method).toBe('GET');
+    expect(page.request.headers.get('X-Expected-Actor')).toBe('captured');
+    expect(page.request.params.keys().sort()).toEqual(['limit', 'offset', 'snapshot']);
+    expect(page.request.params.get('snapshot')).toBe('snapshot');
+    expect(page.request.params.get('offset')).toBe('25');
+    page.flush({});
+    http.verify();
+  });
+
+  it('retains readable side and decoded event coordinates across subscription and exact manual replay', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ComparisonApi);
+    const http = TestBed.inject(HttpTestingController);
+    const cursor = { event: 5, offset: 1024 };
+    const intent = api.readableUnit('original', 'proposal', 'snapshot', 'file', 'before', 7, cursor, 4096);
+    cursor.event = 100;
+    cursor.offset = 9000;
+    intent.subscribe({ error: () => {} });
+    const first = http.expectOne(request => request.url === '/api/v1/proposals/proposal/diff/files/file/readable/units/7');
+    expect(first.request.headers.get('X-Expected-Actor')).toBe('original');
+    expect(first.request.params.keys().sort()).toEqual(['event', 'max_bytes', 'offset', 'side', 'snapshot']);
+    expect(first.request.params.get('event')).toBe('5');
+    expect(first.request.params.get('offset')).toBe('1024');
+    expect(first.request.params.get('side')).toBe('before');
+    expect(first.request.params.get('snapshot')).toBe('snapshot');
+    first.error(new ProgressEvent('error'));
+    http.expectNone(request => request.url.includes('/readable'));
+    api.job('another', 'job').subscribe();
+    const other = http.expectOne('/api/v1/jobs/job');
+    expect(other.request.headers.get('X-Expected-Actor')).toBe('another');
+    other.flush({});
+    intent.subscribe();
+    const retry = http.expectOne(request => request.url === '/api/v1/proposals/proposal/diff/files/file/readable/units/7');
+    expect(retry.request.headers.get('X-Expected-Actor')).toBe('original');
+    expect(retry.request.params.toString()).toBe(first.request.params.toString());
+    retry.flush({ state: 'RAW_REQUIRED', window: null });
+    http.verify();
+  });
+
 });

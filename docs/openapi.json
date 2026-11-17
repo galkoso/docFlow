@@ -244,7 +244,7 @@
           {
             "name": "X-Expected-Actor",
             "in": "header",
-            "description": "Required captured actor UUID for SAVE_PROPOSAL and COMPARE_PROPOSAL jobs",
+            "description": "Required captured actor UUID for SAVE_PROPOSAL, COMPARE_PROPOSAL and SUBMIT_REVIEW jobs",
             "required": false,
             "schema": {
               "type": [
@@ -275,6 +275,15 @@
             }
           },
           "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3589,6 +3598,443 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/snapshots": {
+      "get": {
+        "tags": [
+          "crate::reviews"
+        ],
+        "operationId": "proposalReviewSnapshots",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSnapshotHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}": {
+      "get": {
+        "tags": [
+          "crate::reviews"
+        ],
+        "operationId": "proposalReviewSnapshot",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/files": {
+      "get": {
+        "tags": [
+          "crate::reviews"
+        ],
+        "operationId": "proposalReviewSnapshotFiles",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSnapshotFiles"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/media": {
+      "get": {
+        "tags": [
+          "crate::reviews"
+        ],
+        "operationId": "proposalReviewSnapshotMedia",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSnapshotMedia"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/specification": {
       "get": {
         "tags": [
@@ -3679,6 +4125,179 @@
             }
           },
           "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/submit": {
+      "post": {
+        "tags": [
+          "crate::reviews"
+        ],
+        "operationId": "submitProposalReview",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSubmissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Submission queued or its immutable receipt replayed. Snapshot, PR and approval completion are separate.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Private actor-bound job status URL"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSubmissionAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
             "content": {
               "application/json": {
                 "schema": {
@@ -6028,6 +6647,16 @@
             ],
             "format": "uuid"
           },
+          "review": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewPublication"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "save": {
             "oneOf": [
               {
@@ -7335,6 +7964,104 @@
         },
         "additionalProperties": false
       },
+      "ReviewFindingSeverity": {
+        "type": "string",
+        "enum": [
+          "warning",
+          "blocker"
+        ]
+      },
+      "ReviewMediaReceipt": {
+        "type": "object",
+        "required": [
+          "path",
+          "blob_oid",
+          "bytes",
+          "source_sha256",
+          "display_sha256",
+          "display_width",
+          "display_height"
+        ],
+        "properties": {
+          "blob_oid": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "display_height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "display_sha256": {
+            "type": "string"
+          },
+          "display_width": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "path": {
+            "type": "string"
+          },
+          "source_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewPublication": {
+        "type": "object",
+        "description": "Durable snapshot outcome; PR synchronization and approvals are separate.",
+        "required": [
+          "proposal_id",
+          "operation_id",
+          "job_id",
+          "snapshot_id",
+          "fingerprint",
+          "evidence_digest",
+          "proposal_version",
+          "activated",
+          "replayed"
+        ],
+        "properties": {
+          "activated": {
+            "type": "boolean"
+          },
+          "evidence_digest": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "ReviewSettings": {
         "type": "object",
         "required": [
@@ -7356,6 +8083,546 @@
               "string",
               "null"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSnapshot": {
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "proposal_id",
+          "fingerprint",
+          "evidence_digest",
+          "media_validation_version",
+          "title",
+          "proposal_number",
+          "delivery_status",
+          "created_at",
+          "created_by",
+          "metadata",
+          "file_count",
+          "media_count",
+          "current_metadata"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "current_metadata": {
+            "type": "boolean",
+            "description": "Current database metadata only; does not assert fresh Git refs or approval."
+          },
+          "delivery_status": {
+            "type": "string"
+          },
+          "evidence_digest": {
+            "type": "string"
+          },
+          "file_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "media_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "media_validation_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ReviewSnapshotMetadata"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_number": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewSnapshotContext": {
+        "type": "object",
+        "required": [
+          "author_id",
+          "owner_id",
+          "team_id",
+          "description",
+          "ui_impact"
+        ],
+        "properties": {
+          "author_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ui_impact": {
+            "$ref": "#/components/schemas/ReviewSnapshotUiImpact"
+          },
+          "ui_impact_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSnapshotFiles": {
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "offset",
+          "total",
+          "files"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            }
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ReviewSnapshotFinding": {
+        "type": "object",
+        "required": [
+          "code",
+          "path",
+          "path_truncated",
+          "severity"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "path_truncated": {
+            "type": "boolean"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/ReviewFindingSeverity"
+          },
+          "source_end_byte": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "source_start_byte": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSnapshotHistory": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "current_proposal_version",
+          "current_proposal_state",
+          "snapshots"
+        ],
+        "properties": {
+          "active_snapshot_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "current_proposal_state": {
+            "type": "string"
+          },
+          "current_proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewSnapshotHistoryEntry"
+            }
+          }
+        }
+      },
+      "ReviewSnapshotHistoryEntry": {
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "fingerprint",
+          "title",
+          "branch",
+          "head_sha",
+          "target_sha",
+          "prepared_version",
+          "configuration_version",
+          "policy_version",
+          "file_count",
+          "media_count",
+          "created_at",
+          "created_by"
+        ],
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "configuration_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "media_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "policy_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "prepared_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_sha": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewSnapshotMedia": {
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "offset",
+          "total",
+          "receipts"
+        ],
+        "properties": {
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewMediaReceipt"
+            }
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ReviewSnapshotMetadata": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "summary",
+          "context",
+          "assignments",
+          "validation"
+        ],
+        "properties": {
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewerSelection"
+            }
+          },
+          "context": {
+            "$ref": "#/components/schemas/ReviewSnapshotContext"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ReviewSnapshotSummary"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/ReviewSnapshotValidation"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSnapshotSummary": {
+        "type": "object",
+        "required": [
+          "fingerprint",
+          "proposal_id",
+          "repository_id",
+          "branch",
+          "head_sha",
+          "target_sha",
+          "merge_base_sha",
+          "recorded_base_sha",
+          "comparison_content_id",
+          "expected_proposal_version",
+          "policy_version",
+          "configuration_version",
+          "ui_impact",
+          "base_outdated",
+          "changed_files",
+          "content_findings_total",
+          "media_checks_required"
+        ],
+        "properties": {
+          "base_outdated": {
+            "type": "boolean"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "changed_files": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "comparison_content_id": {
+            "type": "string"
+          },
+          "configuration_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "content_findings_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "media_checks_required": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "merge_base_sha": {
+            "type": "string"
+          },
+          "policy_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recorded_base_sha": {
+            "type": "string"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_sha": {
+            "type": "string"
+          },
+          "ui_impact": {
+            "$ref": "#/components/schemas/ReviewSnapshotUiImpact"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSnapshotUiImpact": {
+        "type": "string",
+        "enum": [
+          "YES",
+          "NO",
+          "UNDECIDED"
+        ]
+      },
+      "ReviewSnapshotValidation": {
+        "type": "object",
+        "required": [
+          "findings",
+          "findings_total",
+          "findings_truncated",
+          "blockers_total",
+          "complete"
+        ],
+        "properties": {
+          "blockers_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewSnapshotFinding"
+            }
+          },
+          "findings_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "findings_truncated": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSubmissionAccepted": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "operation_id",
+          "job_id"
+        ],
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ReviewSubmissionRequest": {
+        "type": "object",
+        "required": [
+          "expected_head_sha",
+          "expected_target_sha",
+          "expected_proposal_version",
+          "expected_configuration_version",
+          "expected_policy_version"
+        ],
+        "properties": {
+          "expected_configuration_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expected_head_sha": {
+            "type": "string"
+          },
+          "expected_policy_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expected_proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expected_target_sha": {
+            "type": "string"
           }
         },
         "additionalProperties": false

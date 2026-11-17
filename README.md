@@ -166,5 +166,9 @@ adds atomic shared snapshots with complete immutable file/media evidence.
 The runtime starts one review worker; `REVIEW_WORKER_TIMEOUT_SECONDS` defaults
 to 900 (30–900 allowed). It renews leases while reading, safely reclaims expired
 read-only work and publishes with a final lease fence. No PR/check or approval
-is created by this worker. Public submission/status/snapshot endpoints and their
-UI flow remain open. See [formal review preparation](docs/reviews.md).
+is created by this worker. Authenticated `POST /api/v1/proposals/:id/submit` queues
+work with actor-bound idempotency and user/organization admission limits from
+migration 012. `/api/v1/jobs/:id` reports private progress. Organization members
+can read shared snapshot history, typed metadata, file manifests and media
+receipts under `/api/v1/proposals/:id/review/snapshots`. The frontend submission
+and shared-review flow remains open. See [formal review preparation](docs/reviews.md).

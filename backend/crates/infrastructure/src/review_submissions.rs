@@ -19,6 +19,7 @@ pub enum SubmissionError {
     NotFound,
     Forbidden,
     Busy,
+    QuotaExceeded,
     IdempotencyMismatch,
     InvalidIntent,
     InvalidQuery,
@@ -202,6 +203,19 @@ impl PgReviewSubmissions {
             let ticket = old.ticket();
             tx.commit().await?;
             return Ok(ticket);
+        }
+        // Serialize admission within the organization across actors and keys.
+        // Exact receipt replay above remains available when a quota is full.
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+            .bind(format!("review-submit-admission:{org}"))
+            .execute(&mut *tx)
+            .await?;
+        let (actor_active,org_active):(i64,i64)=sqlx::query_as("SELECT count(*) FILTER(WHERE actor_id=$2),count(*) FROM git_operations WHERE organization_id=$1 AND kind='SUBMIT' AND state IN ('PENDING','RUNNING','UNKNOWN')")
+            .bind(org).bind(input.actor()).fetch_one(&mut *tx).await?;
+        let (actor_recent,org_recent):(i64,i64)=sqlx::query_as("SELECT count(*) FILTER(WHERE actor_id=$2),count(*) FROM review_submissions WHERE organization_id=$1 AND created_at>statement_timestamp()-interval '10 minutes'")
+            .bind(org).bind(input.actor()).fetch_one(&mut *tx).await?;
+        if actor_active >= 2 || org_active >= 12 || actor_recent >= 10 || org_recent >= 60 {
+            return Err(SubmissionError::QuotaExceeded);
         }
         let scope = review_authorization::context_in(
             &mut tx,

@@ -373,6 +373,7 @@ pub(crate) async fn job_status(
                 content_id: status.summary.map(|s| s.content_id),
                 progress_path: progress_path(proposal, snapshot),
             }),
+            review: None,
         })
         .into_response(),
     )

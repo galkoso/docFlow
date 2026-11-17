@@ -37,6 +37,8 @@ use uuid::Uuid;
 const OLD: &str = "1111111111111111111111111111111111111111";
 const HEAD: &str = "2222222222222222222222222222222222222222";
 const MAIN: &str = "3333333333333333333333333333333333333333";
+#[path = "comparisons_postgres/reviews.rs"]
+mod reviews;
 fn sha(value: &str) -> CommitSha {
     CommitSha::parse(value).unwrap()
 }
@@ -198,6 +200,7 @@ impl BoundProviderFactory for Factory {
 struct User {
     id: Uuid,
     token: String,
+    csrf: String,
 }
 struct Fixture {
     actor: User,
@@ -249,13 +252,15 @@ async fn user(pool: &PgPool, organization: Uuid, role: &str) -> User {
         .execute(pool)
         .await
         .unwrap();
-    let token = SessionStore::new(pool.clone())
+    let credentials = SessionStore::new(pool.clone())
         .mint(id, 3600)
         .await
-        .unwrap()
-        .session_cookie_value()
-        .to_owned();
-    User { id, token }
+        .unwrap();
+    User {
+        id,
+        token: credentials.session_cookie_value().to_owned(),
+        csrf: credentials.csrf_cookie_value().to_owned(),
+    }
 }
 async fn fixture(pool: &PgPool, configured: bool) -> Fixture {
     fixture_source(pool, configured, "PRIVATE SOURCE SENTINEL before", false).await
@@ -270,6 +275,17 @@ async fn fixture_options(
     asset: bool,
     revoke_at: Option<usize>,
     presence: bool,
+) -> Fixture {
+    fixture_review_options(pool, configured, body, asset, revoke_at, presence, false).await
+}
+async fn fixture_review_options(
+    pool: &PgPool,
+    configured: bool,
+    body: &str,
+    asset: bool,
+    revoke_at: Option<usize>,
+    presence: bool,
+    review_media: bool,
 ) -> Fixture {
     let organization = Uuid::new_v4();
     let repository = Uuid::new_v4();
@@ -299,7 +315,7 @@ async fn fixture_options(
         ".specspace/catalog.json".into(),
         json!({"schema_version":1,"documents":entries}).to_string(),
     );
-    if asset {
+    if asset && !review_media {
         files.insert(
             "assets/change.png".into(),
             "opaque fixture bytes before".into(),

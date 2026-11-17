@@ -1506,3 +1506,27 @@ Checkboxes represent verified work only.
   passes. Both workflows for the preceding snapshot-publication commit passed.
   Public submission/status/snapshot endpoints and their frontend flow, PR/check
   processing, checkpointed scans and all remaining full-spec work remain open.
+
+- Authenticated review submission/shared snapshot HTTP: `POST /proposals/:id/submit`
+  queues or exactly replays a small actor-bound intent with CSRF/origin, current
+  edit authority, strict input and expected-version checks. Generic job status
+  now returns typed, backed snapshot publication to the original actor only and
+  rejects ambiguous query parameters. Organization members, including Readers,
+  can inspect shared typed snapshot metadata, stable cursor history, complete
+  paginated file descriptors and media receipts without Git IO. History remains
+  available after closure/provider changes; current-metadata flags do not imply
+  fresh refs or approval. Owned read schemas do not construct sealed evidence;
+  private source bodies, provider IDs and authority/job payloads stay excluded.
+  Migration 012 indexes organization-serialized admission: actor/organization
+  unresolved limits are 2/12 and ten-minute new-request limits 10/60. Terminal
+  requests still count, exact replay bypasses limits, and rejected admission
+  creates no partial work. Eleven new HTTP integration scenarios cover the real
+  queued-to-published text/image flow, private/shared scope and revocation,
+  strict/malformed/oversized requests, all CAS versions, busy/idempotency/closure,
+  immutable history during new publication, unbacked success, concurrent actor
+  admission and both organization quotas. All 423 backend tests and workspace
+  Clippy pass; frontend build and all 240 tests pass with the updated OpenAPI and
+  generated client. Two existing performance measurements remain excluded. Both
+  workflows for the preceding worker commit passed. Frontend submission/shared
+  review, shared raw/readable/image bodies, PR/checks, decisions/discussions,
+  approvals and the remaining full specification are still open.

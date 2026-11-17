@@ -3,9 +3,9 @@
 Review configuration is editable at `/changes/:id/review`; its contract is in
 [`review-configuration.md`](review-configuration.md). Server-side preparation,
 the submission journal, durable worker and atomic shared snapshot persistence
-are implemented.
-The public submit/status/snapshot API, decisions, discussions,
-and provider PR/check orchestration remain open.
+and authenticated submission/status/shared snapshot endpoints are implemented.
+The frontend submission/shared-review flow, decisions, discussions and provider
+PR/check orchestration remain open.
 
 ## Current server context
 
@@ -184,8 +184,8 @@ closure, content changes and provider reconfiguration, without provider calls.
 `current_metadata` compares the active pointer and current database refs, versions
 and binding; it is neither a fresh Git observation nor approval/merge readiness.
 Job status remains private to the original actor with current edit access. These
-store methods are not yet exposed through public HTTP endpoints; shared raw/
-readable/image body reads and snapshot history navigation remain open.
+store methods also support the authenticated endpoints below. Shared raw/
+readable/image body reads and frontend snapshot history navigation remain open.
 
 ## Durable snapshot worker
 
@@ -221,5 +221,70 @@ outside the worker's claim and failure paths.
 This worker performs only Git reads. It does not create PRs, publish checks,
 grant approval or merge. A crash before snapshot commit can repeat reads; a crash
 after commit leaves the successful job and immutable receipt observable. Scans
-currently restart rather than resume. Public submission/status/snapshot endpoints
-and the corresponding frontend flow remain separate remaining work.
+currently restart rather than resume. The corresponding frontend flow remains
+open.
+
+## Authenticated HTTP contract
+
+`POST /api/v1/proposals/:proposal/submit` accepts only the five fields in
+`ReviewSubmissionRequest`: exact saved head, selected target, and expected
+proposal/configuration/policy versions. It requires the captured `X-Expected-Actor`,
+the session's CSRF token, same-origin `Origin`, and one valid `Idempotency-Key`.
+The body limit is 8 KiB. Unknown/duplicate fields, unknown query parameters,
+malformed JSON and invalid SHA/version values fail without queueing work.
+Current edit authority and server scope are checked before reservation. A reused
+key with changed expectations conflicts; identical replay returns its original
+ticket even after later changes or closure, while requiring current edit access.
+
+Acceptance returns **202**, proposal/operation/job IDs, `Location: /api/v1/jobs/:id`
+and `Retry-After: 2`. It claims acceptance only. Job reads for `SUBMIT_REVIEW`
+require the original actor's current edit access and captured actor header. Other
+members, including another Admin, cannot inspect this private job. Existing job
+routes now reject unknown query parameters. Review status uses the journal's
+validated phases and includes a typed `review` publication only for a backed
+`SNAPSHOT_READY` outcome. It never returns arbitrary job payload/result JSON.
+Snapshot readiness does not claim PR synchronization, approval or merge readiness.
+
+All shared routes require a session, captured actor header, active user and current
+organization membership, including for Readers. They are read-only and make no
+provider calls:
+
+| GET route under `/api/v1/proposals/:proposal/review/snapshots` | Response |
+|---|---|
+| Base path | Shared history, active snapshot pointer and current database proposal state/version |
+| `/:snapshot` | Typed immutable metadata, validation findings, assignments and evidence identity |
+| `/:snapshot/files` | Complete file descriptors, preserving original IDs and hashes |
+| `/:snapshot/media` | Verified source/display hashes, dimensions and byte-count receipts |
+
+History defaults to 20 entries and accepts limits 1–50. `after` is the immutable
+snapshot ID returned as `next_after`; ordering uses descending creation time and
+UUID. New publications do not shift or duplicate older cursor pages. A cursor
+from another proposal/organization cannot select history there. File/media pages
+default to 50 entries and accept 1–100, with `offset` bounded at 40,000/20,000
+respectively. Responses include exact snapshot identity, total and `next_offset`.
+Unknown, duplicated or out-of-range query fields fail. Empty history/media and
+pages beyond the end are explicit empty results.
+
+Metadata uses an owned, versioned read schema, separate from non-constructible
+publication evidence. The snapshot UI-impact enum preserves the frozen uppercase
+`YES`/`NO`/`UNDECIDED` representation. Header/summary counts and validation
+completeness must agree before serving typed metadata. Snapshots retain original
+creator and UTC timestamps. History stays readable after closure, head advance
+and provider reconfiguration; `current_metadata` describes current database
+metadata only. Source Markdown, image bytes, provider connection IDs and private
+authority/request digests are not included. All routes, including errors and jobs,
+use `Cache-Control: no-store`.
+
+Migration 012 adds indexes for bounded public admission. New reservations serialize
+within their organization: each actor may hold two unresolved submissions and
+create ten new requests per ten minutes; the organization may hold twelve and
+create sixty respectively. Terminal jobs still count in the recent-request
+window. Started/unknown operations retain their unresolved slot. Exact replay is
+checked before quotas and remains available at a limit. Rejected admission writes
+no job/operation and returns **429** with `REVIEW_SUBMISSION_LIMIT` and
+`Retry-After: 60`. The existing per-proposal mutation gate still prevents concurrent
+save/submit/import/merge reservations.
+
+OpenAPI and the generated TypeScript client describe these routes and read models.
+This contract does not yet add frontend submission controls, shared diff bodies,
+PR/check processing, discussion/decision APIs or approvals.

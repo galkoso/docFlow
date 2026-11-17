@@ -9,11 +9,16 @@ use serde_json::{Value, json};
 use specspace_application::{
     comparison::Change,
     review_preparation::{ReviewPreparationError, ReviewPreparer, VerifiedReview},
+    review_snapshot::{
+        ReviewMediaReceipt, ReviewSnapshot, ReviewSnapshotHistory, ReviewSnapshotHistoryEntry,
+        ReviewSnapshotMedia, ReviewSnapshotMetadata,
+    },
     review_submission::ReviewPublication,
 };
 use sqlx::{FromRow, PgConnection, PgPool, Postgres, QueryBuilder, Transaction};
 use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
+type Timestamp = sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>;
 
 #[derive(Debug)]
 pub enum SnapshotError {
@@ -38,6 +43,9 @@ pub struct SharedReviewSnapshot {
     pub proposal_id: Uuid,
     pub fingerprint: String,
     pub evidence_digest: String,
+    pub media_validation_version: i32,
+    pub created_at: Timestamp,
+    pub created_by: Uuid,
     pub title: String,
     pub proposal_number: i64,
     pub delivery_status: String,
@@ -46,6 +54,41 @@ pub struct SharedReviewSnapshot {
     pub media_count: i32,
     /// Compares current database metadata only; this is not a fresh Git check.
     pub current_metadata: bool,
+}
+impl SharedReviewSnapshot {
+    pub fn into_read_model(self) -> Result<ReviewSnapshot, SnapshotError> {
+        let metadata: ReviewSnapshotMetadata =
+            serde_json::from_value(self.metadata).map_err(|_| SnapshotError::InvalidEvidence)?;
+        if metadata.schema_version != 1
+            || metadata.summary.proposal_id != self.proposal_id
+            || metadata.summary.changed_files != self.file_count as usize
+            || metadata.summary.media_checks_required != self.media_count as usize
+            || metadata.assignments.len() > 200
+            || !metadata.validation.complete
+            || metadata.validation.blockers_total != 0
+            || metadata.validation.findings.len() > 1000
+            || metadata.validation.findings_total < metadata.validation.findings.len()
+            || metadata.summary.content_findings_total != metadata.validation.findings_total
+        {
+            return Err(SnapshotError::InvalidEvidence);
+        }
+        Ok(ReviewSnapshot {
+            snapshot_id: self.id,
+            proposal_id: self.proposal_id,
+            fingerprint: self.fingerprint,
+            evidence_digest: self.evidence_digest,
+            media_validation_version: self.media_validation_version as u32,
+            title: self.title,
+            proposal_number: self.proposal_number,
+            delivery_status: self.delivery_status,
+            created_at: self.created_at.to_rfc3339(),
+            created_by: self.created_by,
+            metadata,
+            file_count: self.file_count,
+            media_count: self.media_count,
+            current_metadata: self.current_metadata,
+        })
+    }
 }
 #[derive(Serialize)]
 pub struct SharedReviewFiles {
@@ -266,10 +309,99 @@ impl PgReviewSnapshots {
     ) -> Result<SharedReviewSnapshot, SnapshotError> {
         let mut tx = self.transaction().await?;
         let org = read_access(&mut tx, actor, proposal).await?;
-        let result = sqlx::query_as::<_, SharedReviewSnapshot>("SELECT h.id,h.proposal_id,h.fingerprint,h.evidence_digest,h.title,h.proposal_number,h.delivery_status,h.metadata,h.file_count,h.media_count,coalesce(p.active_review_snapshot_id=h.id AND p.head_sha=h.head_sha AND p.target_sha=h.target_sha AND p.base_sha=h.recorded_base_sha AND p.review_configuration_version=h.configuration_version AND o.policy_version=h.policy_version AND p.repository_id=h.repository_id AND r.remote_id=h.remote_id AND r.installation_id=h.installation_id AND r.default_branch='main',false) AS current_metadata FROM review_snapshots h JOIN proposals p ON p.id=h.proposal_id AND p.organization_id=h.organization_id JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id JOIN organizations o ON o.id=p.organization_id WHERE h.id=$1 AND h.organization_id=$2 AND h.proposal_id=$3 AND h.state='READY'")
+        let result = sqlx::query_as::<_, SharedReviewSnapshot>("SELECT h.id,h.proposal_id,h.fingerprint,h.evidence_digest,h.media_validation_version,h.created_at,h.created_by,h.title,h.proposal_number,h.delivery_status,h.metadata,h.file_count,h.media_count,coalesce(p.active_review_snapshot_id=h.id AND p.head_sha=h.head_sha AND p.target_sha=h.target_sha AND p.base_sha=h.recorded_base_sha AND p.review_configuration_version=h.configuration_version AND o.policy_version=h.policy_version AND p.repository_id=h.repository_id AND r.remote_id=h.remote_id AND r.installation_id=h.installation_id AND r.default_branch='main',false) AS current_metadata FROM review_snapshots h JOIN proposals p ON p.id=h.proposal_id AND p.organization_id=h.organization_id JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id JOIN organizations o ON o.id=p.organization_id WHERE h.id=$1 AND h.organization_id=$2 AND h.proposal_id=$3 AND h.state='READY'")
             .bind(snapshot).bind(org).bind(proposal).fetch_optional(&mut *tx).await?.ok_or(SubmissionError::NotFound)?;
         tx.commit().await?;
         Ok(result)
+    }
+    pub async fn history(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        after: Option<Uuid>,
+        limit: i32,
+    ) -> Result<ReviewSnapshotHistory, SnapshotError> {
+        if !(1..=50).contains(&limit) || after.is_some_and(|id| id.is_nil()) {
+            return Err(SubmissionError::InvalidQuery.into());
+        }
+        let mut tx = self.transaction().await?;
+        let org = read_access(&mut tx, actor, proposal).await?;
+        let (active,version,state):(Option<Uuid>,i64,String)=sqlx::query_as("SELECT active_review_snapshot_id,version,state FROM proposals WHERE id=$1 AND organization_id=$2")
+            .bind(proposal).bind(org).fetch_one(&mut *tx).await?;
+        let cursor = if let Some(after) = after {
+            Some(sqlx::query_scalar::<_,Timestamp>("SELECT created_at FROM review_snapshots WHERE id=$1 AND proposal_id=$2 AND organization_id=$3 AND state='READY'")
+                .bind(after).bind(proposal).bind(org).fetch_optional(&mut *tx).await?.ok_or(SubmissionError::NotFound)?)
+        } else {
+            None
+        };
+        let mut rows=sqlx::query_as::<_,HistoryRow>("SELECT id,fingerprint,title,branch,head_sha,target_sha,prepared_version,configuration_version,policy_version,file_count,media_count,created_at,created_by FROM review_snapshots WHERE organization_id=$1 AND proposal_id=$2 AND state='READY' AND ($3::uuid IS NULL OR (created_at,id)<($4::timestamptz,$3::uuid)) ORDER BY created_at DESC,id DESC LIMIT $5")
+            .bind(org).bind(proposal).bind(after).bind(cursor).bind(limit+1).fetch_all(&mut *tx).await?;
+        let more = rows.len() > limit as usize;
+        rows.truncate(limit as usize);
+        let next_after = if more {
+            rows.last().map(|row| row.id)
+        } else {
+            None
+        };
+        let snapshots = rows
+            .into_iter()
+            .map(|row| ReviewSnapshotHistoryEntry {
+                snapshot_id: row.id,
+                fingerprint: row.fingerprint,
+                title: row.title,
+                branch: row.branch,
+                head_sha: row.head_sha,
+                target_sha: row.target_sha,
+                prepared_version: row.prepared_version,
+                configuration_version: row.configuration_version,
+                policy_version: row.policy_version,
+                file_count: row.file_count,
+                media_count: row.media_count,
+                created_at: row.created_at.to_rfc3339(),
+                created_by: row.created_by,
+            })
+            .collect();
+        tx.commit().await?;
+        Ok(ReviewSnapshotHistory {
+            proposal_id: proposal,
+            active_snapshot_id: active,
+            current_proposal_version: version,
+            current_proposal_state: state,
+            snapshots,
+            next_after,
+        })
+    }
+    pub async fn media(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        offset: i32,
+        limit: i32,
+    ) -> Result<ReviewSnapshotMedia, SnapshotError> {
+        if !(0..=20000).contains(&offset) || !(1..=100).contains(&limit) {
+            return Err(SubmissionError::InvalidQuery.into());
+        }
+        let mut tx = self.transaction().await?;
+        let org = read_access(&mut tx, actor, proposal).await?;
+        let total:i32=sqlx::query_scalar("SELECT media_count FROM review_snapshots WHERE id=$1 AND organization_id=$2 AND proposal_id=$3 AND state='READY'")
+            .bind(snapshot).bind(org).bind(proposal).fetch_optional(&mut *tx).await?.ok_or(SubmissionError::NotFound)?;
+        let values:Vec<Value>=sqlx::query_scalar("SELECT receipt FROM review_snapshot_media WHERE snapshot_id=$1 AND organization_id=$2 AND proposal_id=$3 AND ordinal>=$4 ORDER BY ordinal LIMIT $5")
+            .bind(snapshot).bind(org).bind(proposal).bind(offset).bind(limit).fetch_all(&mut *tx).await?;
+        let receipts: Vec<ReviewMediaReceipt> = values
+            .into_iter()
+            .map(serde_json::from_value)
+            .collect::<Result<_, _>>()
+            .map_err(|_| SnapshotError::InvalidEvidence)?;
+        let end = offset + receipts.len() as i32;
+        tx.commit().await?;
+        Ok(ReviewSnapshotMedia {
+            snapshot_id: snapshot,
+            offset,
+            total,
+            next_offset: (end < total).then_some(end),
+            receipts,
+        })
     }
     pub async fn files(
         &self,
@@ -301,6 +433,22 @@ impl PgReviewSnapshots {
             files,
         })
     }
+}
+#[derive(FromRow)]
+struct HistoryRow {
+    id: Uuid,
+    fingerprint: String,
+    title: String,
+    branch: String,
+    head_sha: String,
+    target_sha: String,
+    prepared_version: i64,
+    configuration_version: i64,
+    policy_version: i64,
+    file_count: i32,
+    media_count: i32,
+    created_at: Timestamp,
+    created_by: Uuid,
 }
 async fn read_access(
     connection: &mut PgConnection,

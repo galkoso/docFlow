@@ -1,7 +1,7 @@
 use crate::{ApiError, AppState, ErrorBody, auth, specification};
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, Path, State},
+    extract::{DefaultBodyLimit, Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -199,6 +199,8 @@ pub struct JobStatus {
     pub save: Option<crate::saves::SaveResult>,
     pub save_failure: Option<crate::saves::SaveFailure>,
     pub comparison: Option<crate::comparisons::ComparisonJobResult>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review: Option<specspace_application::review_submission::ReviewPublication>,
 }
 #[derive(sqlx::FromRow)]
 struct JobRow {
@@ -215,12 +217,16 @@ struct JobRow {
     index_state: Option<String>,
     index_error: Option<String>,
 }
-#[utoipa::path(get, path = "/api/v1/jobs/{job}", security(("sessionCookie" = [])), params(("job" = Uuid, Path), ("X-Expected-Actor" = Option<Uuid>, Header, description = "Required captured actor UUID for SAVE_PROPOSAL and COMPARE_PROPOSAL jobs")),
-    responses((status = 200, body = JobStatus), (status = 400, body = ErrorBody), (status = 401, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 503, body = ErrorBody)))]
+#[utoipa::path(get, path = "/api/v1/jobs/{job}", security(("sessionCookie" = [])), params(("job" = Uuid, Path), ("X-Expected-Actor" = Option<Uuid>, Header, description = "Required captured actor UUID for SAVE_PROPOSAL, COMPARE_PROPOSAL and SUBMIT_REVIEW jobs")),
+    responses((status = 200, body = JobStatus), (status = 400, body = ErrorBody), (status = 401, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 503, body = ErrorBody)))]
 pub(crate) async fn job_status(
     State(state): State<AppState>,
     headers: HeaderMap,
     path: Result<Path<Uuid>, axum::extract::rejection::PathRejection>,
+    query: Result<
+        Query<crate::review_configuration::NoQuery>,
+        axum::extract::rejection::QueryRejection,
+    >,
 ) -> Response {
     let actor = match auth::authenticate(&state, &headers).await {
         Ok(actor) => actor,
@@ -229,6 +235,12 @@ pub(crate) async fn job_status(
     let Ok(Path(job)) = path else {
         return invalid_query();
     };
+    if query.is_err() {
+        return invalid_query();
+    }
+    if let Some(response) = crate::reviews::job_status(&state, &headers, &actor, job).await {
+        return response;
+    }
     if let Some(response) = crate::comparisons::job_status(&state, &headers, &actor, job).await {
         return response;
     }
@@ -321,6 +333,7 @@ pub(crate) async fn job_status(
         save: None,
         save_failure: None,
         comparison: None,
+        review: None,
     })
     .into_response()
 }

@@ -21,7 +21,7 @@ use std::{
 };
 use uuid::Uuid;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ReviewAssignment {
     pub reviewer: Uuid,
     pub domain: ReviewDomain,
@@ -29,7 +29,7 @@ pub struct ReviewAssignment {
 }
 /// Resolved by a current server-side authorization/configuration read. No
 /// Deserialize implementation: browser selection is not authority for a scope.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ReviewContext {
     pub actor: Membership,
     pub assigned_editor: bool,

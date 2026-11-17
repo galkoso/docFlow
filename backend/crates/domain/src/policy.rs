@@ -18,7 +18,7 @@ pub enum ReviewDomain {
     Design,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Membership {
     pub organization_id: Uuid,
     pub user_id: Uuid,

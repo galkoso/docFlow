@@ -1390,3 +1390,17 @@ Checkboxes represent verified work only.
   physical keyboard/layout/RTL/narrow-screen acceptance remains open, as do
   formal snapshots, submission/media workers, decisions/discussions, PR/checks,
   merge/base/rollback, bundles and the remaining operational/pilot requirements.
+
+- Authoritative review submission context: a non-deserializable expectation and
+  server scope pair current review metadata with the verified comparison's
+  repository identity. PostgreSQL enforces active scoped actor/edit authority,
+  editable state, saved head and all three versions, a valid active owner and no
+  unresolved Git mutation. Immutable revision lookup follows the proposal lock;
+  reviewer memberships are fresh, revoked members stay absent/inactive, and
+  qualification ordering/duplicates have stable semantic equality. Seven new
+  database scenarios cover authority, tenant scope, version gates, revocation,
+  owner eligibility, repository configuration and observed concurrent lock waits.
+  All 76 application and seven domain tests plus workspace Clippy pass. Both CI
+  workflows for the prior configuration-page commit passed. This scope reader
+  makes no provider call and publishes no snapshot. See `reviews.md`; verified
+  preparation/media orchestration and durable submission/publication remain open.

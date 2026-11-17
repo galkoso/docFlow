@@ -3,6 +3,7 @@ use crate::{
     review_context::{ReviewAuthorization, ReviewContextError, ReviewExpectation, ReviewScope},
     review_preparation::{ReviewPreparationError, ReviewPreparer},
 };
+mod media;
 type RecheckHook = Mutex<Option<(usize, Box<dyn FnOnce() + Send>)>>;
 struct ReviewAuth {
     scope: Arc<Mutex<ReviewScope>>,

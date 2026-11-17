@@ -561,6 +561,12 @@ mod tests {
         trees: BTreeMap<String, BTreeMap<String, Vec<u8>>>,
         tree_reads: Mutex<Vec<String>>,
         text_reads: Mutex<Vec<(String, String)>>,
+        binary_reads: Mutex<Vec<(String, String, usize)>>,
+        binary_override: Mutex<Option<Result<Vec<u8>, GitError>>>,
+        after_bytes: Hook,
+        binary_blocked: AtomicBool,
+        binary_started: Notify,
+        binary_allowed: AtomicBool,
         after_read: Hook,
         blocked: AtomicBool,
         started: Notify,
@@ -634,11 +640,40 @@ mod tests {
         }
         async fn read_bytes(
             &self,
-            _: &CommitSha,
-            _: &RepositoryPath,
-            _: usize,
+            commit: &CommitSha,
+            path: &RepositoryPath,
+            maximum: usize,
         ) -> Result<Vec<u8>, GitError> {
-            panic!("inventory must not read opaque assets")
+            assert!(
+                self.binary_allowed.load(Ordering::SeqCst),
+                "comparison inventory must not read opaque assets"
+            );
+            self.binary_reads.lock().unwrap().push((
+                commit.as_str().into(),
+                path.as_str().into(),
+                maximum,
+            ));
+            self.binary_started.notify_one();
+            if self.binary_blocked.load(Ordering::SeqCst) {
+                std::future::pending::<()>().await;
+            }
+            let result = self
+                .binary_override
+                .lock()
+                .unwrap()
+                .clone()
+                .unwrap_or_else(|| {
+                    self.trees
+                        .get(commit.as_str())
+                        .and_then(|tree| tree.get(path.as_str()))
+                        .cloned()
+                        .ok_or(GitError::FileMissing)
+                });
+            let hook = self.after_bytes.lock().unwrap().take();
+            if let Some(hook) = hook {
+                hook();
+            }
+            result
         }
         async fn list_files(&self, commit: &CommitSha) -> Result<Vec<FileEntry>, GitError> {
             self.tree_reads.lock().unwrap().push(commit.as_str().into());
@@ -720,6 +755,9 @@ mod tests {
         fixture_asset(proposal_body, None)
     }
     fn fixture_asset(proposal_body: &str, asset: Option<(String, Vec<u8>)>) -> Fixture {
+        fixture_assets(proposal_body, asset.into_iter().collect())
+    }
+    fn fixture_assets(proposal_body: &str, assets: Vec<(String, Vec<u8>)>) -> Fixture {
         let actor = Uuid::new_v4();
         let proposal = Uuid::new_v4();
         let binding = RepositoryBinding {
@@ -753,7 +791,7 @@ mod tests {
             (HEAD.into(), tree(proposal_body)),
             (MAIN.into(), tree("main-only change")),
         ]);
-        if let Some((path, bytes)) = asset {
+        for (path, bytes) in assets {
             trees.get_mut(HEAD).unwrap().insert(path, bytes);
         }
         let provider = Arc::new(Provider {
@@ -768,6 +806,12 @@ mod tests {
             trees,
             tree_reads: Mutex::new(vec![]),
             text_reads: Mutex::new(vec![]),
+            binary_reads: Mutex::new(vec![]),
+            binary_override: Mutex::new(None),
+            after_bytes: Mutex::new(None),
+            binary_blocked: AtomicBool::new(false),
+            binary_started: Notify::new(),
+            binary_allowed: AtomicBool::new(false),
             after_read: Mutex::new(None),
             blocked: AtomicBool::new(false),
             started: Notify::new(),
@@ -831,6 +875,7 @@ mod tests {
                 .all(|c| c.kind == crate::comparison::Kind::Document)
         );
         assert_eq!(f.factory.calls.load(Ordering::SeqCst), 1);
+        assert!(f.provider.binary_reads.lock().unwrap().is_empty());
         f.reader.recheck(f.actor, &view).await.unwrap();
         f.auth.allowed.store(false, Ordering::SeqCst);
         assert_eq!(

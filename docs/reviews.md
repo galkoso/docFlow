@@ -56,10 +56,43 @@ head/target, and authority is checked after connecting and reading refs. A later
 `recheck` repeats authority/ref observations without reloading source.
 
 The non-deserializable `ReviewCandidate` retains the source comparison and full
-plan for the upcoming media and publication stages. Its media requirements are
-not verification receipts. It has no public submission endpoint or published
-shared snapshot yet. The current scope resolver is for pre-reservation work;
-the durable worker still needs authority tied to its own fenced submission lease,
-media verification and an atomic publication transaction. Fresh provider
-observations cannot lock Git against later external changes, so approval and
-merge gates must recheck their own exact refs.
+plan. Its media requirements become verified receipts through the next step.
+
+## Sealed media verification
+
+`ReviewPreparer::verify_media` consumes the candidate and returns an opaque
+`VerifiedReview` only after every required image passes. It checks current scope
+and exact provider binding/refs before scanning, reads one image at a time at
+the saved head, and rechecks authority after each binary read and CPU decode.
+Final authority/ref checks follow the complete scan and digest calculation.
+
+Each source must match the planned byte count and Git blob OID, fit the 5 MiB
+per-file limit, and match its content-addressed SHA-256 path. The existing media
+engine verifies PNG/JPEG/WebP content and extension, bounds dimensions/allocation,
+applies orientation, and creates a metadata-free PNG display derivative.
+Verification drops original and display bytes. Receipts retain only path,
+blob OID, source length/hash, display hash, and display dimensions. They cannot
+be deserialized or constructed by a caller. Referenced assets are deduplicated;
+unreferenced newly added images are also verified. Text-only candidates have an
+explicit empty media set. Other unchanged opaque files are not read.
+
+The scan shares the preparer's two-slot limit and deadline. Its permit stays in
+CPU closures through cancellation. Provider errors preserve their backoff and
+are not retried automatically. Invalid media identifies the failing asset path
+with a bounded error code; authority changes take precedence over diagnostics.
+A failure never returns partial evidence. Large scans currently restart rather
+than resume; checkpointed media work remains part of durable-worker development.
+
+`VerifiedReview::fingerprint` hashes the planned content identity and media
+validation version. It is independent of actor, state-only changes, or incidental
+PNG encoding details. A separate `evidence_digest` also binds the canonical
+receipt set, including generated display hashes. Decoder-policy changes must
+bump `MEDIA_VALIDATION_VERSION` and therefore change review identity. Content
+findings, including missing alt text, remain attached to the candidate for later
+review/merge gates; decoding an image does not satisfy those gates.
+
+There is no public submission endpoint or published shared snapshot yet. The
+current scope resolver is for pre-reservation work; the durable worker still
+needs authority tied to its own fenced submission lease and an atomic publication
+transaction. Fresh provider observations cannot lock Git against later external
+changes, so approval and merge gates must recheck their own exact refs.

@@ -414,8 +414,9 @@ async fn media_requirements_cover_new_and_referenced_assets_once_without_claimin
             .len(),
         1
     );
-    // The fixture provider panics on binary reads; this pure plan creates work,
-    // not fabricated validation receipts for media or a successful submission.
+    // This pure plan creates work without reading or certifying any binary.
+    assert!(f.provider.binary_reads.lock().unwrap().is_empty());
+    assert!(unused.provider.binary_reads.lock().unwrap().is_empty());
 }
 #[tokio::test]
 async fn unsupported_new_assets_and_missing_image_alt_do_not_disappear_from_review_requirements() {

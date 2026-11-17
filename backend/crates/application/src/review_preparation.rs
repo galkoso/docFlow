@@ -12,6 +12,8 @@ use specspace_git_adapter::GitError;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use uuid::Uuid;
+mod media;
+pub use media::{MEDIA_VALIDATION_VERSION, VerifiedMedia, VerifiedReview};
 
 #[derive(Debug)]
 pub enum ReviewPreparationError {
@@ -25,6 +27,7 @@ pub enum ReviewPreparationError {
     Busy,
     TimedOut,
     ProcessingUnavailable,
+    InvalidMedia { path: String, code: &'static str },
 }
 pub struct ReviewCandidate {
     scope: ReviewScope,
@@ -176,6 +179,13 @@ impl ReviewPreparer {
         scope: &ReviewScope,
         expectation: &ReviewExpectation,
     ) -> Result<(), ReviewPreparationError> {
+        self.checked_provider(scope, expectation).await.map(|_| ())
+    }
+    async fn checked_provider(
+        &self,
+        scope: &ReviewScope,
+        expectation: &ReviewExpectation,
+    ) -> Result<Arc<dyn specspace_git_adapter::GitProvider>, ReviewPreparationError> {
         let result = self
             .source
             .provider_bound(&scope.comparison.connection)
@@ -193,7 +203,7 @@ impl ReviewPreparer {
         if target.map_err(ReviewPreparationError::Provider)? != expectation.target {
             return Err(ReviewPreparationError::TargetChanged);
         }
-        Ok(())
+        Ok(provider)
     }
 }
 fn validate_scope(

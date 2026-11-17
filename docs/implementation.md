@@ -1420,3 +1420,22 @@ Checkboxes represent verified work only.
   scope-resolver commit passed. No API/client change is exposed by this stage.
   Media receipts, submission leases, durable shared snapshots and their API/UI,
   PR/checks, decisions/discussions and the remaining full specification are open.
+
+- Review media evidence: candidates can now be consumed into a sealed
+  `VerifiedReview` after every required image has passed saved-head byte-count/
+  Git-object/content-address checks and bounded MIME/pixel decoding. Referenced
+  images are deduplicated and newly added unreferenced images are included.
+  Original/derivative bytes are discarded; immutable receipts retain only hashes,
+  dimensions and source metadata. The logical identity binds the plan and media
+  validation version; a separate digest binds canonical evidence and display
+  hashes. Current scope is checked before/after IO and CPU, and final exact refs
+  are observed before any complete evidence is returned. Errors identify the
+  failing asset and preserve provider backoff without automatic retry. Missing-alt
+  and other content findings remain visible for later gates. Twelve new real-
+  loader scenarios cover valid/empty scans, reuse, unreferenced media, forged or
+  oversized bytes, content hashes, MIME/decoder failure, revoked authority, moved
+  refs, policy/actor identity, timeout cleanup and missing-alt preservation. All
+  96 application tests and workspace Clippy pass. Both CI workflows for the prior
+  preparation commit passed. Durable submission leases, checkpointing, shared
+  snapshots, their HTTP/UI flow and all remaining review/merge/bundle/production
+  requirements remain open. This step exposes no new API route or approval.

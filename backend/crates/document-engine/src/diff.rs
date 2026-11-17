@@ -1,5 +1,6 @@
 //! Exact byte-preserving line alignment. Resource fallback is explicit and never
 //! omits source: coarse replacements retain ranges covering both complete files.
+pub mod readable;
 pub mod window;
 
 use serde::Serialize;

@@ -340,6 +340,22 @@ pub fn validate(
     report
 }
 
+/// Shared read-side guard against the parser silently treating exhausted
+/// reference expansions as plain text. This performs no save or whole-book
+/// validation; callers must bound and validate their source separately.
+pub(crate) fn check_reference_expansion(source: &str) -> Result<(), &'static str> {
+    let mut report = SaveValidation::default();
+    let mut work = 0;
+    if reference_budget("", source, &mut report, &mut work) {
+        Ok(())
+    } else {
+        Err(report
+            .findings
+            .first()
+            .map_or("REFERENCE_EXPANSION_LIMIT", |finding| finding.code))
+    }
+}
+
 /// pulldown-cmark 0.13 bounds reference expansion and then treats later uses as
 /// plain text. Probe all resolution attempts with tiny callback destinations,
 /// before trusting canonical events. Definition spans are replaced by spaces

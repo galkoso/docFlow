@@ -1086,3 +1086,20 @@ Checkboxes represent verified work only.
   scenarios and eleven comparison HTTP scenarios. OpenAPI and editor fixtures
   regenerate without drift. Both CI workflows for the preceding raw-window
   commit completed successfully.
+
+
+- Bounded readable projection: existing lossless editor blocks and inert GFM
+  events now produce contiguous units covering every source byte, including
+  metadata, protected definitions/HTML and whitespace. Raw and render identities
+  stay distinct; only unique document-local heading markers are trusted. Render
+  identity retains formatting, destinations, GFM metadata and nested code info.
+  Event/expanded-text/depth budgets precede model construction; the existing
+  reference expansion probe now also prevents read-side parser exhaustion from
+  masquerading as literal reference text. Sorted range/occurrence lookup avoids
+  block-by-heading quadratic scans. Seven engine scenarios cover these source,
+  identity, safety and work-limit boundaries. Projection models grant no scope
+  or approval and cannot be serialized as whole response DTOs. Pairing, bounded
+  readable HTTP/UI, media, review anchors and remaining lifecycle remain work.
+  Full backend workspace tests and Clippy pass, including all 66 engine tests.
+  OpenAPI and editor fixtures regenerate without drift. Both CI workflows for
+  the preceding private-cache commit completed successfully.

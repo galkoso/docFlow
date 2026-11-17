@@ -342,10 +342,46 @@ later closure and revoked membership. A PostgreSQL scenario also proves a new
 reader refetches identical frozen bodies after restart. Operational retention
 and cleanup beyond this bounded ephemeral cache remain part of hardening.
 
+## Implemented: lossless bounded readable projection
+
+`diff::readable::prepare` derives a document's readable units from the existing
+lossless top-level editor boundaries and inert GFM renderer. Contiguous source
+ranges cover every byte, including exact YAML metadata, stable-marker prefixes,
+reference definitions, unsupported HTML/comments and trailing whitespace. Each
+unit retains raw SHA-256, source/body ranges, kind, protected reason and nested
+section IDs. A heading receives a stable identity only when its marker is unique
+within that document. No parser failure becomes an empty or unchanged result.
+
+Renderable units also carry a coordinate-independent fingerprint of their inert
+render events and code-block information. Formatting, link targets/titles,
+list/table/task metadata, exact visible text and code-language changes remain
+part of that identity. Equivalent Markdown spellings can share a render identity
+while their raw hashes still differ. Protected metadata/source has no claimed
+render equivalence. This digest describes the derived view; it is not proof of
+business meaning, a review anchor or approval.
+
+Preparation limits source to 2MiB, parser events to 32,000, nesting to 64 and
+expanded event strings to 8MiB before constructing full models. Heading lookups
+use sorted source ranges and indexed occurrence counts. The existing reference
+expansion probe is shared with the readable path, so the parser's exhaustion
+fallback to literal reference text cannot silently change the readable result.
+Definition rescanning remains bounded and reports its existing explicit limit.
+The renderer emits known inert events, never executable source HTML.
+
+Seven engine scenarios cover full source reconstruction/coordinates, GFM lists,
+quotes/tables/code, Hebrew/emoji, protected definitions/HTML, semantic versus raw
+identity, duplicate/missing markers, empty and unterminated/CRLF source, nested
+code-language changes and adversarial limits. Projection types deliberately are
+not serializable whole-response DTOs. This is pure processing without scope or
+provider I/O. Before/after pairing, bounded readable windows, authenticated
+serving and UI remain required; this foundation does not complete DIFF-04 or
+review acceptance.
+
 ## Remaining workflow
 
-Readable AST and media views still need verified pinned materialization and
-bounded responses, with access rechecks after rendering. Retention/operational
+Readable AST comparisons still need before/after pairing and bounded serving;
+media views still need verified pinned materialization. Both require access
+rechecks after rendering. Retention/operational
 pruning and cold-load performance still need hardening. Raw windows reuse their
 private bounded verified-payload cache; each window still validates and
 materializes its source coordinates on bounded CPU.

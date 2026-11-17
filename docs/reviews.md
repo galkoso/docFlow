@@ -35,3 +35,31 @@ selection: the comparison loader and `PreparedReview` must prove its lineage and
 current-main match. The full preparation path must also validate all source and
 media, recheck authorization/refs, and fence its eventual publication transaction.
 An earlier successful scope read alone cannot authorize later publication.
+
+## Bounded comparison and plan orchestration
+
+`ReviewPreparer` resolves current review scope before loading any Git content,
+loads the exact saved head/selected target through `ComparisonReader`, and
+requires its frozen comparison context to match the resolved review scope.
+Full edit/reviewer metadata is checked again after loading, including failed
+comparison reads.
+
+`PreparedReview` runs on the blocking pool with the verified complete comparison.
+The two-slot preparation limit remains held through that CPU work when its caller
+cancels or times out. A deadline bounds each preparation or later recheck. There
+is no automatic retry, Git write, or branch/PR creation in this path.
+
+After processing, authority is checked before either the plan or its validation
+diagnostics can be returned. A fresh provider connection binds the same numeric
+repository/install identity; branch and main refs must still match the expected
+head/target, and authority is checked after connecting and reading refs. A later
+`recheck` repeats authority/ref observations without reloading source.
+
+The non-deserializable `ReviewCandidate` retains the source comparison and full
+plan for the upcoming media and publication stages. Its media requirements are
+not verification receipts. It has no public submission endpoint or published
+shared snapshot yet. The current scope resolver is for pre-reservation work;
+the durable worker still needs authority tied to its own fenced submission lease,
+media verification and an atomic publication transaction. Fresh provider
+observations cannot lock Git against later external changes, so approval and
+merge gates must recheck their own exact refs.

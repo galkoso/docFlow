@@ -1404,3 +1404,19 @@ Checkboxes represent verified work only.
   workflows for the prior configuration-page commit passed. This scope reader
   makes no provider call and publishes no snapshot. See `reviews.md`; verified
   preparation/media orchestration and durable submission/publication remain open.
+
+- Verified review preparation orchestration: `ReviewPreparer` pairs the current
+  server scope with a full saved-head/target comparison, checks edit/reviewer
+  authority after loading and CPU planning, and observes exact branch/main refs
+  through the frozen provider binding before returning a private candidate.
+  Authorization changes take precedence over private validation diagnostics.
+  A later recheck observes authority/refs without reloading source. Two preparation
+  slots and a deadline bound work; CPU closures retain capacity through caller
+  cancellation. There is no automatic retry or provider write. Eight new cases
+  use the real comparison loader and include malformed scope, revocation at each
+  boundary, changed refs, diagnostic suppression, later rechecks, cancellation
+  and a virtual-clock deadline/recovery check. All 84 application tests, the full
+  backend suite and workspace Clippy pass. Both CI workflows for the preceding
+  scope-resolver commit passed. No API/client change is exposed by this stage.
+  Media receipts, submission leases, durable shared snapshots and their API/UI,
+  PR/checks, decisions/discussions and the remaining full specification are open.

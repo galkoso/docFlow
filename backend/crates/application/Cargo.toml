@@ -20,5 +20,8 @@ sha2 = "0.10"
 url = "2"
 utoipa = { version = "6", features = ["uuid"], optional = true }
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+
 [lints]
 workspace = true

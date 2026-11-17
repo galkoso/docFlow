@@ -373,13 +373,51 @@ quotes/tables/code, Hebrew/emoji, protected definitions/HTML, semantic versus ra
 identity, duplicate/missing markers, empty and unterminated/CRLF source, nested
 code-language changes and adversarial limits. Projection types deliberately are
 not serializable whole-response DTOs. This is pure processing without scope or
-provider I/O. Before/after pairing, bounded readable windows, authenticated
-serving and UI remain required; this foundation does not complete DIFF-04 or
-review acceptance.
+provider I/O. Before/after pairing is described below. Bounded readable windows,
+authenticated serving and UI remain required; this foundation does not complete
+DIFF-04 or review acceptance.
+
+## Implemented: conservative before/after readable pairing
+
+`ReadablePair::prepare` projects both optional file sides and retains every unit
+exactly once in its derived rows, including unchanged/protected source. Absent
+files and present files whose projection fails remain distinct. An unavailable
+side retains its source hash/byte count and error; `ready=false` explicitly
+requires raw fallback. Empty rows from a failed projection cannot mean no change.
+Identical complete sources pair directly, including repeated text and duplicate
+markers, and never manufacture changes from identity ambiguity.
+
+Matching first uses unique stable heading IDs, then unique exact source and
+unique render fingerprints. Metadata and trailing source have structural slots.
+Remaining unique units can pair by ordinal within the same known heading scope
+when both remaining counts agree; this inference is explicitly labelled
+`section_position`. Unidentified headings disable positional inference. Changed
+trusted heading IDs are not silently replaced by same-label matches. Ambiguous
+duplicate units in changed sources remain unpaired additions/deletions. These
+are conservative derived alignments, not proof of an author's intended move.
+
+Rows distinguish raw change, render change (or unknown), and absolute ordinal
+change. Render-equivalent Markdown changes retain raw differences. Reordering
+can remain visible with unchanged unit content; insertion shifts are also
+absolute position changes. Row identities bind a version tag, both complete
+source hashes, unit indexes, ranges and raw hashes. Serving/review must still
+bind file/snapshot, section context and current scope independently. No row is
+an approval or a complete review anchor.
+
+Hash/position grouping uses indexed linear passes over the bounded projections;
+there is no block-pair alignment matrix. Output order and identifiers are
+deterministic. Eight scenarios cover moved/edited stable sections, raw/render
+and metadata differences, ambiguous/missing/changed identities, insert-plus-edit
+cardinality, add/delete/parse failure, identical duplicate/protected source and
+whole-pair identity. Every short binary block sequence through length three is
+paired against every other sequence, checking complete one-to-one coverage,
+determinism, unique rows and visible reordering. Pair objects remain private
+processing models rather than serializable whole-file responses. Authenticated
+bounded readable serving and UI remain required.
 
 ## Remaining workflow
 
-Readable AST comparisons still need before/after pairing and bounded serving;
+Readable AST comparisons still need bounded serving and application integration;
 media views still need verified pinned materialization. Both require access
 rechecks after rendering. Retention/operational
 pruning and cold-load performance still need hardening. Raw windows reuse their

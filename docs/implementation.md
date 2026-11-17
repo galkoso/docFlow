@@ -1103,3 +1103,22 @@ Checkboxes represent verified work only.
   Full backend workspace tests and Clippy pass, including all 66 engine tests.
   OpenAPI and editor fixtures regenerate without drift. Both CI workflows for
   the preceding private-cache commit completed successfully.
+
+
+- Before/after readable pairing: unique stable headings, exact source and render
+  identity precede explicitly labelled section-position inference. Structural
+  metadata/trailing units and unpaired duplicates retain complete source coverage.
+  Missing files and failed projections stay distinct; unavailable sides require
+  raw fallback, while identical complete sources never invent duplicate changes.
+  Raw/render/absolute position flags remain separate. Versioned row identities
+  bind both full source hashes and unit ranges, with outer file/snapshot/scope
+  still required before any review use. Indexed grouping avoids a pair matrix.
+  Eight scenarios include every short repeated binary block sequence, verifying
+  deterministic one-to-one coverage and visible reorderings alongside identity,
+  movement, cardinality and failure cases. Whole pairs are not response DTOs.
+  Bounded authenticated readable serving/UI, media, review anchors and remaining
+  review/merge lifecycle are still required.
+  Full backend workspace tests and Clippy pass, including all 74 engine tests.
+  Both CI workflows for the preceding readable-projection commit completed
+  successfully.
+  OpenAPI and editor fixtures regenerate without drift.

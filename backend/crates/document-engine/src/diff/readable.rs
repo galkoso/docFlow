@@ -1,6 +1,8 @@
 //! Bounded readable projection. Every byte belongs to a unit even when YAML,
 //! definitions, HTML or unsupported syntax cannot be rendered as ordinary GFM.
 //! This is derived content, not authorization or a review approval.
+pub mod pair;
+
 use crate::{
     editing::{self, EditorKind},
     markdown,
@@ -21,7 +23,7 @@ pub enum ReadableError {
     DepthLimit,
     InvalidRange,
 }
-#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum UnitKind {

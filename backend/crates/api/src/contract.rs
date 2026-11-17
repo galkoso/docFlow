@@ -39,6 +39,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn raw_operations_do_not_collide_with_file_categories() {
+        let document = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let schemas = &document["components"]["schemas"];
+        assert_eq!(
+            schemas["RawSegment"]["properties"]["kind"]["$ref"],
+            "#/components/schemas/RawDiffKind"
+        );
+        assert_eq!(
+            schemas["RawDiffKind"]["enum"],
+            serde_json::json!(["equal", "delete", "insert"])
+        );
+        assert_eq!(
+            schemas["Kind"]["enum"],
+            serde_json::json!(["document", "asset", "catalog", "other"])
+        );
+    }
+
+    #[test]
     fn operation_ids_are_unique_for_generated_clients() {
         let document = serde_json::to_value(ApiDoc::openapi()).unwrap();
         let mut ids = std::collections::HashSet::new();

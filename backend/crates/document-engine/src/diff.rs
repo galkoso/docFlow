@@ -15,6 +15,7 @@ const MAX_CHUNKS: usize = 1024;
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(as = RawDiffKind))]
 pub enum Kind {
     Equal,
     Delete,

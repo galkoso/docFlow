@@ -1076,6 +1076,8 @@ export interface components {
             /** @description UTF-8 byte offset in this chunk's nonempty text (old text for equal). */
             offset: number;
         };
+        /** @enum {string} */
+        RawDiffKind: "equal" | "delete" | "insert";
         RawFileResponse: {
             content_id: string;
             file: components["schemas"]["Change"];
@@ -1090,7 +1092,7 @@ export interface components {
         RawSegment: {
             chunk_index: number;
             continues_chunk: boolean;
-            kind: components["schemas"]["Kind"];
+            kind: components["schemas"]["RawDiffKind"];
             new_end_byte: number;
             new_start_byte: number;
             new_start_column_bytes: number;

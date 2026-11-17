@@ -1180,3 +1180,9 @@ Checkboxes represent verified work only.
   workflows for the preceding readable HTTP commit completed successfully.
   Route/page, body viewers, browser acceptance, media and the remaining review/
   merge lifecycle remain required; the full goal remains unfinished.
+
+- Raw diff OpenAPI contract correction: use the distinct `RawDiffKind` schema
+  for equal/delete/insert operations instead of colliding with the inventory's
+  document/asset/catalog/other `Kind`. Wire JSON is unchanged. Regenerated the
+  checked-in OpenAPI and Angular client. Both API contract tests pass, including
+  a regression assertion for the two distinct enum references.

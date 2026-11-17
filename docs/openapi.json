@@ -5963,6 +5963,14 @@
         },
         "additionalProperties": false
       },
+      "RawDiffKind": {
+        "type": "string",
+        "enum": [
+          "equal",
+          "delete",
+          "insert"
+        ]
+      },
       "RawFileResponse": {
         "type": "object",
         "required": [
@@ -6026,7 +6034,7 @@
             "type": "boolean"
           },
           "kind": {
-            "$ref": "#/components/schemas/Kind"
+            "$ref": "#/components/schemas/RawDiffKind"
           },
           "new_end_byte": {
             "type": "integer",

@@ -149,4 +149,10 @@ Markdown and binaries stay in Git. Authenticated diff preparation/progress and
 snapshot-pinned metadata pages and bounded raw text-file windows are available;
 a bounded private memory cache avoids repeated file fetches across windows.
 Authenticated readable metadata and AST event windows are also available.
-Media views and the comparison UI remain in progress. See [comparison boundaries and evidence](docs/diffs.md).
+See [comparison boundaries and evidence](docs/diffs.md).
+
+Review metadata uses migration 009 and actor-bound GET/PUT configuration routes.
+Assignments and UI-impact decisions have immutable revisions, optimistic version
+checks and durable replay receipts. See [review configuration](docs/review-configuration.md)
+for the contract and invalidation behavior. The reviewer picker, formal submission,
+decisions, discussions and PR/check orchestration remain in progress.

@@ -12,6 +12,7 @@ pub mod oidc;
 pub mod proposal_worker;
 pub mod proposals;
 pub mod provisioning;
+pub mod review_configuration;
 pub mod save_verification;
 pub mod save_worker;
 pub mod saves;

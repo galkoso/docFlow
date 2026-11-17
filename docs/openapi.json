@@ -3253,6 +3253,236 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/configuration": {
+      "get": {
+        "tags": [
+          "crate::review_configuration"
+        ],
+        "operationId": "proposalReviewConfiguration",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewConfiguration"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "crate::review_configuration"
+        ],
+        "operationId": "updateProposalReviewConfiguration",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewConfigurationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned metadata saved or identical request replayed; no submission/approval is claimed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationUpdated"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/specification": {
       "get": {
         "tags": [
@@ -4282,6 +4512,45 @@
           }
         },
         "additionalProperties": false
+      },
+      "ConfigurationUpdated": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "request_id",
+          "applied_proposal_version",
+          "applied_configuration_version",
+          "changed",
+          "replayed",
+          "current"
+        ],
+        "properties": {
+          "applied_configuration_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "applied_proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "current": {
+            "$ref": "#/components/schemas/ReviewConfiguration"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       },
       "CreateProposal": {
         "type": "object",
@@ -6847,6 +7116,175 @@
             "type": "string"
           },
           "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ReviewArea": {
+        "type": "string",
+        "enum": [
+          "PRODUCT",
+          "DEVELOPMENT",
+          "DESIGN"
+        ]
+      },
+      "ReviewConfiguration": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "proposal_version",
+          "configuration_version",
+          "policy_version",
+          "state",
+          "can_edit",
+          "settings",
+          "reviewers"
+        ],
+        "properties": {
+          "can_edit": {
+            "type": "boolean"
+          },
+          "configuration_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "head_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policy_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reviewers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewerStatus"
+            }
+          },
+          "settings": {
+            "$ref": "#/components/schemas/ReviewSettings"
+          },
+          "state": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewConfigurationRequest": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "expected_head_sha",
+          "expected_proposal_version",
+          "expected_configuration_version",
+          "settings"
+        ],
+        "properties": {
+          "expected_configuration_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expected_head_sha": {
+            "type": "string"
+          },
+          "expected_proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/ReviewSettings"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSettings": {
+        "type": "object",
+        "required": [
+          "ui_impact",
+          "assignments"
+        ],
+        "properties": {
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewerSelection"
+            }
+          },
+          "ui_impact": {
+            "$ref": "#/components/schemas/UiImpact"
+          },
+          "ui_impact_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewerSelection": {
+        "type": "object",
+        "required": [
+          "reviewer_id",
+          "domain",
+          "required"
+        ],
+        "properties": {
+          "domain": {
+            "$ref": "#/components/schemas/ReviewArea"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewerStatus": {
+        "type": "object",
+        "required": [
+          "reviewer_id",
+          "domain",
+          "required",
+          "display_name",
+          "active",
+          "qualified"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ReviewArea"
+          },
+          "qualified": {
+            "type": "boolean"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "reviewer_id": {
             "type": "string",
             "format": "uuid"
           }

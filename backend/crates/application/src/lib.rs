@@ -11,3 +11,4 @@ pub mod comparison_file;
 pub mod comparison_reader;
 
 pub mod review;
+pub mod review_configuration;

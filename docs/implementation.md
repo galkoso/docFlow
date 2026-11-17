@@ -1334,3 +1334,26 @@ Checkboxes represent verified work only.
   Durable submission/snapshot publication, media verification receipts, PR/check
   orchestration, review anchors/decisions/discussions and review UI still require
   implementation; this pure plan is not an exposed or completed review workflow.
+
+- Durable review configuration: migration 009 stores immutable UI-impact and
+  reviewer-assignment revisions plus actor-bound replay receipts. Authenticated
+  GET/PUT routes and a generated typed Angular client enforce captured actor,
+  CSRF, current organization/edit authority, bounded input, saved head and both
+  proposal/configuration versions. Selected reviewers must be active, qualified
+  for the domain, and independent of the author. Partial configuration remains
+  editable without claiming submission readiness. Reads recompute eligibility;
+  membership revocation preserves historical selections. Changed settings advance
+  both versions, demote APPROVED to IN_REVIEW, and atomically append audit plus a
+  review-invalidation outbox event. Canonical no-ops preserve state and versions.
+  Exact retries retain their original receipt after later edits, closure or an
+  unresolved Git mutation while still requiring current edit authority.
+  A concurrent-write regression identified and fixed a PostgreSQL statement-
+  snapshot race: revision lookup now follows the proposal lock. Database guards
+  reject history rewrites, late appends, unselected/incomplete revisions and
+  manifests bypassed by forcing deferred checks early. Nine new PostgreSQL/HTTP
+  scenarios and two application cases pass; the full backend suite and workspace
+  Clippy pass. OpenAPI/client regeneration, production frontend build and all 206
+  frontend tests pass, including two new typed-client cases. Both CI workflows
+  for the previous review-plan commit passed. See `review-configuration.md` for
+  the exact contract. Picker/review UI, formal submission/snapshots, decisions,
+  discussions and PR/check/merge orchestration remain open.

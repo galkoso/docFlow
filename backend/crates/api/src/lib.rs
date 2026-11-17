@@ -7,6 +7,7 @@ pub mod editor;
 pub mod proposal_content;
 pub mod proposal_reads;
 pub mod proposals;
+pub mod review_configuration;
 pub mod saves;
 pub mod specification;
 
@@ -246,6 +247,7 @@ pub fn router(state: AppState) -> Router {
         .merge(drafts::routes())
         .merge(editor::routes())
         .merge(saves::routes())
+        .merge(review_configuration::routes())
         .merge(comparisons::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))

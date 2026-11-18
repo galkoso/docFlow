@@ -1697,3 +1697,22 @@ Checkboxes represent verified work only.
   `docs/pull-requests.md`. Application journal/outbox consumption, stable proposal
   PR binding, required checks and frontend status are still pending, together with
   decisions/discussions, approvals, merge, bundles and the remaining full scope.
+
+
+- Immutable PR sync intent and reconciliation contract: a server-owned capture
+  binds actor, scope, frozen repository/refs, snapshot/evidence/authority digests,
+  versions and exact PR metadata with a canonical request hash. Restore reuses the
+  stored body instead of rerendering an uncertain attempt. The bounded projection
+  includes a snapshot-pinned site link, description, UI impact, questions and
+  development links; quoted text cannot inject ownership markers or mentions and
+  incomplete question coverage stays explicit. Pure decisions allow new drafts
+  only before a write starts and with no existing binding/candidate; unknown or
+  bound absence remains observation. Exact receipts reconcile; foreign, closed,
+  merged, ready, duplicate, malformed/unowned and stale candidates cannot authorize
+  writes. Ten new cases verify capture/restore, immutable scope and metadata,
+  unsafe origins/links, marker injection, bounds, unknown writes and reconciliation.
+  All 474 backend tests pass with two existing performance measurements excluded;
+  workspace Clippy passes. Both workflows for the preceding PR provider commit
+  passed. Database outbox admission, leases, durable PR identity/results, runtime
+  synchronization/check workers and frontend status remain pending, together with
+  all remaining review, merge, bundle, security/operations and pilot requirements.

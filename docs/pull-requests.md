@@ -1,6 +1,6 @@
 # Dedicated proposal PR synchronization
 
-## Current stage: provider capability
+## Current stage: provider capability and immutable intent
 
 The Git adapter exposes `PullRequestProvider` separately from content operations.
 It reads one PR, discovers PRs for a proposal branch across all states, creates a
@@ -63,12 +63,42 @@ absence from a single eventually consistent list response is not sufficient proo
 that a timed-out create did not happen. No existing worker invokes these new
 mutations yet.
 
+## Immutable metadata intent
+
+`PrSyncIntent` captures actor/organization/proposal/operation/snapshot identities,
+frozen repository/installation/branch, head/target/base, proposal/configuration/
+policy versions, snapshot/evidence/authority digests and exact title/body. Its
+canonical SHA-256 request hash binds every captured field and metadata byte.
+Restoration validates the stored hash and managed ownership frame and reuses the
+stored body, so a deployment's newer renderer cannot change an uncertain retry.
+This pure construction is not authorization or a database admission receipt. The
+journal must resolve current edit authority and the exact active sealed snapshot
+before storing it, and recheck those conditions around provider writes/results.
+
+The body contains a snapshot-pinned website link, description, UI-impact decision,
+questions, development/tracker/design links and source identities. Root managed
+markers bind organization/proposal, operation and snapshot. Untrusted text is
+quoted with HTML/Markdown escaping and neutralized mentions; it cannot inject a
+managed root marker. Line endings are normalized for readable metadata projection.
+Incomplete question coverage is explicitly labelled rather than represented as no
+open questions. Invalid links, unsafe site origins and oversized context fail
+before any provider call; production site links require HTTPS and only explicit
+development configuration permits loopback HTTP.
+
+Pure reconciliation decisions distinguish a new draft, metadata update, exact
+synchronization, continued observation, conflict and stale refs. Unknown writes
+and already-bound PR absence never authorize another create. Exact metadata and
+source observations can reconcile an outcome; mismatches after a write starts
+remain read-only. Closed/merged/ready, duplicate, foreign, malformed or unowned
+candidates cannot authorize writes. An unbound candidate must match the original
+operation marker, and cannot be overwritten when its metadata differs.
+
 ## Remaining full-spec work
 
 - Persist one scoped PR identity per proposal, immutable sync intents and fenced
   mutation/reconciliation phases; consume review publication outbox events.
-- Compose bounded title/body with website/snapshot links, description, decisions,
-  open product questions and development links, using stable server-owned markers.
+- Connect the bounded metadata projection to persisted decisions and complete open
+  product questions when those workflows exist; capture them under journal locks.
 - Expose authenticated synchronization status and explicit recovery without
   changing the saved snapshot or reporting provider failures as proposal closure.
 - Enforce the required head-bound SpecSpace check and native branch protection;

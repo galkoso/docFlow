@@ -16,3 +16,5 @@ pub mod review_context;
 pub mod review_preparation;
 pub mod review_snapshot;
 pub mod review_submission;
+
+pub mod pr_sync;

@@ -170,5 +170,9 @@ is created by this worker. Authenticated `POST /api/v1/proposals/:id/submit` que
 work with actor-bound idempotency and user/organization admission limits from
 migration 012. `/api/v1/jobs/:id` reports private progress. Organization members
 can read shared snapshot history, typed metadata, file manifests and media
-receipts under `/api/v1/proposals/:id/review/snapshots`. The frontend submission
-and shared-review flow remains open. See [formal review preparation](docs/reviews.md).
+receipts under `/api/v1/proposals/:id/review/snapshots`.
+`/changes/:id/review/snapshots` offers explicit saved-version preflight and
+submission, private job observation, shared history and paged metadata/manifests.
+Uncertain writes retain their original actor/key/body; restored job URLs observe
+existing work without reconstructing a POST. Shared diff bodies, PR/checks,
+decisions/discussions and approvals remain open. See [formal review preparation](docs/reviews.md).

@@ -4,8 +4,9 @@ Review configuration is editable at `/changes/:id/review`; its contract is in
 [`review-configuration.md`](review-configuration.md). Server-side preparation,
 the submission journal, durable worker and atomic shared snapshot persistence
 and authenticated submission/status/shared snapshot endpoints are implemented.
-The frontend submission/shared-review flow, decisions, discussions and provider
-PR/check orchestration remain open.
+The submission/shared-snapshot frontend is available at
+`/changes/:id/review/snapshots`. Shared diff bodies, decisions, discussions and
+provider PR/check orchestration remain open.
 
 ## Current server context
 
@@ -185,7 +186,7 @@ closure, content changes and provider reconfiguration, without provider calls.
 and binding; it is neither a fresh Git observation nor approval/merge readiness.
 Job status remains private to the original actor with current edit access. These
 store methods also support the authenticated endpoints below. Shared raw/
-readable/image body reads and frontend snapshot history navigation remain open.
+readable/image body reads remain open.
 
 ## Durable snapshot worker
 
@@ -221,8 +222,7 @@ outside the worker's claim and failure paths.
 This worker performs only Git reads. It does not create PRs, publish checks,
 grant approval or merge. A crash before snapshot commit can repeat reads; a crash
 after commit leaves the successful job and immutable receipt observable. Scans
-currently restart rather than resume. The corresponding frontend flow remains
-open.
+currently restart rather than resume.
 
 ## Authenticated HTTP contract
 
@@ -286,5 +286,55 @@ no job/operation and returns **429** with `REVIEW_SUBMISSION_LIMIT` and
 save/submit/import/merge reservations.
 
 OpenAPI and the generated TypeScript client describe these routes and read models.
-This contract does not yet add frontend submission controls, shared diff bodies,
-PR/check processing, discussion/decision APIs or approvals.
+Shared diff bodies, PR/check processing, discussion/decision APIs and approvals
+remain open.
+
+## Submission and shared snapshot frontend
+
+`/changes/:id/review/snapshots` is linked from proposal details and reviewer
+configuration. Opening it performs only shared database reads. History now carries
+the current proposal number/title/branch/target, so even empty or historical views
+retain branch identity without Git IO. The page displays frozen head/target/base,
+description, UI-impact decision, content findings, complete paged file descriptors
+and verified image metadata. It links to commit-pinned book views; shared raw,
+readable and image-body comparison rendering is still pending. Snapshot availability
+is explicitly separate from PR/checks, approval and publication through merge.
+
+Editors explicitly check the saved version before submitting. Preflight combines
+captured-actor configuration and provider-observed proposal detail and rejects
+mixed versions, moved/unavailable refs, revoked/ineligible reviewers, missing
+independent product/development reviewers and required design eligibility. The
+detail endpoint honors an optional captured-actor header before provider work;
+legacy detail reads without it remain supported. The subsequent explicit send
+freezes head/target, all three versions, actor and idempotency key. Further edits
+or route/query changes cannot replace that intent while its outcome is uncertain.
+Worker-side source/media/authority checks remain authoritative.
+
+Polling observes the accepted private job only. Timeouts and lost replies preserve
+the original mutation for explicit exact retry; timers never POST. A later error
+does not erase earlier uncertainty. Definite admission failure permits a new
+preflight; provider reconciliation retains its pending reservation. Publication
+responses must match captured proposal/operation/job, identity digests and applied
+version before the page reports snapshot completion. A job restored from `job=`
+uses authenticated observation only and has no reconstructed body or retry key.
+Its result is validated against the requested job/proposal before shared reading.
+
+The URL preserves proposal, selected `snapshot`, file/media offsets, history cursor
+and accepted private job ID. Unknown/duplicate parameters and out-of-range offsets
+are rejected. Shared history preserves microsecond UTC ordering. Header, history,
+file/media counts, identities, content findings and receipt hashes/dimensions must
+agree before a complete page is installed. There is no partial mixed-snapshot
+display. Pending requests use timeouts and generation checks and are cancelled on
+scope change or destruction. Same-actor session recovery resumes safe job reads;
+unknown POST results require explicit retry. Account switches and logout purge
+private intent and displayed evidence. A denied private observation also clears
+displayed evidence; explicit reload drops the denied job URL and reads shared
+history afresh. Mutation event handlers check the current profile synchronously,
+including queued clicks before reactive cleanup. Route exit, logout and unload
+guard pending work. Private intent is kept in page memory only.
+
+Native labelled controls, RTL/LTR isolation, wrapping layouts and 44px button
+heights support keyboard and narrow-screen use. Component/router tests verify
+guards, labels, escaped server strings and account isolation. Physical keyboard,
+visual RTL and 320px acceptance remain open: browser discovery returned no available
+browser, so no visual acceptance is claimed by the automated DOM tests.

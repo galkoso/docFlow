@@ -13,6 +13,7 @@
   @if (proposal.head_sha) {<p><a class="button" [routerLink]="['/changes', proposal.proposal_id, 'book']" [queryParams]="{ commit: proposal.head_sha }">קריאת תוכן ההצעה</a></p>}
   @if (proposal.head_sha) {<p><a [routerLink]="['/changes', proposal.proposal_id, 'diff']">השוואת לפני ואחרי</a></p>}
   <p><a [routerLink]="['/changes', proposal.proposal_id, 'review']">הגדרת סוקרים והשפעת ממשק</a></p>
+  <p><a [routerLink]="['/changes', proposal.proposal_id, 'review', 'snapshots']">שליחה לסקירה וגרסאות משותפות</a></p>
   @if (proposal.state === 'CLOSED' || proposal.state === 'MERGED') {<p class="notice" role="status">ההצעה {{ proposal.state === 'MERGED' ? 'מוזגה' : 'סגורה' }} ומוצגת לקריאה בלבד.</p>}
   @switch (proposal.synchronization.state) {
     @case ('provisioning') {

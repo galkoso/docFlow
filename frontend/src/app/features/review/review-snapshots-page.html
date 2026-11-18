@@ -1,0 +1,95 @@
+<nav aria-label="ניווט סקירה"><a [routerLink]="['/changes', proposal()]">לפרטי ההצעה</a>
+  <a [routerLink]="['/changes', proposal(), 'review']">הגדרת סוקרים והשפעת ממשק</a></nav>
+<h1>שליחה לסקירה וגרסאות משותפות</h1>
+@if (!session.profile()) {
+  @if (session.status() === 'loading') {<p role="status">בודקים התחברות…</p>}
+  @else if (session.status() === 'unconfigured') {<p>נדרשת הגדרת התחברות ארגונית.</p><a routerLink="/settings">הגדרות</a>}
+  @else if (session.status() === 'error') {<button (click)="session.refresh()">בדיקת התחברות מחדש</button>}
+  @else {<p>יש להתחבר כדי לקרוא גרסאות סקירה.</p><a href="/api/v1/auth/login">התחברות ארגונית</a>}
+} @else if (blocked()) {
+  <p role="alert">החשבון או מצב הגישה השתנו. המידע הקודם הוסתר. יש לבדוק התחברות לפני טעינה עבור החשבון הנוכחי.</p>
+  <button (click)="session.refresh()">בדיקת התחברות</button><button (click)="reload()">טעינה עבור החשבון הנוכחי</button>
+} @else {
+  @if (routeError(); as error) {<p role="alert">{{ error }}</p>}
+  @if (state.phase() === 'loading') {<p role="status">טוענים את גרסת הסקירה…</p>}
+  @if (state.error(); as error) {<p class="notice" role="alert">{{ error }}</p>}
+  @if (visible()) {
+    @if (state.history(); as history) {
+      <header><p>הצעה #{{ history.number }}</p><h2>{{ history.title }}</h2>
+        <div class="branch-bar"><span>ענף: <bdi>{{ history.branch }}</bdi></span><span>יעד: <bdi>{{ history.target_branch }}</bdi></span></div>
+        <p>{{ stateLabel(history.current_proposal_state) }} · גרסת ההצעה השמורה: {{ history.current_proposal_version }}</p></header>
+    }
+    <section aria-labelledby="submit-title"><h2 id="submit-title">שליחת גרסה שמורה</h2>
+      <p>יש לשמור תוכן והגדרת סוקרים לפני שליחה. הבדיקה הבאה בוחרת את הגרסה השמורה ואת גרסת היעד שנבדקה ב־Git.</p>
+      <button type="button" (click)="prepare()" [disabled]="submission.pending() || submission.busy() || !!routeError()">בדיקת הגרסה לשליחה</button>
+      @if (submission.phase() !== 'idle') {<p role="status">{{ phaseLabel(submission.phase()) }}</p>}
+      @if (submission.error(); as error) {<p class="notice" role="alert">{{ error }}</p>}
+      @if (submission.context(); as context) {
+        <dl><dt>ראש הענף לשליחה</dt><dd><bdi>{{ context.body.expected_head_sha }}</bdi></dd>
+          <dt>גרסת היעד</dt><dd><bdi>{{ context.body.expected_target_sha }}</bdi></dd>
+          <dt>גרסאות הצעה / הגדרה / מדיניות</dt><dd>{{ context.body.expected_proposal_version }} / {{ context.body.expected_configuration_version }} / {{ context.body.expected_policy_version }}</dd></dl>
+        @if (context.detail.synchronization.base_outdated) {<p class="notice">היעד התקדם. לפני אישור מחייב נדרש לבדוק את עדכון הבסיס.</p>}
+        @if (context.configuration.settings.ui_impact === 'undecided') {<p class="notice">השפעת הממשק טרם הוכרעה; לפני אישור סופי נדרשת הכרעה.</p>}
+        <button type="button" (click)="send()" [disabled]="submission.busy() || submission.pending()">שליחת הגרסה השמורה לסקירה</button>
+      }
+      @if (submission.canRetry()) {<button (click)="retry()">בדיקת תוצאת אותה בקשת שליחה</button>}
+      @if (submission.canCheck()) {<button (click)="check()">בדיקת העבודה הקיימת</button>}
+      @if (submission.result(); as result) {<p class="notice" role="status">{{ result.activated ? 'גרסה משותפת נשמרה לסקירה.' : 'הגרסה הפעילה כבר תואמת לתוכן שנבדק.' }}
+        פרסום באפיון המאושר דורש מיזוג. קישור PR ואישורים יוצגו כשיהיו זמינים.</p>
+        <button (click)="select(result.snapshot_id)">צפייה בגרסה שהתקבלה</button>}
+    </section>
+    @if (state.history(); as history) {
+      <section aria-labelledby="history-title"><h2 id="history-title">גרסאות סקירה</h2>
+        @if (!history.snapshots.length) {<p>אין גרסאות סקירה בעמוד זה.</p>}
+        <ol class="history">@for (item of history.snapshots; track item.snapshot_id) {
+          <li><button (click)="select(item.snapshot_id)" [attr.aria-current]="state.selected() === item.snapshot_id ? 'true' : null">
+            {{ item.created_at | date:'dd/MM/yyyy HH:mm:ss' }} · {{ item.title }} · {{ item.file_count }} קבצים</button>
+            @if (item.snapshot_id === history.active_snapshot_id) {<span>הגרסה הפעילה</span>}
+            <bdi class="sha">{{ item.head_sha }}</bdi></li>
+        }</ol>
+        @if (location()?.after) {<button (click)="historyPage(null)">לגרסאות האחרונות</button>}
+        @if (history.next_after) {<button (click)="historyPage(history.next_after)">גרסאות קודמות</button>}
+      </section>
+    }
+    @if (mismatched()) {<p role="alert">פרטי הגרסה אינם תואמים לתוצאת השליחה. יש לטעון מחדש לפני המשך סקירה.</p>}
+    @else if (state.snapshot(); as snapshot) {
+      <section aria-labelledby="snapshot-title"><h2 id="snapshot-title">הגרסה המוצגת: {{ snapshot.title }}</h2>
+        <p>{{ snapshot.created_at | date:'dd/MM/yyyy HH:mm:ss' }} · {{ current() ? 'מתאימה לפרטי ההצעה השמורים כעת' : 'גרסה היסטורית או שאינה תואמת למצב השמור כעת' }}</p>
+        <p>מצב הענפים, האישורים ובדיקות המיזוג נבדק בנפרד.</p>
+        <dl><dt>ענף</dt><dd><bdi>{{ snapshot.metadata.summary.branch }}</bdi></dd><dt>ראש הענף</dt><dd><bdi>{{ snapshot.metadata.summary.head_sha }}</bdi></dd>
+          <dt>יעד הסקירה</dt><dd><bdi>{{ snapshot.metadata.summary.target_sha }}</bdi></dd><dt>בסיס ההשוואה</dt><dd><bdi>{{ snapshot.metadata.summary.merge_base_sha }}</bdi></dd></dl>
+        <p>{{ snapshot.metadata.context.description }}</p>
+        <p>השפעת ממשק: {{ snapshot.metadata.summary.ui_impact === 'YES' ? 'כן' : snapshot.metadata.summary.ui_impact === 'NO' ? 'לא' : 'טרם הוכרעה' }}</p>
+        @if (snapshot.metadata.context.ui_impact_reason) {<p>{{ snapshot.metadata.context.ui_impact_reason }}</p>}
+        @if (snapshot.metadata.summary.base_outdated) {<p class="notice">גרסת היעד שונה מבסיס ההצעה. לפני אישור מחייב נדרשת בדיקת עדכון בסיס.</p>}
+        <p><a [routerLink]="['/changes', proposal(), 'book']" [queryParams]="{ commit: snapshot.metadata.summary.head_sha }">קריאת תוכן הענף בגרסה זו</a></p>
+        <p><a routerLink="/specification" [queryParams]="{ repo: snapshot.metadata.summary.repository_id, commit: snapshot.metadata.summary.merge_base_sha }">קריאת תוכן הבסיס</a></p>
+        <h3>ממצאי תוכן</h3><p>{{ snapshot.metadata.validation.findings_total }} ממצאים נשמרו עם הגרסה.</p>
+        <ul>@for (finding of snapshot.metadata.validation.findings; track $index) {
+          <li><bdi>{{ finding.path }}</bdi> · {{ findingLabel(finding.code) }}@if (finding.path_truncated) {<span> (הנתיב מקוצר)</span>}</li>
+        }</ul>
+        @if (snapshot.metadata.validation.findings_truncated) {<p>הרשימה מקוצרת. הספירה כוללת את כל הממצאים.</p>}
+        @if (state.files(); as files) {
+          <h3>קבצים שהשתנו — {{ files.total }}</h3><p>הרשימה מתייחסת לגרסה המוצגת. תצוגת השוואה משותפת מלאה תתווסף בהמשך.</p>
+          <ul class="files">@for (file of files.files; track file.id) {
+            <li><strong>{{ kind(file.kind) }} · {{ change(file.status) }}</strong>
+              @if (file.before) {<p>לפני: <bdi>{{ file.before.path }}</bdi></p>}
+              @if (file.after) {<p>אחרי: <bdi>{{ file.after.path }}</bdi></p>}</li>
+          }</ul>
+          <div class="pages">@if (files.offset) {<button (click)="filePage(previous(files.offset))">קבצים קודמים</button>}
+            @if (files.next_offset != null) {<button (click)="filePage(files.next_offset)">קבצים נוספים</button>}</div>
+        }
+        @if (state.media(); as media) {
+          <h3>תמונות שנבדקו — {{ media.total }}</h3>
+          @if (!media.total) {<p>אין תמונות שנדרשו לבדיקה בגרסה זו.</p>}
+          <ul>@for (receipt of media.receipts; track receipt.path) {
+            <li><bdi>{{ receipt.path }}</bdi> · {{ receipt.bytes }} בתים · <bdi>{{ receipt.display_width }} × {{ receipt.display_height }}</bdi></li>
+          }</ul>
+          <div class="pages">@if (media.offset) {<button (click)="mediaPage(previous(media.offset))">תמונות קודמות</button>}
+            @if (media.next_offset != null) {<button (click)="mediaPage(media.next_offset)">תמונות נוספות</button>}</div>
+        }
+      </section>
+    }
+  }
+  <button (click)="reload()" [disabled]="state.phase() === 'loading'">טעינת גרסאות מחדש</button>
+}

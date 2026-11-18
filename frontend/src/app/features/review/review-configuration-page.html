@@ -18,7 +18,8 @@
     <div class="branch-bar"><span>ענף: <bdi>{{ data.branch }}</bdi></span><span>יעד: <bdi>{{ data.target_branch }}</bdi></span></div>
     <p>גרסת ההגדרה: {{ data.configuration_version }} · גרסת ההצעה: {{ data.proposal_version }}</p>
     <p>מצב ההצעה: {{ stateLabel(data.state) }}</p>
-    <p>שמירת ההגדרה קובעת את הסוקרים ואת השפעת השינוי על הממשק. שליחה לסקירה ואישורים יופיעו כאן בהמשך.</p>
+    <p>שמירת ההגדרה קובעת את הסוקרים ואת השפעת השינוי על הממשק. לאחר שמירה אפשר לבדוק גרסה ולשלוח אותה לסקירה.</p>
+    <p><a [routerLink]="['/changes', data.proposal_id, 'review', 'snapshots']">שליחה לסקירה וגרסאות משותפות</a></p>
     <p>נדרשים סוקרי מוצר ופיתוח נפרדים שאינם המחבר. כשיש השפעת ממשק נדרשת גם סקירת עיצוב. אפשר לשמור בינתיים הגדרה חלקית.</p>
     @if (!data.can_edit) {<p class="notice" role="status">ההגדרה מוצגת לקריאה בלבד. ייתכן שאין הרשאת עריכה, שההצעה במצב סופי או שפעולה קודמת טרם הסתיימה.</p>}
     @if (state.phase() === 'uncertain') {<button (click)="state.retry()">בדיקת תוצאת בקשת השמירה</button>}

@@ -1,0 +1,15 @@
+:host { display: block; max-width: 68rem; margin-inline: auto; line-height: 1.65; }
+nav, .branch-bar, .pages { display: flex; flex-wrap: wrap; gap: 1rem; }
+h1, h2, p, li, dd, bdi { overflow-wrap: anywhere; }
+section { padding-block: 1rem; border-block-end: 1px solid #cad6de; }
+.branch-bar { padding-block: .8rem; border-block: 1px solid #cad6de; }
+bdi { direction: ltr; unicode-bidi: isolate; }
+.sha { display: block; font-size: .85rem; }
+button { font: inherit; min-height: 2.75rem; padding: .4rem .8rem; margin: .3rem; cursor: pointer; max-width: 100%; text-align: start; }
+button:disabled { cursor: default; }
+:is(button, a):focus-visible { outline: 3px solid #176ba0; outline-offset: 3px; }
+[aria-current="true"] { border: 2px solid #176ba0; }
+.notice { padding: .8rem; background: #edf4f7; border-inline-start: 4px solid #276787; }
+dt { font-weight: 600; } dd { margin-inline-start: 1rem; }
+li { padding-block: .45rem; } .files p { margin-block: .2rem; }
+@media (max-width: 420px) { .branch-bar { display: block; } .branch-bar span { display: block; } button { margin-inline: 0; } }

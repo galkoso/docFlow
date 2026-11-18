@@ -1530,3 +1530,26 @@ Checkboxes represent verified work only.
   workflows for the preceding worker commit passed. Frontend submission/shared
   review, shared raw/readable/image bodies, PR/checks, decisions/discussions,
   approvals and the remaining full specification are still open.
+
+- Review submission/shared snapshot frontend: a page at
+  `/changes/:id/review/snapshots` now links saved-version preflight, explicit
+  submission, actor-private job observation and shared snapshot history/manifests.
+  The body/key/actor remain frozen through uncertain responses; only explicit
+  retry can POST again. Polls and restored job URLs observe existing work without
+  reconstructing writes. The page validates scope, receipt identities, applied
+  versions, UTC history ordering and all complete file/media metadata before
+  display. Session refresh hides private data and resumes reads only for the same
+  actor; account changes/logout purge it, and denied private access clears shared
+  display before reload. Synchronous event guards cover queued actions during an
+  identity switch. Route/logout/unload guards retain pending intent, and URL state
+  preserves snapshot, file/media pages, history cursor and private job observation.
+  History now includes current branch/title/number/target without provider IO;
+  proposal-detail preflight honors an optional captured-actor header. The OpenAPI
+  and generated client are updated. Thirty-nine new frontend cases bring the suite
+  to 279 passing tests across 37 files; production build passes. One new backend
+  actor-header scenario brings the workspace to 424 passing tests, with two existing
+  performance measurements excluded. Workspace Clippy passes. Both workflows for
+  the preceding review-API commit passed. No browser was available for visual
+  verification; physical keyboard, visual RTL and 320px acceptance remain open.
+  Shared raw/readable/image bodies, PR/check integration, decisions/discussions,
+  approvals, merge, bundles and the remaining full specification are still open.

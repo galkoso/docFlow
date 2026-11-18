@@ -9,6 +9,7 @@ pub mod github_source;
 pub mod index_worker;
 pub mod login_flows;
 pub mod oidc;
+pub mod pr_sync;
 pub mod proposal_worker;
 pub mod proposals;
 pub mod provisioning;
@@ -52,7 +53,7 @@ pub async fn lease_job(
     sqlx::query_as::<_, LeasedJob>(
         "WITH candidate AS (
           SELECT id FROM jobs
-          WHERE state = 'QUEUED' AND kind NOT IN ('INDEX_SNAPSHOT','CREATE_PROPOSAL','SAVE_PROPOSAL','COMPARE_PROPOSAL','SUBMIT_REVIEW') AND available_at <= now() AND attempts < max_attempts
+          WHERE state = 'QUEUED' AND kind NOT IN ('INDEX_SNAPSHOT','CREATE_PROPOSAL','SAVE_PROPOSAL','COMPARE_PROPOSAL','SUBMIT_REVIEW','SYNC_REVIEW_PR') AND available_at <= now() AND attempts < max_attempts
           ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1
         )
         UPDATE jobs SET state = 'RUNNING', lease_owner = $1,
@@ -78,7 +79,7 @@ pub async fn complete_job(
     let updated = sqlx::query(
         "UPDATE jobs SET state = 'SUCCEEDED', result = $3, lease_owner = NULL,
           leased_until = NULL
-        WHERE id = $1 AND lease_owner = $2 AND state = 'RUNNING' AND leased_until > now() AND kind<>'SUBMIT_REVIEW'",
+        WHERE id = $1 AND lease_owner = $2 AND state = 'RUNNING' AND leased_until > now() AND kind NOT IN ('SUBMIT_REVIEW','SYNC_REVIEW_PR')",
     )
     .bind(job_id)
     .bind(worker_id)

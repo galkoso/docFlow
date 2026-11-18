@@ -1,14 +1,14 @@
 # Dedicated proposal PR synchronization
 
-## Current stage: provider capability and immutable intent
+## Current stage: provider capability, immutable intent and durable admission
 
 The Git adapter exposes `PullRequestProvider` separately from content operations.
 It reads one PR, discovers PRs for a proposal branch across all states, creates a
 draft, and updates title/body metadata. A provider observation is not an approval,
-merge receipt or proof that a saved review snapshot is current. Application
-orchestration, persistence, required checks and the user-facing synchronization
-status remain pending. Published review snapshots already emit outbox events
-requesting that synchronization.
+merge receipt or proof that a saved review snapshot is current. PostgreSQL admission
+now freezes publication outbox events into dedicated PR operations/jobs. Dispatch,
+provider orchestration, PR identity/results, required checks and the user-facing
+synchronization status remain pending.
 
 The [GitHub PR REST API](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10)
 provides the list/get/create/update operations used here. Draft creation uses
@@ -102,10 +102,41 @@ remain read-only. Closed/merged/ready, duplicate, foreign, malformed or unowned
 candidates cannot authorize writes. An unbound candidate must match the original
 operation marker, and cannot be overwritten when its metadata differs.
 
+## Durable publication-event admission
+
+`PgPrSync::reserve` requires the publication's original actor to retain current
+edit access. It validates the exact event schema and flags against a successful
+submission operation/job, immutable publication result and sealed READY snapshot.
+New work also requires that snapshot to remain active with matching current
+repository/installation/branch, commits, configuration and policy. It captures
+current projection metadata and fresh authority under locks without provider IO.
+The authority digest also includes title, proposal number and links, which are
+absent from the review-scope digest. Question coverage remains explicitly partial.
+
+One transaction stores the immutable intent and exact title/body/hash, creates a
+`PR_SYNC` operation and `SYNC_REVIEW_PR` job, appends audit evidence and marks the
+event delivered. `outbox.sent_at` means journal delivery, never provider success.
+Repeated/concurrent delivery returns the original bytes and identifiers even if
+the site origin or proposal metadata later changes; current actor access is still
+required. A unique source submission prevents duplicate publication receipts from
+creating independent operations. Failure rolls back delivery and all journal rows.
+
+One unresolved PR operation per proposal is separate from the content-mutation
+slot, so document saves and new review submissions remain possible. New admissions
+are serialized per organization and limited to two active/ten recent per actor and
+twelve active/sixty recent per organization, with a ten-minute recent window.
+Exact replay precedes quotas. Database guards freeze intents, source events, jobs
+and operation scope, require atomic admission evidence, and reject generic success.
+Generic job leasing/completion excludes PR jobs. This stage grants no provider
+mutation lease; the database prevents these operations crossing the mutation or
+success boundary until the dedicated fenced worker/result protocol is installed.
+No dispatcher or existing runtime worker invokes this admission method yet.
+
 ## Remaining full-spec work
 
-- Persist one scoped PR identity per proposal, immutable sync intents and fenced
-  mutation/reconciliation phases; consume review publication outbox events.
+- Persist one scoped PR identity per proposal and fenced mutation/reconciliation
+  phases/results; dispatch publication outbox events, including stale/poison-event
+  handling and recovery when the original actor loses authority.
 - Connect the bounded metadata projection to persisted decisions and complete open
   product questions when those workflows exist; capture them under journal locks.
 - Expose authenticated synchronization status and explicit recovery without

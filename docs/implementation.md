@@ -1730,3 +1730,23 @@ Checkboxes represent verified work only.
   The synchronization journal, outbox delivery, worker, durable PR identity/results,
   required checks and frontend status remain pending alongside the full remaining
   specification.
+
+- Durable PR synchronization admission (migration 013): a current original editor
+  can atomically deliver a backed review-publication event into an immutable PR
+  intent, dedicated operation/job and audit receipt. Captures require the exact
+  active sealed snapshot, repository binding, refs and current policy/configuration;
+  strict event validation checks the successful source submission/result/job.
+  Exact concurrent/repeated delivery restores stored metadata without rerendering,
+  even after later metadata/site changes, while current access remains mandatory.
+  Per-proposal PR serialization is independent from content mutations; actor and
+  organization quotas apply only to new admissions. Database guards preserve
+  intents/events/scopes, reject incomplete admission and prevent generic provider
+  mutation/success. Eleven PostgreSQL cases cover concurrency, rollback, forged
+  flags/evidence, stale/foreign scope, revocation, quota replay, invalid projections,
+  immutable history and continued content-review submission. All 488 backend tests
+  pass with two existing performance measurements excluded; workspace Clippy and
+  formatting pass, and OpenAPI is unchanged. Both workflows for the preceding
+  factory commit passed. Dispatch, stale-event
+  handling, fenced PR mutation/reconciliation leases, durable PR identity/results,
+  required checks and frontend synchronization status remain pending, together
+  with decisions/discussions, approvals, merge, bundles and all remaining scope.

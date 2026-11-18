@@ -26,6 +26,8 @@ use std::{
 };
 #[path = "snapshots/files.rs"]
 mod files;
+#[path = "snapshots/pr_sync.rs"]
+mod pr_sync;
 #[path = "snapshots/worker.rs"]
 mod worker;
 struct Source {

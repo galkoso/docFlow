@@ -152,6 +152,10 @@ pub struct ReviewSnapshotHistoryEntry {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewSnapshotHistory {
     pub proposal_id: Uuid,
+    pub number: i64,
+    pub title: String,
+    pub branch: String,
+    pub target_branch: String,
     pub active_snapshot_id: Option<Uuid>,
     pub current_proposal_version: i64,
     pub current_proposal_state: String,

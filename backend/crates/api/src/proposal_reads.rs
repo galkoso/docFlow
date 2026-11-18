@@ -304,8 +304,8 @@ async fn detail_row(
         .map_err(|_| ProposalError::Unavailable)?
         .ok_or(ProposalError::NotFound)
 }
-#[utoipa::path(get,path="/api/v1/proposals/{proposal}",security(("sessionCookie"=[])),params(("proposal"=Uuid,Path)),
-    responses((status=200,body=ProposalDetail),(status=400,body=crate::ErrorBody),(status=401,body=crate::ErrorBody),(status=404,body=crate::ErrorBody),(status=503,body=crate::ErrorBody)))]
+#[utoipa::path(get,path="/api/v1/proposals/{proposal}",security(("sessionCookie"=[])),params(("proposal"=Uuid,Path),("X-Expected-Actor"=Option<Uuid>,Header,description="When present, binds this read to the captured actor")),
+    responses((status=200,body=ProposalDetail),(status=400,body=crate::ErrorBody),(status=401,body=crate::ErrorBody),(status=404,body=crate::ErrorBody),(status=409,body=crate::ErrorBody),(status=503,body=crate::ErrorBody)))]
 pub(crate) async fn detail(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -315,6 +315,11 @@ pub(crate) async fn detail(
         Ok(actor) => actor,
         Err(error) => return error.into_response(),
     };
+    if headers.contains_key("X-Expected-Actor")
+        && let Err(error) = auth::verify_actor(&headers, &actor)
+    {
+        return error.into_response();
+    }
     let Ok(Path(proposal)) = path else {
         return invalid_query();
     };

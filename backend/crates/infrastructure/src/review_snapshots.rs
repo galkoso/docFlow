@@ -326,7 +326,7 @@ impl PgReviewSnapshots {
         }
         let mut tx = self.transaction().await?;
         let org = read_access(&mut tx, actor, proposal).await?;
-        let (active,version,state):(Option<Uuid>,i64,String)=sqlx::query_as("SELECT active_review_snapshot_id,version,state FROM proposals WHERE id=$1 AND organization_id=$2")
+        let (active,version,state,number,title,branch,target_branch):(Option<Uuid>,i64,String,i64,String,String,String)=sqlx::query_as("SELECT p.active_review_snapshot_id,p.version,p.state,p.number,p.title,p.branch,r.default_branch FROM proposals p JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id WHERE p.id=$1 AND p.organization_id=$2")
             .bind(proposal).bind(org).fetch_one(&mut *tx).await?;
         let cursor = if let Some(after) = after {
             Some(sqlx::query_scalar::<_,Timestamp>("SELECT created_at FROM review_snapshots WHERE id=$1 AND proposal_id=$2 AND organization_id=$3 AND state='READY'")
@@ -364,6 +364,10 @@ impl PgReviewSnapshots {
         tx.commit().await?;
         Ok(ReviewSnapshotHistory {
             proposal_id: proposal,
+            number,
+            title,
+            branch,
+            target_branch,
             active_snapshot_id: active,
             current_proposal_version: version,
             current_proposal_state: state,

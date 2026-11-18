@@ -1518,14 +1518,19 @@ export interface components {
         ReviewSnapshotHistory: {
             /** Format: uuid */
             active_snapshot_id?: string | null;
+            branch: string;
             current_proposal_state: string;
             /** Format: int64 */
             current_proposal_version: number;
             /** Format: uuid */
             next_after?: string | null;
+            /** Format: int64 */
+            number: number;
             /** Format: uuid */
             proposal_id: string;
             snapshots: components["schemas"]["ReviewSnapshotHistoryEntry"][];
+            target_branch: string;
+            title: string;
         };
         ReviewSnapshotHistoryEntry: {
             branch: string;
@@ -2449,7 +2454,10 @@ export interface operations {
     detail: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description When present, binds this read to the captured actor */
+                "X-Expected-Actor"?: string | null;
+            };
             path: {
                 proposal: string;
             };
@@ -2482,6 +2490,14 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

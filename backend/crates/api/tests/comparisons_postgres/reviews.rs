@@ -773,3 +773,34 @@ async fn review_http_organization_recent_quota_survives_actor_changes_and_termin
         StatusCode::TOO_MANY_REQUESTS
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn proposal_detail_honors_an_optional_captured_actor_before_review_preflight(pool: PgPool) {
+    let (f, product, _) = configured(&pool, false).await;
+    for actors in [vec![product.id], vec![f.owner.id, f.owner.id]] {
+        let mut request = Request::builder()
+            .uri(format!("/api/v1/proposals/{}", f.proposal))
+            .header("Cookie", format!("specspace-session={}", f.owner.token));
+        for actor in actors {
+            request = request.header("X-Expected-Actor", actor.to_string());
+        }
+        let response = f
+            .app
+            .clone()
+            .oneshot(request.body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+    assert_eq!(
+        get(
+            &f.app,
+            &f.owner,
+            &format!("/api/v1/proposals/{}", f.proposal),
+            true
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+}

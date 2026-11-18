@@ -1857,3 +1857,16 @@ Checkboxes represent verified work only.
   workflows passed. Definitive provider rejection/negative-proof resolution,
   external closed/merged PR synchronization, transport correction, required checks
   and all remaining review, merge, bundle and operational requirements stay open.
+
+- Required review-policy calculation: a pure domain evaluator now computes
+  pending/failure/success for the exact current snapshot, refs and policy. It
+  reuses independent qualified approval rules, requires every extra mandatory
+  reviewer and rejects ambiguous current authority/decision evidence. Explicit
+  unknown/pending/failed/passed states cover base update, content/media validation,
+  mandatory section coverage, blocking discussions and product questions. Eight
+  new cases cover all gates, stale refs/policy, revocation, self/foreign approval,
+  extra reviewers, duplicate evidence and proposal lifecycle. All 15 domain tests
+  pass; workspace Clippy and formatting pass. Provider publication, current-evidence readers, persisted official reviews,
+  section coverage and blocker workflows still need integration; this evaluator
+  is not advertised as runtime check enforcement or merge authorization. The full
+  remaining specification stays active.

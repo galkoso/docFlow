@@ -1,7 +1,8 @@
+import { COMPARISON_BODY_API } from '../../core/api/comparison-body-api';
 import { inject, Injectable, OnDestroy, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subscription, timeout } from 'rxjs';
-import { ComparisonApi, EventCursor, ReadableUnitResponse } from '../../core/api/comparison-api';
+import { EventCursor, ReadableUnitResponse } from '../../core/api/comparison-api';
 import type { RenderEvent } from '../specification/render-model';
 import { scopeKey, unitIdentity, validUnit } from './readable-evidence';
 import { stackIdentity, UnitScope, validUnitResponse } from './readable-window';
@@ -10,7 +11,7 @@ import { stackIdentity, UnitScope, validUnitResponse } from './readable-window';
  * source, container state and subscriptions never survive a scope change. */
 @Injectable()
 export class ReadableUnitState implements OnDestroy {
-  private readonly api = inject(ComparisonApi);
+  private readonly api = inject(COMPARISON_BODY_API);
   private scope: UnitScope | null = null;
   private readonly key = signal('');
   private generation = 0;

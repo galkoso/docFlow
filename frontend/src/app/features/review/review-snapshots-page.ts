@@ -5,11 +5,13 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { SessionState } from '../../core/auth/session-state';
 import { stateLabel } from '../proposals/proposal-labels';
 import { ReviewSubmission } from './review-submission';
+import { SharedReviewBody } from './shared-review-body';
+import type { RawScope } from '../comparison/raw-state';
 import { SharedReviewState } from './shared-review-state';
 import { reviewLocation, type ReviewPageLocation } from './review-location';
 
 @Component({
-  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe], providers: [ReviewSubmission, SharedReviewState],
+  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody], providers: [ReviewSubmission, SharedReviewState],
   changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './review-snapshots-page.html', styleUrl: './review-snapshots-page.css',
 })
 export class ReviewSnapshotsPage implements OnDestroy {
@@ -37,6 +39,13 @@ export class ReviewSnapshotsPage implements OnDestroy {
     return !!result && !!snapshot && result.snapshot_id === snapshot.snapshot_id
       && (result.fingerprint !== snapshot.fingerprint || result.evidence_digest !== snapshot.evidence_digest);
   });
+  readonly selectedFile = computed(() => this.state.files()?.files.find(file => file.id === this.location()?.file) ?? null);
+  readonly fileScope = computed<RawScope | null>(() => {
+    const actor = this.session.profile()?.user_id, snapshot = this.state.snapshot(), file = this.selectedFile(), proposal = this.proposal();
+    if (!this.visible() || this.mismatched() || this.state.phase() !== 'ready' || !actor || !proposal || !snapshot || !file) return null;
+    const summary = snapshot.metadata.summary;
+    return { actor, proposal, snapshot: snapshot.snapshot_id, content: summary.comparison_content_id, head: summary.head_sha, base: summary.merge_base_sha, file };
+  });
   readonly stateLabel = stateLabel;
   private readonly releaseLogout = this.session.guardLogout(() => this.canLeave());
   constructor() {
@@ -57,7 +66,7 @@ export class ReviewSnapshotsPage implements OnDestroy {
         if (!actor || actor !== this.submission.owner() || this.blocked()) return;
         const key = result ? `${result.job_id}:${result.snapshot_id}` : '';
         if (result && this.applied !== key) {
-          this.applied = key; this.navigate({ job: result.job_id, snapshot: result.snapshot_id, files: null, media: null }, true);
+          this.applied = key; this.navigate({ job: result.job_id, snapshot: result.snapshot_id, files: null, media: null, file: null, mode: null, unit: null }, true);
         } else if (job && this.query().get('job') !== job) this.navigate({ job }, true);
       });
     });
@@ -111,8 +120,14 @@ export class ReviewSnapshotsPage implements OnDestroy {
   private ownsSubmission(): boolean {
     return !this.blocked() && !!this.session.profile() && this.session.profile()?.user_id === this.submission.owner();
   }
-  select(snapshot: string): void { this.navigate({ snapshot, files: null, media: null }); }
-  filePage(offset: number): void { this.navigate({ snapshot: this.state.selected(), files: offset }); }
+  select(snapshot: string): void { this.navigate({ snapshot, files: null, media: null, file: null, mode: null, unit: null }); }
+  filePage(offset: number): void { this.navigate({ snapshot: this.state.selected(), files: offset, file: null, mode: null, unit: null }); }
+  selectFile(file: string): void {
+    if (this.visible() && this.state.files()?.files.some(item => item.id === file)) this.navigate({ snapshot: this.state.selected(), file, mode: null, unit: null });
+  }
+  setMode(mode: 'raw' | 'readable'): void { if (this.fileScope()) this.navigate({ mode, unit: null }); }
+  selectUnit(unit: string | null): void { if (this.fileScope()) this.navigate({ unit }); }
+  bodyDenied(): void { this.blocked.set(true); this.state.clear(); this.routeKey = ''; }
   mediaPage(offset: number): void { this.navigate({ snapshot: this.state.selected(), media: offset }); }
   historyPage(after: string | null): void { this.navigate({ after }); }
   previous(offset: number): number { return Math.max(0, offset - 50); }

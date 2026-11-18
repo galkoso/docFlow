@@ -1582,3 +1582,21 @@ Checkboxes represent verified work only.
   excluded), workspace Clippy, the frontend build and all 279 frontend tests.
   Shared body UI, PR/checks, decisions/discussions, approvals and all remaining
   specification work remain open.
+
+
+- Shared snapshot content frontend: validated manifest files now open shared raw,
+  readable-unit and image comparisons. A page-local transport reuses the existing
+  bounded controllers while private comparison pages retain their original API.
+  Snapshot/file/mode/unit coordinates survive URLs and browser navigation; file or
+  snapshot page changes clear dependent selection. Actor and complete immutable
+  source evidence gate display, including immediate hiding of prior-file raw
+  output. Mid-read denials clear the entire snapshot until explicit reload;
+  identity/route/destruction cancel requests and revoke image URLs. Raw markup
+  stays inert and before/after changes have text labels. Twenty-six new tests
+  cover transport scope, strict URLs, shared renderer/event/image wiring, malformed
+  evidence, cancellation, account changes, denial/reload and stale-file display.
+  All 305 frontend tests across 40 files and the production build pass. Both CI
+  workflows for the preceding HTTP commit passed. No browser is available for
+  physical keyboard, visual RTL or 320px verification. Shared inline referenced
+  images remain alt-text placeholders; PR/checks, decisions/discussions, approvals,
+  merge, bundles and all remaining specification work remain open.

@@ -1,7 +1,8 @@
+import { COMPARISON_BODY_API } from '../../core/api/comparison-body-api';
 import { inject, Injectable, OnDestroy, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subscription, timeout } from 'rxjs';
-import { ComparisonApi, ComparisonChange, RawCursor, RawFileResponse } from '../../core/api/comparison-api';
+import { ComparisonChange, RawCursor, RawFileResponse } from '../../core/api/comparison-api';
 import { changeIdentity, digest, integer, sha, uuid, validChange } from './comparison-evidence';
 
 export interface RawScope { actor: string; proposal: string; snapshot: string; content: string; head: string; base: string; file: ComparisonChange; }
@@ -59,7 +60,7 @@ function valid(response: RawFileResponse, scope: RawScope, cursor: RawCursor): b
  * coordinates only; a selection/identity change destroys source and requests. */
 @Injectable()
 export class RawState implements OnDestroy {
-  private readonly api = inject(ComparisonApi);
+  private readonly api = inject(COMPARISON_BODY_API);
   private scope: RawScope | null = null;
   private key = '';
   private generation = 0;

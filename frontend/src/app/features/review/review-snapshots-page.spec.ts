@@ -116,4 +116,33 @@ describe('Review snapshots page', () => {
     http.expectNone(req => req.method === 'POST'); expect(page.submission.pending()).toBe(false);
     harness.detectChanges(); await settle(); expect(page.blocked()).toBe(true); expect(page.submission.context()).toBeNull(); http.verify();
   });
+  it('restores a shared raw file URL and changes modes without reloading immutable metadata; navigation cancels source reads', async () => {
+    const file = files().files[0].id, query = `?snapshot=${snapshot}&file=${file}&mode=raw`;
+    const { page, http, load, router, settle } = await create(query); load(); await settle();
+    const path = `${snapshots}/${snapshot}/files/${file}`, raw = http.expectOne(req => req.url === `${path}/raw`);
+    expect(raw.request.headers.get('X-Expected-Actor')).toBe(actor); expect(page.fileScope()?.snapshot).toBe(snapshot);
+    raw.flush({}, { status: 503, statusText: 'Unavailable' }); await settle(); expect(page.state.snapshot()).not.toBeNull();
+    page.setMode('readable'); await settle(); const readable = http.expectOne(req => req.url === `${path}/readable`);
+    expect(router.url).toContain('mode=readable'); http.expectNone(req => req.url === snapshots);
+    await router.navigateByUrl(`${route}${query}`); await settle(); expect(readable.cancelled).toBe(true);
+    const restored = http.expectOne(req => req.url === `${path}/raw`);
+    await router.navigateByUrl('/away'); await settle(); expect(restored.cancelled).toBe(true); http.verify();
+  });
+  it('purges the snapshot and body on denied source access and recreates authority only after explicit reload', async () => {
+    const file = files().files[0].id;
+    const { page, harness, http, load, settle } = await create(`?snapshot=${snapshot}&file=${file}&mode=raw`); load(); await settle();
+    const path = `${snapshots}/${snapshot}/files/${file}/raw`;
+    http.expectOne(req => req.url === path).flush({}, { status: 403, statusText: 'Denied' }); await settle();
+    expect(page.blocked()).toBe(true); expect(page.state.snapshot()).toBeNull(); expect(page.fileScope()).toBeNull();
+    expect(harness.routeNativeElement!.querySelector('app-shared-review-body')).toBeNull(); http.expectNone(() => true);
+    page.reload(); load(); await settle(); expect(page.blocked()).toBe(false);
+    http.expectOne(req => req.url === path).flush({}, { status: 503, statusText: 'Unavailable' }); await settle(); http.verify();
+  });
+  it('does not fetch source for an unknown file or a queued file click after an account switch', async () => {
+    const { page, http, profile, load, settle } = await create(`?snapshot=${snapshot}&file=${'9'.repeat(64)}`); load(); await settle();
+    expect(page.fileScope()).toBeNull(); http.expectNone(req => req.url.includes('/readable') || req.url.includes('/raw'));
+    profile.set({ user_id: other }); page.selectFile(files().files[0].id); await settle();
+    expect(page.blocked()).toBe(true); http.expectNone(() => true); http.verify();
+  });
+
 });

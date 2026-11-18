@@ -1,7 +1,8 @@
+import { COMPARISON_BODY_API } from '../../core/api/comparison-body-api';
 import { inject, Injectable, InjectionToken, OnDestroy, signal } from '@angular/core';
 import { HttpErrorResponse, HttpResponse } from '@angular/common/http';
 import { Subscription, timeout } from 'rxjs';
-import { ComparisonApi, ImageEvidence, ImageSide } from '../../core/api/comparison-api';
+import { ImageEvidence, ImageSide } from '../../core/api/comparison-api';
 import { changeIdentity, digest, integer, sha, uuid, validChange } from './comparison-evidence';
 import type { RawScope } from './raw-state';
 
@@ -37,7 +38,7 @@ function evidence(response: HttpResponse<Blob>, scope: ImageScope): ImageEvidenc
  * and are revoked on replacement, retry, failure, scope loss and destruction. */
 @Injectable()
 export class ImageState implements OnDestroy {
-  private readonly api = inject(ComparisonApi);
+  private readonly api = inject(COMPARISON_BODY_API);
   private readonly hash = inject(IMAGE_DIGEST);
   private scope: ImageScope | null = null;
   private readonly key = signal('');

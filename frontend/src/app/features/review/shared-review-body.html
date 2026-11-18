@@ -1,0 +1,32 @@
+@if (active(); as scope) {
+  @if (scope.file.kind === 'asset') {<app-comparison-image [scope]="scope" />}
+  @else if (scope.file.kind === 'document' || scope.file.kind === 'catalog') {
+    <div class="actions" role="group" aria-label="תצוגת ההשוואה">
+      <button (click)="setMode('readable')" [attr.aria-pressed]="mode() === 'readable'">השוואה קריאה</button>
+      <button (click)="setMode('raw')" [attr.aria-pressed]="mode() === 'raw'">מקור גולמי</button>
+    </div>
+    @if (mode() === 'readable') {
+      <app-readable-view [scope]="scope" [row]="row()" (rowSelected)="selectRow($event)" (rawRequested)="setMode('raw')" />
+      <p>תמונות בתוך הטקסט מוצגות כתיאור חלופי. תמונות שהשתנו נפתחות מרשימת הקבצים להשוואה מאומתת.</p>
+    } @else {
+      <section class="raw" aria-label="השוואת מקור"><h2>מקור גולמי — <bdi>{{ scope.file.after?.path ?? scope.file.before?.path }}</bdi></h2>
+        @if (raw.busy()) {<p role="status">טוענים מקטע מקור…</p>}
+        @if (raw.error()) {<p role="alert">{{ raw.error() }}</p><button (click)="move('retry')" [disabled]="raw.busy() || raw.authRequired()">בדיקה נוספת של המקטע</button>}
+        @if (rawView(); as view) {
+          @if (!view.raw.detailed) {<p>מוצגת החלפה רחבה של המקור. כל התוכן נגיש באמצעות המקטעים.</p>}
+          <label><input type="checkbox" [checked]="showEqual()" (change)="showEqual.set(!showEqual())">הצגת תוכן זהה</label>
+          <div class="pair headings"><h3>לפני — לקריאה בלבד {{ scope.file.before ? '' : '(לא קיים)' }}</h3><h3>אחרי {{ scope.file.after ? '' : '(לא קיים)' }}</h3></div>
+          @for (segment of segments(); track $index) {
+            <div class="pair" [class.removed]="segment.kind === 'delete'" [class.added]="segment.kind === 'insert'">
+              <div><span class="side-label">לפני — לקריאה בלבד</span><span class="marker">{{ segment.kind === 'delete' ? '− הוסר' : segment.kind === 'equal' ? '= זהה' : '' }}</span><small>שורה {{ segment.old_start_line }} · בית {{ segment.old_start_byte }}</small><pre dir="auto" tabindex="0" aria-label="מקור לפני">{{ segment.old_text }}</pre></div>
+              <div><span class="side-label">אחרי</span><span class="marker">{{ segment.kind === 'insert' ? '+ נוסף' : segment.kind === 'equal' ? '= זהה' : '' }}</span><small>שורה {{ segment.new_start_line }} · בית {{ segment.new_start_byte }}</small><pre dir="auto" tabindex="0" aria-label="מקור אחרי">{{ segment.new_text }}</pre></div>
+            </div>
+          }
+          @if (!view.raw.segments.length) {<p>אין תוכן טקסט במקטע זה.</p>}
+          <div class="actions"><button (click)="move('back')" [disabled]="raw.busy() || !raw.canBack()">המקטע הקודם</button>
+            <button (click)="move('next')" [disabled]="raw.busy() || !view.raw.next">המקטע הבא</button></div>
+        }
+      </section>
+    }
+  } @else {<p>סוג קובץ זה אינו נתמך בתצוגת ההשוואה. פרטי השינוי נשמרו ברשימת הקבצים.</p>}
+}

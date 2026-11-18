@@ -70,15 +70,20 @@
         }</ul>
         @if (snapshot.metadata.validation.findings_truncated) {<p>הרשימה מקוצרת. הספירה כוללת את כל הממצאים.</p>}
         @if (state.files(); as files) {
-          <h3>קבצים שהשתנו — {{ files.total }}</h3><p>הרשימה מתייחסת לגרסה המוצגת. תצוגת השוואה משותפת מלאה תתווסף בהמשך.</p>
+          <h3>קבצים שהשתנו — {{ files.total }}</h3><p>יש לבחור קובץ להשוואה בגרסה המוצגת.</p>
           <ul class="files">@for (file of files.files; track file.id) {
             <li><strong>{{ kind(file.kind) }} · {{ change(file.status) }}</strong>
               @if (file.before) {<p>לפני: <bdi>{{ file.before.path }}</bdi></p>}
-              @if (file.after) {<p>אחרי: <bdi>{{ file.after.path }}</bdi></p>}</li>
+              @if (file.after) {<p>אחרי: <bdi>{{ file.after.path }}</bdi></p>}
+              <button (click)="selectFile(file.id)" [attr.aria-pressed]="selectedFile()?.id === file.id">השוואת הקובץ <bdi>{{ file.after?.path ?? file.before?.path }}</bdi></button></li>
           }</ul>
           <div class="pages">@if (files.offset) {<button (click)="filePage(previous(files.offset))">קבצים קודמים</button>}
             @if (files.next_offset != null) {<button (click)="filePage(files.next_offset)">קבצים נוספים</button>}</div>
         }
+        @if (fileScope(); as scope) {
+          <app-shared-review-body [scope]="scope" [mode]="location()?.mode ?? 'readable'" [row]="location()?.unit ?? null"
+            (modeSelected)="setMode($event)" (rowSelected)="selectUnit($event)" (accessDenied)="bodyDenied()" />
+        } @else if (location()?.file) {<p role="alert">הקובץ שנבחר אינו בעמוד הקבצים המוצג. יש לבחור קובץ מהרשימה.</p>}
         @if (state.media(); as media) {
           <h3>תמונות שנבדקו — {{ media.total }}</h3>
           @if (!media.total) {<p>אין תמונות שנדרשו לבדיקה בגרסה זו.</p>}

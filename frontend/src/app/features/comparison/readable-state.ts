@@ -1,7 +1,8 @@
+import { COMPARISON_BODY_API } from '../../core/api/comparison-body-api';
 import { inject, Injectable, OnDestroy, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subscription, timeout } from 'rxjs';
-import { ComparisonApi, ReadableFileResponse, ReadableRow } from '../../core/api/comparison-api';
+import { ReadableFileResponse, ReadableRow } from '../../core/api/comparison-api';
 import { digest, integer } from './comparison-evidence';
 import { pageIdentity, rowIdentity, scopeKey, validPage } from './readable-evidence';
 import type { RawScope } from './raw-state';
@@ -10,7 +11,7 @@ import type { RawScope } from './raw-state';
  * separate, bounded side controllers and never accumulate in this inventory. */
 @Injectable()
 export class ReadableState implements OnDestroy {
-  private readonly api = inject(ComparisonApi);
+  private readonly api = inject(COMPARISON_BODY_API);
   private scope: RawScope | null = null;
   private readonly key = signal('');
   private generation = 0;

@@ -1,0 +1,11 @@
+:host{display:block;direction:rtl;min-width:0;margin-block:1.5rem}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;margin:1rem 0}
+button{cursor:pointer;min-height:44px;padding:.5rem .8rem}button:disabled{cursor:default;opacity:.55}
+button:focus-visible,input:focus-visible,pre:focus-visible{outline:3px solid #275b9b;outline-offset:3px}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);direction:rtl;gap:1px;background:#c3cbd5}
+.pair>div,.headings>h3{min-width:0;background:#fff;padding:.5rem;margin:0}
+.pair.removed>div:first-child{background:#fff0ef}.pair.added>div:last-child{background:#eafaef}
+.marker{font-size:.8rem;font-weight:700}.side-label{display:none}small{display:block;font-size:.75rem}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;unicode-bidi:plaintext;tab-size:4;margin:.4rem 0;max-height:32rem;overflow:auto}
+.raw{border:1px solid #c3cbd5;padding:1rem}bdi{overflow-wrap:anywhere}
+@media(max-width:650px){.pair{grid-template-columns:1fr;gap:.4rem}.headings{display:none}.side-label{display:block;font-weight:700}}

@@ -320,8 +320,7 @@ their existing bounds, safe fallback states, capacity and provider backoff.
 Current authority is checked again after rendering before publishing any response.
 Image bodies contain only verified PNG pixels, with `X-Comparison-Image` binding
 the actor, frozen source, side and display hash. Responses are `no-store`.
-OpenAPI and the generated client describe all four shared operations. Shared body
-frontend integration remains pending.
+OpenAPI and the generated client describe all four shared operations.
 
 ## Submission and shared snapshot frontend
 
@@ -330,8 +329,8 @@ configuration. Opening it performs only shared database reads. History now carri
 the current proposal number/title/branch/target, so even empty or historical views
 retain branch identity without Git IO. The page displays frozen head/target/base,
 description, UI-impact decision, content findings, complete paged file descriptors
-and verified image metadata. It links to commit-pinned book views; shared raw,
-readable and image-body comparison rendering is still pending. Snapshot availability
+and verified image metadata. It links to commit-pinned book views and shared raw,
+readable and image-body comparisons. Snapshot availability
 is explicitly separate from PR/checks, approval and publication through merge.
 
 Editors explicitly check the saved version before submitting. Preflight combines
@@ -353,8 +352,11 @@ version before the page reports snapshot completion. A job restored from `job=`
 uses authenticated observation only and has no reconstructed body or retry key.
 Its result is validated against the requested job/proposal before shared reading.
 
-The URL preserves proposal, selected `snapshot`, file/media offsets, history cursor
-and accepted private job ID. Unknown/duplicate parameters and out-of-range offsets
+The URL preserves proposal, selected `snapshot`, file/media offsets, history cursor,
+selected `file`, raw/readable `mode`, paired readable `unit` and accepted private job ID.
+File selection requires an explicit snapshot and a file from the displayed manifest
+page; changing file pages or snapshots clears file/unit selection. Unknown/duplicate
+parameters and out-of-range offsets
 are rejected. Shared history preserves microsecond UTC ordering. Header, history,
 file/media counts, identities, content findings and receipt hashes/dimensions must
 agree before a complete page is installed. There is no partial mixed-snapshot
@@ -366,6 +368,23 @@ displayed evidence; explicit reload drops the denied job URL and reads shared
 history afresh. Mutation event handlers check the current profile synchronously,
 including queued clicks before reactive cleanup. Route exit, logout and unload
 guard pending work. Private intent is kept in page memory only.
+
+Shared body components provide a page-local transport for the existing bounded
+raw/readable/image controllers. Private comparison pages retain their original
+transport and authority. Shared responses must match actor, proposal, snapshot,
+content identity, pinned head/base and full file evidence before display. Raw
+source remains escaped text with explicit before/after and addition/removal labels;
+readable units retain safe AST events, raw fallback and bounded pagination. Image
+proof and body hashes are checked before an object URL is created; replacement,
+identity loss and destruction revoke it. Input changes hide prior-file raw output
+immediately, before the new read completes. All source stays in page memory.
+
+A body access denial clears the displayed snapshot and requires an explicit reload;
+source backoff retains safe retry for the same immutable selection. Source requests
+are cancelled on selection, route, identity or component changes. Shared readable
+inline images currently remain alt-text placeholders; changed image files use the
+sealed shared image endpoint. Displaying unchanged/referenced images inline under
+shared snapshot media authority remains open.
 
 Native labelled controls, RTL/LTR isolation, wrapping layouts and 44px button
 heights support keyboard and narrow-screen use. Component/router tests verify

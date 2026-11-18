@@ -8,7 +8,7 @@ import { SessionState } from '../../core/auth/session-state';
 import { ReviewSnapshotsPage } from './review-snapshots-page';
 import { reviewSnapshotExit } from './review-snapshot-exit';
 import { actor, proposal, snapshot, other, configuration, detail, history, metadata, files, media,
-  ticket, publication, job } from '../../../testing/review-fixtures';
+  ticket, publication, job, prStatus } from '../../../testing/review-fixtures';
 
 @Component({ template: '<p>Elsewhere</p>' })
 class Away {}
@@ -35,6 +35,7 @@ describe('Review snapshots page', () => {
       http.expectOne(`${snapshots}/${snapshot}`).flush(body);
       http.expectOne(req => req.url === `${snapshots}/${snapshot}/files`).flush(files());
       http.expectOne(req => req.url === `${snapshots}/${snapshot}/media`).flush(media()); harness.detectChanges();
+      http.expectOne(`${snapshots}/${snapshot}/pr-sync`).flush(prStatus()); harness.detectChanges();
     };
     const prepare = () => { page.prepare(); http.expectOne(`${root}/review/configuration`).flush(configuration()); http.expectOne(root).flush(detail()); harness.detectChanges(); };
     return { harness, page, http, router, profile, logoutEpoch, released, guard: () => guard(), settle, load, prepare };
@@ -54,6 +55,15 @@ describe('Review snapshots page', () => {
     expect(page.submission.pending()).toBe(false); expect(router.url).toContain(`job=${ticket.job_id}`);
     expect(element.textContent).toContain('גרסה משותפת נשמרה לסקירה'); expect(element.textContent).toContain('פרסום באפיון המאושר דורש מיזוג');
     expect([...element.querySelectorAll('button')].some(button => button.textContent?.trim() === 'אישור')).toBe(false); http.verify();
+  });
+  it('purges the shared snapshot and body when PR status reports lost access', async () => {
+    const { harness, page, http, load, settle } = await create(); load(); await settle();
+    const refresh = [...harness.routeNativeElement!.querySelectorAll('button')].find(button => button.textContent?.trim() === 'עדכון מצב העבודה')!;
+    refresh.click(); harness.detectChanges();
+    http.expectOne(`${snapshots}/${snapshot}/pr-sync`).flush({ error: { code: 'NOT_FOUND' } }, { status: 404, statusText: 'Not Found' });
+    await settle(); expect(page.blocked()).toBe(true); expect(page.state.snapshot()).toBeNull();
+    expect(harness.routeNativeElement!.querySelector('app-shared-review-body')).toBeNull();
+    expect(harness.routeNativeElement!.querySelector('app-review-pr-status')).toBeNull(); http.verify();
   });
   it('restores a job URL through observation only, never reconstructing a submission', async () => {
     const { page, http, load, settle } = await create(`?snapshot=${snapshot}&job=${ticket.job_id}`); load();

@@ -1,0 +1,22 @@
+<section aria-label="סנכרון PR">
+  <h3>סנכרון בקשת המיזוג</h3>
+  @if (busy()) {<p role="status">טוענים מצב עבודה שנשמר באתר…</p>}
+  @if (error(); as message) {<p role="alert">{{ message }}</p>}
+  @if (view(); as status) {
+    <p role="status">{{ phase(status) }}</p>
+    @if (reason(status); as explanation) {<p>{{ explanation }}</p>}
+    @if (!status.current_for_sync) {<p>גרסה זו אינה תואמת כעת למצב ההצעה שנדרש לסנכרון.</p>}
+    @if (status.uncertain_write) {<p>ייתכן שתוצאת פעולה קודמת עדיין בבירור. גרסת הסקירה השמורה נשארת זמינה באתר.</p>}
+    @if (status.sync?.phase === 'RECONCILING' && !status.sync!.automatic) {<p>הבדיקה האוטומטית נעצרה. נדרשת בדיקת מנהל מערכת.</p>}
+    @if (status.sync?.next_attempt_at ?? status.dispatch.next_attempt_at; as next) {<p>ניסיון נוסף מתוכנן: {{ next | date:'dd/MM/yyyy HH:mm:ss' }}</p>}
+    @if (status.pr; as pr) {
+      <p><a [href]="pr.url" target="_blank" rel="noopener noreferrer">פתיחת PR <bdi>#{{ pr.number }}</bdi> ב־GitHub</a></p>
+      @if (pr.snapshot_id !== status.snapshot_id) {<p>תיעוד ה־PR האחרון שייך לגרסת סקירה אחרת של ההצעה.</p>}
+      @if (pr.superseded) {<p>התיעוד נשמר לאחר שמצב ההצעה השתנה.</p>}
+      <p>תוצאת ספק אחרונה שנשמרה: {{ pr.recorded_at | date:'dd/MM/yyyy HH:mm:ss' }}. פתיחה ב־GitHub דורשת גישה נפרדת למאגר.</p>
+    }
+    <p class="muted">מצב העבודה נקרא מהאתר ב־{{ status.read_at | date:'dd/MM/yyyy HH:mm:ss' }}.</p>
+  }
+  <p>התצוגה מבוססת על תיעוד שנשמר. מצב הענפים, האישורים וכשירות המיזוג נבדקים בנפרד.</p>
+  <button type="button" (click)="refresh()" [disabled]="busy()">עדכון מצב העבודה</button>
+</section>

@@ -1823,3 +1823,18 @@ Checkboxes represent verified work only.
   and one dispatcher. Both workflows for the preceding dispatcher commit passed.
   Explicit recovery, required checks, decisions/discussions, approvals, merge,
   bundles and all other unfinished full-spec requirements remain open.
+
+- PR status in shared review: the selected snapshot now shows queued/observed/
+  retry/failure/reconciliation phases, planned retries and a validated GitHub link.
+  Stored observation time and site read time are distinct; historical observations
+  and uncertain writes remain explicit, with no implied approval or merge readiness.
+  Refresh and bounded pending-work polling use GET only. Status outages preserve
+  the saved review; scoped denial purges the parent snapshot/body. Generation,
+  live actor and logout checks discard late responses and hide links immediately.
+  Client validation binds snapshot/ref/fingerprint evidence, bounds decimal provider
+  identity and rejects unsafe/mismatched URLs before rendering a link. All 396
+  frontend tests pass across 46 files, including evidence, async scope, polling,
+  local failure and parent denial cases; the production build passes without
+  warnings. Browser verification could not run because no browser is connected;
+  physical keyboard, RTL and 320px acceptance remain open. Explicit PR recovery,
+  required checks and every remaining full-spec requirement remain pending.

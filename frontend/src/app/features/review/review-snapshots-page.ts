@@ -6,12 +6,13 @@ import { SessionState } from '../../core/auth/session-state';
 import { stateLabel } from '../proposals/proposal-labels';
 import { ReviewSubmission } from './review-submission';
 import { SharedReviewBody } from './shared-review-body';
+import { ReviewPrStatusView } from './review-pr-status';
 import type { RawScope } from '../comparison/raw-state';
 import { SharedReviewState } from './shared-review-state';
 import { reviewLocation, type ReviewPageLocation } from './review-location';
 
 @Component({
-  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody], providers: [ReviewSubmission, SharedReviewState],
+  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody, ReviewPrStatusView], providers: [ReviewSubmission, SharedReviewState],
   changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './review-snapshots-page.html', styleUrl: './review-snapshots-page.css',
 })
 export class ReviewSnapshotsPage implements OnDestroy {

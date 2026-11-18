@@ -1,6 +1,12 @@
 import type { ReviewConfiguration } from '../app/core/api/review-configuration-api';
 import type { ReviewAccepted, ReviewDetail, ReviewFiles, ReviewHistory, ReviewJob, ReviewMedia,
-  ReviewPublication, ReviewSnapshot } from '../app/core/api/review-api';
+  ReviewPublication, ReviewSnapshot, ReviewPrStatus } from '../app/core/api/review-api';
+
+export const prStatus = (): ReviewPrStatus => ({ proposal_id: proposal, snapshot_id: snapshot, fingerprint: metadata().fingerprint,
+  head_sha: head, target_sha: target, current_for_sync: true, binding_current: true, read_at: '2026-11-18T00:00:01Z',
+  dispatch: { phase: 'ENQUEUED' }, sync: { phase: 'OBSERVED_SYNCED', automatic: false }, uncertain_write: false,
+  pr: { number: '9', url: 'https://github.com/synthetic/specs/pull/9', snapshot_id: snapshot, head_sha: head, target_sha: target,
+    recorded_at: '2026-11-18T00:00:00.123456Z', superseded: false } });
 
 export const proposal = '00000000-0000-4000-8000-000000000001', actor = '00000000-0000-4000-8000-000000000004';
 export const product = '00000000-0000-4000-8000-000000000010', development = '00000000-0000-4000-8000-000000000020';

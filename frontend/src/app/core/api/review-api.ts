@@ -10,6 +10,7 @@ export type ReviewSnapshot = components['schemas']['ReviewSnapshot'];
 export type ReviewHistory = components['schemas']['ReviewSnapshotHistory'];
 export type ReviewFiles = components['schemas']['ReviewSnapshotFiles'];
 export type ReviewMedia = components['schemas']['ReviewSnapshotMedia'];
+export type ReviewPrStatus = components['schemas']['ReviewPrStatus'];
 export type ReviewDetail = components['schemas']['ProposalDetail'];
 
 @Injectable({ providedIn: 'root' })
@@ -33,6 +34,9 @@ export class ReviewApi {
     return this.http.get<ReviewFiles>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/files`, {
       headers: this.actor(actor), params: { offset, limit: 50 },
     });
+  }
+  prStatus(actor: string, proposal: string, snapshot: string) {
+    return this.http.get<ReviewPrStatus>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/pr-sync`, { headers: this.actor(actor) });
   }
   media(actor: string, proposal: string, snapshot: string, offset = 0) {
     return this.http.get<ReviewMedia>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/media`, {

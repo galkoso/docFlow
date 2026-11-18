@@ -632,6 +632,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalReviewPrStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/specification": {
         parameters: {
             query?: never;
@@ -1557,6 +1573,54 @@ export interface components {
             display_width: number;
             path: string;
             source_sha256: string;
+        };
+        /** @enum {string} */
+        ReviewPrDispatchPhase: "AWAITING" | "WAITING" | "ENQUEUED" | "SKIPPED" | "REJECTED" | "UNTRACKED";
+        ReviewPrDispatchStatus: {
+            next_attempt_at?: string | null;
+            phase: components["schemas"]["ReviewPrDispatchPhase"];
+            reason?: components["schemas"]["ReviewPrReason"] | null;
+        };
+        ReviewPrObservation: {
+            head_sha: string;
+            /** @description Decimal string avoids losing provider identity in JavaScript numbers. */
+            number: string;
+            /** @description Database receipt time, not the time of a new provider read by this GET. */
+            recorded_at: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            superseded: boolean;
+            target_sha: string;
+            url: string;
+        };
+        /** @enum {string} */
+        ReviewPrReason: "BUSY" | "QUOTA" | "AUTHORITY_REQUIRED" | "SETUP_REQUIRED" | "SOURCE_CHANGED" | "BINDING_CHANGED" | "INVALID_PUBLICATION" | "INVALID_PROJECTION" | "PROVIDER_UNAVAILABLE" | "PROVIDER_RATE_LIMIT" | "PROVIDER_REJECTED" | "CONFLICT" | "UNCERTAIN_RESULT" | "OBSERVATION_PENDING" | "OTHER";
+        ReviewPrStatus: {
+            binding_current: boolean;
+            /** @description Current DB metadata/editable state only; provider refs are not read here. */
+            current_for_sync: boolean;
+            dispatch: components["schemas"]["ReviewPrDispatchStatus"];
+            fingerprint: string;
+            head_sha: string;
+            pr?: components["schemas"]["ReviewPrObservation"] | null;
+            /** Format: uuid */
+            proposal_id: string;
+            read_at: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            sync?: components["schemas"]["ReviewPrSyncStatus"] | null;
+            target_sha: string;
+            /** @description Any unresolved started PR write for this proposal, including older work. */
+            uncertain_write: boolean;
+        };
+        /** @enum {string} */
+        ReviewPrSyncPhase: "QUEUED" | "OBSERVING" | "RETRY_WAIT" | "RECONCILING" | "OBSERVED_SYNCED" | "SUPERSEDED" | "FAILED";
+        ReviewPrSyncStatus: {
+            /** @description Planned automatic work, not proof that a worker/provider is available. */
+            automatic: boolean;
+            next_attempt_at?: string | null;
+            phase: components["schemas"]["ReviewPrSyncPhase"];
+            reason?: components["schemas"]["ReviewPrReason"] | null;
         };
         /** @description Durable snapshot outcome; PR synchronization and approvals are separate. */
         ReviewPublication: {
@@ -5125,6 +5189,78 @@ export interface operations {
                 };
             };
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalReviewPrStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewPrStatus"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

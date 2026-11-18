@@ -14,6 +14,7 @@ use serde::Deserialize;
 use specspace_application::{
     comparison_reader::ComparisonReadError,
     review_context::ReviewContextError,
+    review_pr_status::ReviewPrStatus,
     review_snapshot::{
         ReviewSnapshot, ReviewSnapshotFiles, ReviewSnapshotHistory, ReviewSnapshotMedia,
     },
@@ -22,7 +23,8 @@ use specspace_application::{
     },
 };
 use specspace_infrastructure::{
-    review_snapshots::SnapshotError, review_submissions::SubmissionError, sessions::SessionIdentity,
+    pr_sync::PrSyncStoreError, review_snapshots::SnapshotError,
+    review_submissions::SubmissionError, sessions::SessionIdentity,
 };
 use uuid::Uuid;
 pub fn routes() -> Router<AppState> {
@@ -46,6 +48,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/media",
             get(media),
+        )
+        .route(
+            "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync",
+            get(pr_status),
         )
 }
 #[derive(Deserialize, utoipa::IntoParams)]
@@ -284,6 +290,31 @@ pub(crate) async fn media(
     {
         Ok(page) => Json(page).into_response(),
         Err(error) => snapshot_failure(error),
+    }
+}
+#[utoipa::path(get,path="/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync",operation_id="proposalReviewPrStatus",security(("sessionCookie"=[])),
+    params(("proposal"=Uuid,Path),("snapshot"=Uuid,Path),("X-Expected-Actor"=Uuid,Header)),responses((status=200,body=ReviewPrStatus),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=403,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=503,body=ErrorBody)))]
+pub(crate) async fn pr_status(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<(Uuid, Uuid)>, axum::extract::rejection::PathRejection>,
+    query: Result<Query<NoQuery>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let actor = match actor(&state, &headers, false).await {
+        Ok(actor) => actor,
+        Err(error) => return error.into_response(),
+    };
+    let (Ok(Path((proposal, snapshot))), Ok(_)) = (path, query) else {
+        return proposals::invalid_query();
+    };
+    match state.pr_sync.status(actor, proposal, snapshot).await {
+        Ok(status) => Json(status).into_response(),
+        Err(PrSyncStoreError::Access(error)) => failure(error),
+        Err(_) => problem(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "PR_STATUS_UNAVAILABLE",
+            true,
+        ),
     }
 }
 fn snapshot_failure(error: SnapshotError) -> Response {

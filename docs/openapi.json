@@ -4947,6 +4947,113 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync": {
+      "get": {
+        "tags": [
+          "crate::reviews"
+        ],
+        "operationId": "proposalReviewPrStatus",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewPrStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/specification": {
       "get": {
         "tags": [
@@ -8980,6 +9087,218 @@
           }
         },
         "additionalProperties": false
+      },
+      "ReviewPrDispatchPhase": {
+        "type": "string",
+        "enum": [
+          "AWAITING",
+          "WAITING",
+          "ENQUEUED",
+          "SKIPPED",
+          "REJECTED",
+          "UNTRACKED"
+        ]
+      },
+      "ReviewPrDispatchStatus": {
+        "type": "object",
+        "required": [
+          "phase"
+        ],
+        "properties": {
+          "next_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "$ref": "#/components/schemas/ReviewPrDispatchPhase"
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewPrReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewPrObservation": {
+        "type": "object",
+        "required": [
+          "number",
+          "url",
+          "snapshot_id",
+          "head_sha",
+          "target_sha",
+          "recorded_at",
+          "superseded"
+        ],
+        "properties": {
+          "head_sha": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "description": "Decimal string avoids losing provider identity in JavaScript numbers."
+          },
+          "recorded_at": {
+            "type": "string",
+            "description": "Database receipt time, not the time of a new provider read by this GET."
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "superseded": {
+            "type": "boolean"
+          },
+          "target_sha": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewPrReason": {
+        "type": "string",
+        "enum": [
+          "BUSY",
+          "QUOTA",
+          "AUTHORITY_REQUIRED",
+          "SETUP_REQUIRED",
+          "SOURCE_CHANGED",
+          "BINDING_CHANGED",
+          "INVALID_PUBLICATION",
+          "INVALID_PROJECTION",
+          "PROVIDER_UNAVAILABLE",
+          "PROVIDER_RATE_LIMIT",
+          "PROVIDER_REJECTED",
+          "CONFLICT",
+          "UNCERTAIN_RESULT",
+          "OBSERVATION_PENDING",
+          "OTHER"
+        ]
+      },
+      "ReviewPrStatus": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "snapshot_id",
+          "fingerprint",
+          "head_sha",
+          "target_sha",
+          "current_for_sync",
+          "binding_current",
+          "read_at",
+          "dispatch",
+          "uncertain_write"
+        ],
+        "properties": {
+          "binding_current": {
+            "type": "boolean"
+          },
+          "current_for_sync": {
+            "type": "boolean",
+            "description": "Current DB metadata/editable state only; provider refs are not read here."
+          },
+          "dispatch": {
+            "$ref": "#/components/schemas/ReviewPrDispatchStatus"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "pr": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewPrObservation",
+                "description": "Last stored observation for this PR; it may refer to another snapshot."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "read_at": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sync": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewPrSyncStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_sha": {
+            "type": "string"
+          },
+          "uncertain_write": {
+            "type": "boolean",
+            "description": "Any unresolved started PR write for this proposal, including older work."
+          }
+        }
+      },
+      "ReviewPrSyncPhase": {
+        "type": "string",
+        "enum": [
+          "QUEUED",
+          "OBSERVING",
+          "RETRY_WAIT",
+          "RECONCILING",
+          "OBSERVED_SYNCED",
+          "SUPERSEDED",
+          "FAILED"
+        ]
+      },
+      "ReviewPrSyncStatus": {
+        "type": "object",
+        "required": [
+          "phase",
+          "automatic"
+        ],
+        "properties": {
+          "automatic": {
+            "type": "boolean",
+            "description": "Planned automatic work, not proof that a worker/provider is available."
+          },
+          "next_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "$ref": "#/components/schemas/ReviewPrSyncPhase"
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewPrReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "ReviewPublication": {
         "type": "object",

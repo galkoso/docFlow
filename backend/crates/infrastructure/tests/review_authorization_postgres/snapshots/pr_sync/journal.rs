@@ -1,4 +1,6 @@
 use super::*;
+#[path = "status.rs"]
+mod status;
 use specspace_application::pr_sync::{PrSyncDecision, PrWritePhase};
 use specspace_git_adapter::pull_requests::{PullRequest, PullRequestNumber, PullRequestState};
 use specspace_infrastructure::pr_sync::{PrSyncLease, PrSyncResolution};

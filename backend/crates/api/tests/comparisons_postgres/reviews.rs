@@ -147,6 +147,97 @@ async fn submit(
 fn history_path(f: &Fixture) -> String {
     format!("/api/v1/proposals/{}/review/snapshots", f.proposal)
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn pr_status_http_is_shared_scoped_read_only_evidence(pool: PgPool) {
+    let (f, reviewer, _) = configured(&pool, false).await;
+    let (_, snapshot) = publish(&f, 2).await;
+    let path = format!("{}/{snapshot}/pr-sync", history_path(&f));
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    for reader in [&f.owner, &f.actor, &reviewer] {
+        let response = get(&f.app, reader, &path, true).await;
+        assert_eq!(response.0, StatusCode::OK, "{}", response.1);
+        assert_eq!(response.1["proposal_id"], f.proposal.to_string());
+        assert_eq!(response.1["snapshot_id"], snapshot);
+        assert_eq!(response.1["dispatch"]["phase"], "AWAITING");
+        assert!(response.1["sync"].is_null() && response.1["pr"].is_null());
+        assert!(!response.1.to_string().contains("PRIVATE SOURCE SENTINEL"));
+    }
+    assert_eq!(
+        get(&f.app, &f.owner, &path, false).await.0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        get(&f.app, &f.owner, &format!("{path}?refresh=true"), true)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    let missing = format!("{}/{}/pr-sync", history_path(&f), Uuid::new_v4());
+    assert_eq!(
+        get(&f.app, &f.owner, &missing, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let foreign = fixture(&pool, true).await;
+    assert_eq!(
+        get(&f.app, &foreign.owner, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+    let intents: i64 = sqlx::query_scalar("SELECT count(*) FROM pr_sync_intents")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(intents, 0);
+    sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
+        .bind(f.owner.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&f.app, &f.owner, &path, true).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn pr_status_http_requires_session_and_expected_actor(pool: PgPool) {
+    let (f, _, _) = configured(&pool, false).await;
+    let (_, snapshot) = publish(&f, 2).await;
+    let path = format!("{}/{snapshot}/pr-sync", history_path(&f));
+    for cookie in [false, true] {
+        let mut request = Request::builder()
+            .uri(&path)
+            .header("X-Expected-Actor", f.actor.id.to_string());
+        if cookie {
+            request = request.header("Cookie", format!("specspace-session={}", f.owner.token));
+        }
+        let response = f
+            .app
+            .clone()
+            .oneshot(request.body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        assert_eq!(
+            response.status(),
+            if cookie {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::UNAUTHORIZED
+            }
+        );
+    }
+    sqlx::query("DELETE FROM memberships WHERE organization_id=$1 AND user_id=$2")
+        .bind(f.organization)
+        .bind(f.actor.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&f.app, &f.actor, &path, true).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+}
 async fn publish(f: &Fixture, version: i64) -> (Value, String) {
     let (status, ticket, location) =
         submit(f, &f.owner, version, &Uuid::new_v4().to_string()).await;

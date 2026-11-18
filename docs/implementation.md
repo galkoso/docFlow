@@ -1805,3 +1805,21 @@ Checkboxes represent verified work only.
   Explicit recovery after correction/rejection/exhaustion/revocation, status API/UI,
   required checks, decisions/discussions, approvals, merge, bundles and the full
   remaining security/operations and acceptance scope remain open.
+
+- Shared PR status API (migration 016): current organization readers can inspect
+  stored synchronization evidence for one exact READY snapshot without provider
+  calls, job mutations or private worker identifiers and payloads. One coherent
+  repeatable-read transaction separates latest publication transport, planned
+  work, proposal-wide unresolved writes and the last stored provider observation.
+  Resubmitting an identical snapshot selects the latest submission; observations
+  belonging to another snapshot stay explicit. Closed/superseded contexts cannot
+  claim current synchronization, and changed provider bindings hide PR links.
+  Safe reason enums and decimal PR numbers preserve privacy and browser identity.
+  Seven PostgreSQL cases and two HTTP cases verify these distinctions, current
+  access, actor headers, strict queries and absence of provider IO or new jobs.
+  All 546 backend tests pass with two existing performance measurements excluded;
+  Clippy and formatting pass. OpenAPI and the generated client are updated.
+  Migration 016 is applied locally; the restarted API is ready with one PR worker
+  and one dispatcher. Both workflows for the preceding dispatcher commit passed.
+  Explicit recovery, required checks, decisions/discussions, approvals, merge,
+  bundles and all other unfinished full-spec requirements remain open.

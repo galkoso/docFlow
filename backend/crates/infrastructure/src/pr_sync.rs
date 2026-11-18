@@ -19,6 +19,7 @@ use sqlx::{FromRow, PgConnection, PgPool};
 use uuid::Uuid;
 mod dispatch;
 mod journal;
+mod status;
 pub use dispatch::{PrDispatchWork, PrSyncDispatcher};
 pub use journal::{PrSyncLease, PrSyncObservation, PrSyncResolution};
 

@@ -454,7 +454,7 @@ struct HistoryRow {
     created_at: Timestamp,
     created_by: Uuid,
 }
-async fn read_access(
+pub(crate) async fn read_access(
     connection: &mut PgConnection,
     actor: Uuid,
     proposal: Uuid,

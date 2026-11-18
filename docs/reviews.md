@@ -289,6 +289,27 @@ OpenAPI and the generated TypeScript client describe these routes and read model
 Shared diff bodies, PR/check processing, discussion/decision APIs and approvals
 remain open.
 
+## Shared snapshot body authority
+
+The shared file authorization adapter resolves only sealed `READY` review
+snapshots and their immutable file manifests. It checks current active user and
+organization membership, including Readers, on every authorization boundary.
+An actor-private comparison snapshot or another organization's locator cannot
+substitute for a shared snapshot. Provider repository identity, installation and
+proposal branch must still match the frozen binding before any cached or uncached
+body is returned. Metadata history remains available independently of that body
+binding. Later head, target, policy or closure changes do not replace historical
+source commits.
+
+The existing verified file reader can fork authorization with a separate cache
+while sharing its two provider/CPU read permits. It rechecks current authority
+around IO, CPU processing and cache use. Shared after-image reads additionally
+require the published validation version, source/display hashes and dimensions to
+match the newly verified, metadata-free PNG derivative. A policy-version mismatch
+fails before fetching after-image bytes. Before images retain exact pinned-source
+verification. This is internal reader support; shared raw/readable/image HTTP and
+frontend wiring remain pending.
+
 ## Submission and shared snapshot frontend
 
 `/changes/:id/review/snapshots` is linked from proposal details and reviewer

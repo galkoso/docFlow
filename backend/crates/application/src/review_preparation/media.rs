@@ -9,7 +9,7 @@ use specspace_domain::RepositoryPath;
 use specspace_git_adapter::blob;
 use std::io::{self, BufWriter, Write};
 
-pub const MEDIA_VALIDATION_VERSION: u32 = 1;
+pub const MEDIA_VALIDATION_VERSION: u32 = media::VALIDATION_VERSION;
 
 #[derive(Serialize)]
 pub struct VerifiedMedia {

@@ -667,6 +667,7 @@ impl specspace_application::comparison_file::ComparisonFileAuthorization for PgC
                 .map_err(|_| ComparisonStoreError::InvalidSnapshot)?;
             if change.id != file { return Err(ComparisonStoreError::InvalidSnapshot); }
             let context = FileReadContext {
+                published_after_image: None,
                 scope,
                 snapshot,
                 content_id: summary.content_id,

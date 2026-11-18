@@ -110,9 +110,15 @@ fn same_evidence(a: &FileReadContext, b: &FileReadContext) -> bool {
         && a.merge_base == b.merge_base
         && a.head == b.head
         && a.change == b.change
+        && a.published_after_image == b.published_after_image
 }
 fn weight(context: &FileReadContext, text: &PreparedText) -> usize {
     let mut total = size_of::<Entry>() + size_of::<PreparedText>() + 2 * size_of::<usize>();
+    if let Some(proof) = &context.published_after_image {
+        total = total
+            .saturating_add(proof.source_sha256.capacity())
+            .saturating_add(proof.display_sha256.capacity());
+    }
     for source in [&text.before, &text.after].into_iter().flatten() {
         total = total.saturating_add(source.capacity());
     }

@@ -87,6 +87,50 @@ async fn load(f: &Fixture, side: ImageSide) -> Result<LoadedImage, FileReadError
         .await
 }
 #[tokio::test]
+async fn sealed_after_image_requires_matching_policy_source_display_hash_and_dimensions() {
+    let bytes = png();
+    let source = image_side(&bytes);
+    let display = media::display(&source.path, &bytes).unwrap();
+    let proof = PublishedImageEvidence {
+        validation_version: media::VALIDATION_VERSION,
+        source_sha256: format!("{:x}", Sha256::digest(&bytes)),
+        display_sha256: format!("{:x}", Sha256::digest(&display.png)),
+        width: display.width,
+        height: display.height,
+    };
+    let valid = fixture(true, bytes.clone());
+    valid
+        .authority
+        .context
+        .lock()
+        .unwrap()
+        .published_after_image = Some(proof.clone());
+    load(&valid, ImageSide::After).await.unwrap();
+    for fault in 0..6 {
+        let f = fixture(true, bytes.clone());
+        let mut changed = proof.clone();
+        match fault {
+            0 => changed.validation_version += 1,
+            1 => changed.source_sha256 = "0".repeat(64),
+            2 => changed.display_sha256 = "0".repeat(64),
+            3 => changed.width += 1,
+            4 => changed.height += 1,
+            _ => changed.validation_version = 0,
+        }
+        f.authority.context.lock().unwrap().published_after_image = Some(changed);
+        assert!(
+            matches!(
+                load(&f, ImageSide::After).await,
+                Err(FileReadError::InvalidEvidence)
+            ),
+            "fault {fault}"
+        );
+        if fault == 0 || fault == 5 {
+            assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 0);
+        }
+    }
+}
+#[tokio::test]
 async fn exact_snapshot_side_verifies_source_and_returns_only_bounded_reencoded_pixels() {
     for (added, side) in [(false, ImageSide::Before), (true, ImageSide::After)] {
         let mut source = png();

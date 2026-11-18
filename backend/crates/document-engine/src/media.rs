@@ -5,6 +5,8 @@ use sha2::{Digest, Sha256};
 use std::io::{Cursor, Write};
 
 pub const MAX_ASSET_BYTES: usize = 5 * 1024 * 1024;
+/// Bump when validation or display encoding changes published media evidence.
+pub const VALIDATION_VERSION: u32 = 1;
 const MAX_DISPLAY_BYTES: usize = 16 * 1024 * 1024;
 
 pub struct DisplayImage {

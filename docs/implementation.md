@@ -1553,3 +1553,14 @@ Checkboxes represent verified work only.
   verification; physical keyboard, visual RTL and 320px acceptance remain open.
   Shared raw/readable/image bodies, PR/check integration, decisions/discussions,
   approvals, merge, bundles and the remaining full specification are still open.
+
+- Shared snapshot body authorization: immutable review file manifests now feed
+  the verified text/image reader through current organization membership and
+  frozen repository/installation/branch checks. Historical heads remain readable
+  after head/target, policy and closure changes. Shared after-image derivatives
+  must match their sealed validation version, source/display hashes and dimensions.
+  Private and shared readers have separate caches and share bounded read capacity.
+  Six PostgreSQL scenarios cover Reader access, historical source, private/foreign
+  locators, cache isolation, provider binding changes and mid-read revocation;
+  two application cases cover shared capacity and tampered image receipts.
+  Shared body HTTP/frontend wiring and the remaining full-spec work remain open.

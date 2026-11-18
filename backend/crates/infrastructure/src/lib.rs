@@ -14,6 +14,7 @@ pub mod proposals;
 pub mod provisioning;
 pub mod review_authorization;
 pub mod review_configuration;
+pub mod review_files;
 pub mod review_snapshots;
 pub mod review_submissions;
 pub mod review_worker;

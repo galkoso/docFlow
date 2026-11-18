@@ -24,6 +24,8 @@ use std::{
     },
     time::Duration,
 };
+#[path = "snapshots/files.rs"]
+mod files;
 #[path = "snapshots/worker.rs"]
 mod worker;
 struct Source {

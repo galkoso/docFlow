@@ -90,6 +90,14 @@ impl ComparisonFileReader {
             return Err(FileReadError::NotFound);
         }
         validate_context(&context)?;
+        if side == ImageSide::After
+            && context
+                .published_after_image
+                .as_ref()
+                .is_some_and(|proof| proof.validation_version != media::VALIDATION_VERSION)
+        {
+            return Err(FileReadError::InvalidEvidence);
+        }
         if context.change.kind != Kind::Asset {
             return Err(FileReadError::UnsupportedKind);
         }
@@ -149,6 +157,16 @@ impl ComparisonFileReader {
             let image =
                 media::display(&source.path, &bytes).map_err(FileReadError::InvalidImage)?;
             let display_sha256 = format!("{:x}", Sha256::digest(&image.png));
+            if side == ImageSide::After
+                && let Some(proof) = &context.published_after_image
+                && (proof.validation_version != media::VALIDATION_VERSION
+                    || proof.source_sha256 != source_sha256
+                    || proof.display_sha256 != display_sha256
+                    || proof.width != image.width
+                    || proof.height != image.height)
+            {
+                return Err(FileReadError::InvalidEvidence);
+            }
             Ok::<_, FileReadError>((
                 LoadedImage {
                     context,

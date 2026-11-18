@@ -193,6 +193,7 @@ impl Fixture {
             state: "CLOSED".into(),
         };
         let context = FileReadContext {
+            published_after_image: None,
             scope,
             snapshot: Uuid::new_v4(),
             content_id: "a".repeat(64),
@@ -719,3 +720,61 @@ async fn a_failed_final_authorization_never_admits_verified_source_to_the_cache(
 }
 
 mod image;
+
+#[tokio::test]
+async fn authorization_forks_have_separate_caches_but_share_read_capacity() {
+    let f = Fixture::new("before", "after");
+    f.load().await.unwrap();
+    let reader = f.reader.with_authorization(f.authority.clone());
+    let context = f.authority.context.lock().unwrap().clone();
+    reader
+        .load(
+            context.scope.actor,
+            context.scope.proposal,
+            context.snapshot,
+            &context.change.id,
+        )
+        .await
+        .unwrap();
+    assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 4);
+    let f = Fixture::new("before", "after");
+    f.factory.provider.block.store(true, Ordering::SeqCst);
+    let private = f.reader.clone();
+    let shared = Arc::new(f.reader.with_authorization(f.authority.clone()));
+    let context = f.authority.context.lock().unwrap().clone();
+    let a = context.clone();
+    let one = tokio::spawn(async move {
+        private
+            .load(a.scope.actor, a.scope.proposal, a.snapshot, &a.change.id)
+            .await
+    });
+    let b = context.clone();
+    let reader = shared.clone();
+    let two = tokio::spawn(async move {
+        reader
+            .load(b.scope.actor, b.scope.proposal, b.snapshot, &b.change.id)
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while f.factory.provider.reads.load(Ordering::SeqCst) < 2 {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(matches!(f.load().await, Err(FileReadError::Busy)));
+    one.abort();
+    two.abort();
+    assert!(one.await.is_err());
+    assert!(two.await.is_err());
+    f.factory.provider.block.store(false, Ordering::SeqCst);
+    shared
+        .load(
+            context.scope.actor,
+            context.scope.proposal,
+            context.snapshot,
+            &context.change.id,
+        )
+        .await
+        .unwrap();
+}

@@ -1,4 +1,4 @@
-//! Private, source-verified file reads from a published comparison. Browser paths
+//! Authorized, source-verified file reads from immutable snapshots. Browser paths
 //! and refs never enter provider calls; only server-resolved immutable evidence.
 mod cache;
 pub mod image;
@@ -42,6 +42,17 @@ pub struct FileReadContext {
     pub merge_base: CommitSha,
     pub head: CommitSha,
     pub change: Change,
+    /// Required by shared review authorization for an asset's after side.
+    /// Ordinary private comparison reads have no sealed media receipt.
+    pub published_after_image: Option<PublishedImageEvidence>,
+}
+#[derive(Clone, PartialEq, Eq)]
+pub struct PublishedImageEvidence {
+    pub validation_version: u32,
+    pub source_sha256: String,
+    pub display_sha256: String,
+    pub width: u32,
+    pub height: u32,
 }
 #[async_trait]
 pub trait ComparisonFileAuthorization: Send + Sync {
@@ -98,6 +109,17 @@ pub struct ComparisonFileReader {
     timeout: Duration,
 }
 impl ComparisonFileReader {
+    /// A separate authorization/cache namespace with the same process capacity
+    /// and exact provider factory. Cached source never becomes shared authority.
+    pub fn with_authorization(&self, authorization: Arc<dyn ComparisonFileAuthorization>) -> Self {
+        Self {
+            authorization,
+            source: self.source.clone(),
+            loads: self.loads.clone(),
+            cache: Mutex::new(cache::FileCache::default()),
+            timeout: self.timeout,
+        }
+    }
     pub fn new(
         authorization: Arc<dyn ComparisonFileAuthorization>,
         source: Arc<dyn BoundProviderFactory>,
@@ -254,6 +276,17 @@ fn validate_context(context: &FileReadContext) -> Result<(), FileReadError> {
         || !digest(&context.content_id)
         || context.scope.version < 1
         || context.change.before.is_none() && context.change.after.is_none()
+    {
+        return Err(FileReadError::InvalidEvidence);
+    }
+    if let Some(proof) = &context.published_after_image
+        && (context.change.kind != Kind::Asset
+            || context.change.after.is_none()
+            || proof.validation_version == 0
+            || !digest(&proof.source_sha256)
+            || !digest(&proof.display_sha256)
+            || !(1..=2048).contains(&proof.width)
+            || !(1..=2048).contains(&proof.height))
     {
         return Err(FileReadError::InvalidEvidence);
     }

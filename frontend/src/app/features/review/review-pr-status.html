@@ -2,12 +2,24 @@
   <h3>סנכרון בקשת המיזוג</h3>
   @if (busy()) {<p role="status">טוענים מצב עבודה שנשמר באתר…</p>}
   @if (error(); as message) {<p role="alert">{{ message }}</p>}
+  @if (recovering()) {<p role="status">שולחים בקשת התאוששות…</p>}
+  @if (recoveryMessage(); as message) {<p role="status">{{ message }}</p>}
+  @if (recoveryPending()) {
+    <p>אותה בקשת התאוששות נשמרת בעמוד זה עד לאימות התוצאה.</p>
+    <button type="button" (click)="recover()" [disabled]="recovering() || busy()">בדיקת אותה בקשת התאוששות</button>
+  }
   @if (view(); as status) {
     <p role="status">{{ phase(status) }}</p>
     @if (reason(status); as explanation) {<p>{{ explanation }}</p>}
     @if (!status.current_for_sync) {<p>גרסה זו אינה תואמת כעת למצב ההצעה שנדרש לסנכרון.</p>}
     @if (status.uncertain_write) {<p>ייתכן שתוצאת פעולה קודמת עדיין בבירור. גרסת הסקירה השמורה נשארת זמינה באתר.</p>}
     @if (status.sync?.phase === 'RECONCILING' && !status.sync!.automatic) {<p>הבדיקה האוטומטית נעצרה. נדרשת בדיקת מנהל מערכת.</p>}
+    @if (status.recovery && !recoveryPending()) {
+      @if (!status.sync) {<p>ההתאוששות מתייחסת לעבודה קודמת שנעצרה עבור אותה גרסת סקירה.</p>}
+      @if (status.recovery === 'OBSERVE_STARTED') {<p>כמנהל מערכת, אפשר לחדש בדיקה של התוצאה הקיימת בספק. לא תישלח כתיבת PR נוספת.</p>}
+      @else {<p>כמנהל מערכת, אפשר לחדש עבודה שטרם החלה לכתוב לספק. ההרשאות והגרסה ייבדקו שוב לפני כתיבה.</p>}
+      <button type="button" (click)="recover()" [disabled]="recovering() || busy()">{{ status.recovery === 'OBSERVE_STARTED' ? 'חידוש בדיקת תוצאת הספק' : 'ניסיון נוסף לעבודה שלא התחילה' }}</button>
+    }
     @if (status.sync?.next_attempt_at ?? status.dispatch.next_attempt_at; as next) {<p>ניסיון נוסף מתוכנן: {{ next | date:'dd/MM/yyyy HH:mm:ss' }}</p>}
     @if (status.pr; as pr) {
       <p><a [href]="pr.url" target="_blank" rel="noopener noreferrer">פתיחת PR <bdi>#{{ pr.number }}</bdi> ב־GitHub</a></p>
@@ -18,5 +30,5 @@
     <p class="muted">מצב העבודה נקרא מהאתר ב־{{ status.read_at | date:'dd/MM/yyyy HH:mm:ss' }}.</p>
   }
   <p>התצוגה מבוססת על תיעוד שנשמר. מצב הענפים, האישורים וכשירות המיזוג נבדקים בנפרד.</p>
-  <button type="button" (click)="refresh()" [disabled]="busy()">עדכון מצב העבודה</button>
+  <button type="button" (click)="refresh()" [disabled]="busy() || recovering()">עדכון מצב העבודה</button>
 </section>

@@ -16,6 +16,9 @@ export function validPrStatus(v: ReviewPrStatus, proposal: string, snapshot: Rev
     || typeof v.current_for_sync !== 'boolean' || typeof v.binding_current !== 'boolean' || typeof v.uncertain_write !== 'boolean'
     || !v.binding_current && (v.current_for_sync || v.pr != null)) return false;
   const d = v.dispatch, s = v.sync, p = v.pr;
+  if (v.recovery != null && (!['RETRY_UNSTARTED', 'OBSERVE_STARTED'].includes(v.recovery) || !v.binding_current
+    || v.recovery === 'RETRY_UNSTARTED' && !v.current_for_sync
+    || v.recovery === 'OBSERVE_STARTED' && !v.uncertain_write)) return false;
   if (!d || !dispatches.includes(d.phase) || !reason(d.reason) || !time(d.next_attempt_at)
     || (d.phase === 'WAITING') !== (d.next_attempt_at != null)) return false;
   if (s != null && (d.phase !== 'ENQUEUED' || !phases.includes(s.phase) || !reason(s.reason) || !time(s.next_attempt_at)

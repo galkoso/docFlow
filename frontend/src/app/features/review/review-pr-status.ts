@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, OnDestroy, output, signal, untracked } from '@angular/core';
 import { DatePipe, DOCUMENT } from '@angular/common';
 import { Subscription, timeout } from 'rxjs';
-import { ReviewApi, type ReviewPrStatus, type ReviewSnapshot } from '../../core/api/review-api';
+import { ReviewApi, type PrRecoveryRequest, type ReviewPrStatus, type ReviewSnapshot } from '../../core/api/review-api';
 import { SessionState } from '../../core/auth/session-state';
 import { validPrStatus } from './pr-status-evidence';
+
+type RecoveryAttempt = { actor: string; proposal: string; snapshot: ReviewSnapshot; epoch: number; body: Readonly<PrRecoveryRequest> };
 
 @Component({
   selector: 'app-review-pr-status', imports: [DatePipe], changeDetection: ChangeDetectionStrategy.OnPush,
@@ -20,10 +22,18 @@ export class ReviewPrStatusView implements OnDestroy {
   private readonly data = signal<ReviewPrStatus | null>(null);
   readonly busy = signal(false);
   readonly error = signal('');
+  readonly recovering = signal(false);
+  readonly recoveryMessage = signal('');
+  private readonly pending = signal<RecoveryAttempt | null>(null);
+  readonly recoveryPending = computed(() => {
+    const attempt = this.pending();
+    return !!attempt && this.matches(attempt.actor, attempt.proposal, attempt.snapshot, attempt.epoch);
+  });
   private generation = 0;
   private owner = '';
   private epoch = -1;
   private request?: Subscription;
+  private recoveryRequest?: Subscription;
   private timer?: ReturnType<typeof setTimeout>;
   readonly view = computed(() => {
     const value = this.data(), snapshot = this.snapshot();
@@ -40,9 +50,51 @@ export class ReviewPrStatusView implements OnDestroy {
     });
   }
   refresh(): void {
-    if (!this.busy() && this.actor() === this.owner && this.session.profile()?.user_id === this.owner && this.session.logoutEpoch() === this.epoch) {
+    if (!this.busy() && !this.recovering() && this.actor() === this.owner && this.session.profile()?.user_id === this.owner && this.session.logoutEpoch() === this.epoch) {
       this.load(this.actor(), this.proposal(), this.snapshot());
     }
+  }
+  recover(): void {
+    if (this.busy() || this.recovering()) return;
+    let attempt = this.pending();
+    if (!attempt) {
+      const value = this.view();
+      if (!value?.recovery) return;
+      attempt = { actor: this.actor(), proposal: this.proposal(), snapshot: this.snapshot(), epoch: this.epoch,
+        body: Object.freeze({ request_id: crypto.randomUUID(), expected_fingerprint: value.fingerprint }) };
+    }
+    const { actor, proposal, snapshot, epoch, body } = attempt;
+    if (!this.matches(actor, proposal, snapshot, epoch)) return;
+    this.pending.set(attempt); this.recovering.set(true); this.error.set(''); this.recoveryMessage.set('');
+    clearTimeout(this.timer); this.request?.unsubscribe(); this.data.set(null);
+    const generation = ++this.generation;
+    const current = () => generation === this.generation && this.matches(actor, proposal, snapshot, epoch);
+    this.recoveryRequest = this.api.recoverPr(actor, proposal, snapshot.snapshot_id, body).pipe(timeout(20000)).subscribe({
+      next: value => {
+        if (!current()) return;
+        this.recovering.set(false);
+        if (!value || value.proposal_id !== proposal || value.snapshot_id !== snapshot.snapshot_id || value.request_id !== body.request_id
+          || !['RETRY_UNSTARTED', 'OBSERVE_STARTED'].includes(value.mode) || typeof value.replayed !== 'boolean') {
+          this.error.set('לא ניתן לאמת את קבלת בקשת ההתאוששות. אפשר לבדוק שוב את אותה בקשה.'); return;
+        }
+        this.pending.set(null); this.recoveryMessage.set('בקשת ההתאוששות נקלטה. תוצאת העבודה נבדקת בנפרד.');
+        this.load(actor, proposal, snapshot);
+      },
+      error: error => {
+        if (!current()) return;
+        this.recovering.set(false);
+        if ([401, 403, 404].includes(error?.status) || error?.status === 409 && error?.error?.error?.code === 'SESSION_IDENTITY_CHANGED') {
+          this.pending.set(null); this.accessDenied.emit(); return;
+        }
+        this.error.set(error?.status === 409 ? 'מצב העבודה או פרטי הבקשה השתנו. יש לעדכן מצב לפני המשך.'
+          : error?.status === 429 ? 'מכסת ההתאוששות מלאה. יש להמתין לפני בדיקה נוספת של אותה בקשה.'
+            : 'תוצאת בקשת ההתאוששות לא אומתה. אפשר לעדכן מצב או לבדוק שוב את אותה בקשה.');
+      },
+    });
+  }
+  private matches(actor: string, proposal: string, snapshot: ReviewSnapshot, epoch: number): boolean {
+    return this.session.profile()?.user_id === actor && this.session.logoutEpoch() === epoch
+      && this.actor() === actor && this.proposal() === proposal && this.snapshot() === snapshot;
   }
   private load(actor: string, proposal: string, snapshot: ReviewSnapshot): void {
     clearTimeout(this.timer); this.request?.unsubscribe();
@@ -88,7 +140,8 @@ export class ReviewPrStatusView implements OnDestroy {
       OBSERVATION_PENDING: 'ממתינים לאימות תוצאת הספק.', OTHER: 'נדרשת בדיקה נוספת של העבודה.' })[reason];
   }
   private clear(): void {
-    ++this.generation; clearTimeout(this.timer); this.request?.unsubscribe(); this.data.set(null); this.busy.set(false); this.error.set('');
+    ++this.generation; clearTimeout(this.timer); this.request?.unsubscribe(); this.recoveryRequest?.unsubscribe();
+    this.data.set(null); this.busy.set(false); this.error.set(''); this.pending.set(null); this.recovering.set(false); this.recoveryMessage.set('');
   }
   ngOnDestroy(): void { this.clear(); }
 }

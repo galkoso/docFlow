@@ -648,6 +648,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recoverProposalReviewPr"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/specification": {
         parameters: {
             query?: never;
@@ -1253,6 +1269,23 @@ export interface components {
         };
         /** Format: binary */
         PngDisplay: string;
+        PrRecoveryAccepted: {
+            mode: components["schemas"]["PrRecoveryMode"];
+            /** Format: uuid */
+            proposal_id: string;
+            replayed: boolean;
+            /** Format: uuid */
+            request_id: string;
+            /** Format: uuid */
+            snapshot_id: string;
+        };
+        /** @enum {string} */
+        PrRecoveryMode: "RETRY_UNSTARTED" | "OBSERVE_STARTED";
+        PrRecoveryRequest: {
+            expected_fingerprint: string;
+            /** Format: uuid */
+            request_id: string;
+        };
         PrepareCreation: {
             /** Format: uuid */
             repository_id: string;
@@ -1606,6 +1639,7 @@ export interface components {
             /** Format: uuid */
             proposal_id: string;
             read_at: string;
+            recovery?: components["schemas"]["PrRecoveryMode"] | null;
             /** Format: uuid */
             snapshot_id: string;
             sync?: components["schemas"]["ReviewPrSyncStatus"] | null;
@@ -5261,6 +5295,103 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    recoverProposalReviewPr: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrRecoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Admin recovery queued or its receipt replayed. Recorded writes resume observation only. */
+            202: {
+                headers: {
+                    Location?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrRecoveryAccepted"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -34,6 +34,7 @@ struct Source {
     trees: BTreeMap<String, BTreeMap<String, Vec<u8>>>,
     reads: AtomicUsize,
     target: AtomicUsize,
+    branch_head: AtomicUsize,
     failure: Mutex<Option<GitError>>,
     blocked: AtomicBool,
     started: tokio::sync::Notify,
@@ -58,7 +59,7 @@ impl GitProvider for Source {
     }
     async fn branch_head(&self, branch: &BranchName) -> Result<CommitSha, GitError> {
         assert_eq!(branch.as_str(), "change/review-scope");
-        Ok(sha(1))
+        Ok(sha(self.branch_head.load(Ordering::SeqCst)))
     }
     async fn create_branch(&self, _: &BranchName, _: &CommitSha) -> Result<CommitSha, GitError> {
         panic!("snapshot publication cannot create Git branches")
@@ -190,6 +191,7 @@ async fn setup_body_options(
         ]),
         reads: AtomicUsize::new(0),
         target: AtomicUsize::new(2),
+        branch_head: AtomicUsize::new(1),
         failure: Mutex::new(None),
         blocked: AtomicBool::new(false),
         started: tokio::sync::Notify::new(),

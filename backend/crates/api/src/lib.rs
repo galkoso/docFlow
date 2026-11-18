@@ -22,6 +22,7 @@ use axum::{
 };
 use serde::Serialize;
 use specspace_application::draft::DraftRetention;
+use specspace_application::pr_sync::PrProviderFactory;
 use specspace_application::proposal_reader::ProposalReader;
 use specspace_application::reader::{BookProviderFactory, BookReader};
 use specspace_application::review_preparation::ReviewPreparer;
@@ -44,6 +45,10 @@ use specspace_infrastructure::{
     proposal_worker::ProposalWorker,
     provisioning::{PgProvisioning, ProvisionError},
     search_index::{IndexError, PgSearchIndex},
+};
+use specspace_infrastructure::{
+    pr_sync::{PgPrSync, PrSyncStoreError},
+    pr_sync_worker::PrSyncWorker,
 };
 use specspace_infrastructure::{
     review_authorization::PgReviewAuthorization,
@@ -72,6 +77,9 @@ pub struct AppState {
     pub review_files: Arc<ComparisonFileReader>,
     pub review_submissions: Arc<PgReviewSubmissions>,
     pub review_snapshots: Arc<PgReviewSnapshots>,
+    pub pr_sync: Arc<PgPrSync>,
+    pr_source: Arc<dyn PrProviderFactory>,
+    bound_source: Arc<dyn BoundProviderFactory>,
     review_preparer: Arc<ReviewPreparer>,
     pub drafts: Arc<PgDrafts>,
     pub search_index: Arc<PgSearchIndex>,
@@ -136,6 +144,9 @@ impl AppState {
             review_preparer,
             review_submissions: Arc::new(PgReviewSubmissions::new(database.clone())),
             review_snapshots: Arc::new(PgReviewSnapshots::new(database.clone())),
+            pr_sync: Arc::new(PgPrSync::new(database.clone())),
+            pr_source: source.clone(),
+            bound_source: source.clone(),
             saves: Arc::new(PgSaves::new(database.clone())),
             drafts: Arc::new(PgDrafts::new(database.clone(), None)),
             database,
@@ -156,6 +167,7 @@ impl AppState {
             self.database.clone(),
             Some(Arc::new(key)),
         ));
+        self.configure_pr_source(source.clone());
         self.configure_comparison_source(source.clone());
         self.configure_book_source(source);
     }
@@ -163,6 +175,7 @@ impl AppState {
     /// Comparison/review sources must support frozen connection settings;
     /// an unbound book source is never silently reused for this capability.
     pub fn configure_comparison_source(&mut self, source: Arc<dyn BoundProviderFactory>) {
+        self.bound_source = source.clone();
         self.comparison_files = Arc::new(
             ComparisonFileReader::new(
                 self.comparison_jobs.clone(),
@@ -232,6 +245,20 @@ impl AppState {
             self.review_submissions.clone(),
             self.review_snapshots.clone(),
             self.review_preparer.clone(),
+            timeout,
+        )
+    }
+    pub fn configure_pr_source(&mut self, source: Arc<dyn PrProviderFactory>) {
+        self.pr_source = source;
+    }
+    pub fn pr_sync_worker(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<PrSyncWorker, PrSyncStoreError> {
+        PrSyncWorker::new(
+            self.pr_sync.clone(),
+            self.bound_source.clone(),
+            self.pr_source.clone(),
             timeout,
         )
     }

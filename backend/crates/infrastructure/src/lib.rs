@@ -10,6 +10,7 @@ pub mod index_worker;
 pub mod login_flows;
 pub mod oidc;
 pub mod pr_sync;
+pub mod pr_sync_worker;
 pub mod proposal_worker;
 pub mod proposals;
 pub mod provisioning;

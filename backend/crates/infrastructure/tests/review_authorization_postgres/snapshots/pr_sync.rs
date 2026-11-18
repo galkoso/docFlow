@@ -4,6 +4,8 @@ use specspace_application::{pr_sync::PrSiteOrigin, review_submission::ReviewPubl
 use specspace_infrastructure::pr_sync::{PgPrSync, PrSyncStoreError};
 #[path = "pr_sync/journal.rs"]
 mod journal;
+#[path = "pr_sync/worker.rs"]
+mod worker;
 fn site() -> PrSiteOrigin {
     PrSiteOrigin::parse("https://specs.example", false).unwrap()
 }

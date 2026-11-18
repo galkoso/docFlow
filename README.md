@@ -171,6 +171,14 @@ work with actor-bound idempotency and user/organization admission limits from
 migration 012. `/api/v1/jobs/:id` reports private progress. Organization members
 can read shared snapshot history, typed metadata, file manifests and media
 receipts under `/api/v1/proposals/:id/review/snapshots`.
+
+Dedicated PR synchronization uses immutable admission and fenced write/result
+journals (migrations 013–014). One runtime PR worker verifies bounded discovery,
+live refs and current authority, sends one draft-create/metadata-update, then reads
+back its result. Unknown writes reconcile through reads. Its attempt deadline is
+`PR_SYNC_WORKER_TIMEOUT_SECONDS` (default 120; allowed 30–900). Automatic outbox
+dispatch, recovery/status UI and required checks remain pending; see
+[PR synchronization](docs/pull-requests.md).
 `/changes/:id/review/snapshots` offers explicit saved-version preflight and
 submission, private job observation, shared history and paged metadata/manifests.
 Uncertain writes retain their original actor/key/body; restored job URLs observe

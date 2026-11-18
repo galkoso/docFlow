@@ -1,15 +1,15 @@
 # Dedicated proposal PR synchronization
 
-## Current stage: provider capability and fenced durable journal
+## Current stage: runtime provider worker and fenced durable journal
 
 The Git adapter exposes `PullRequestProvider` separately from content operations.
 It reads one PR, discovers PRs for a proposal branch across all states, creates a
 draft, and updates title/body metadata. A provider observation is not an approval,
 merge receipt or proof that a saved review snapshot is current. PostgreSQL admission
 now freezes publication outbox events into dedicated PR operations/jobs and stores
-fenced write phases, PR identities and observation results. Dispatch,
-provider orchestration, required checks and the user-facing
-synchronization status remain pending.
+fenced write phases, PR identities and observation results. A bounded runtime
+worker now performs provider orchestration. Outbox dispatch, required checks and
+the user-facing synchronization status remain pending.
 
 The [GitHub PR REST API](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10)
 provides the list/get/create/update operations used here. Draft creation uses
@@ -70,8 +70,7 @@ must fence its journal/lease, check current local authority and refs, and valida
 the observed pair against the selected snapshot before publishing synchronization
 success. Unknown creates require reconciliation before any further mutation;
 absence from a single eventually consistent list response is not sufficient proof
-that a timed-out create did not happen. No existing worker invokes these new
-mutations yet.
+that a timed-out create did not happen.
 
 ## Immutable metadata intent
 
@@ -128,8 +127,8 @@ are serialized per organization and limited to two active/ten recent per actor a
 twelve active/sixty recent per organization, with a ten-minute recent window.
 Exact replay precedes quotas. Database guards freeze intents, source events, jobs
 and operation scope, require atomic admission evidence, and reject generic success.
-Generic job leasing/completion excludes PR jobs. No dispatcher or existing runtime
-worker invokes this admission method yet.
+Generic job leasing/completion excludes PR jobs. No runtime dispatcher invokes
+this admission method yet.
 
 ## Fenced writes and observation results
 
@@ -168,13 +167,37 @@ it grants no approval and changes no content or proposal state. The immutable
 binding, result, job/operation outcome and audit commit together. Late fences and
 audit failures roll back the entire receipt, including a newly discovered binding.
 Database guards prevent unbacked writes, forged generic success, identity changes
-and incomplete terminal outcomes. The runtime worker that performs provider IO and
-honors these boundaries is still pending.
+and incomplete terminal outcomes.
+
+## Runtime provider orchestration
+
+`PrSyncWorker` rechecks current authority and connects both provider capabilities
+to the frozen binding. Discovery requests at most two candidates: two prove a
+conflict, while zero/one with no next page proves exhaustion. Foreign, conflicting
+or incomplete observations cannot authorize a write. A listed candidate whose
+direct GET returns 404 stays observation work rather than becoming proof of
+absence. Known PRs are read directly even when omitted from a list response.
+
+Before writing, live branch/main must match the frozen pair. After recording the
+journal boundary, the worker checks local authority and refs again, then sends one
+draft-create or metadata-update. Positive replies are read back directly and
+checked against bounded discovery; exact owned metadata and current provider refs
+must agree before final database publication. Unknown/reclaimed attempts never
+mutate again, including when the list remains empty. Ref disagreement defers
+observation; an exact older projection can resolve as SUPERSEDED without losing
+its durable PR identity.
+
+One worker runs in the API process. `PR_SYNC_WORKER_TIMEOUT_SECONDS` defaults to
+120, with a 30–900 second attempt deadline. Leases last 60 seconds and renew every
+15 seconds during long provider calls and between short calls. Heartbeats never
+run alongside the worker's own journal transactions. Graceful shutdown cancels
+in-flight work; a persisted write phase forces read-only recovery after restart.
+Provider rate-limit backoff is preserved. Explicit rejection/operator recovery,
+outbox dispatch and authenticated synchronization status remain pending.
 
 ## Remaining full-spec work
 
-- Connect the journal to a bounded provider worker and dispatch publication outbox
-  events, including stale/poison-event handling and explicit recovery for rejected,
+- Dispatch publication outbox events, including stale/poison-event handling and explicit recovery for rejected,
   exhausted, closed-provider and revoked-original-actor cases.
 - Connect the bounded metadata projection to persisted decisions and complete open
   product questions when those workflows exist; capture them under journal locks.

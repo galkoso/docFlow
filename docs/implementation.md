@@ -1677,3 +1677,23 @@ Checkboxes represent verified work only.
   physical keyboard, visual RTL and 320px acceptance remain open. PR/checks,
   decisions/discussions, approvals, merge, bundles and all remaining specification
   work remain open.
+
+- GitHub PR provider capability: a separate typed interface now supports scoped
+  observations, bounded all-state discovery, explicit draft creation and title/body
+  updates. PR operations require the numeric repository binding established by
+  verified GitHub App metadata, and validate both repositories, proposal branch,
+  main target, commit identities and canonical URL. Discovery omits the base
+  filter so retargeting cannot hide a candidate and falsely justify a new PR;
+  duplicates, overfull pages, scan limits and pending read statuses fail closed.
+  Updates validate an open PR before writing and preserve its provider identity
+  and draft state. Cut-off replies, redirects, server failures, unexpected status
+  and mismatched write receipts remain uncertain; writes never automatically retry.
+  Eleven new tests cover contracts, scope, pagination, forks/retargeting, unsafe
+  metadata/URLs, metadata-only writes, lost replies, rate limits and uncertainty.
+  All 464 backend tests pass with two existing performance measurements excluded;
+  workspace Clippy passes and the exported OpenAPI remains unchanged. Both CI
+  workflows for the preceding before-image UI commit passed.
+  The provider design and remaining integration are recorded in
+  `docs/pull-requests.md`. Application journal/outbox consumption, stable proposal
+  PR binding, required checks and frontend status are still pending, together with
+  decisions/discussions, approvals, merge, bundles and the remaining full scope.

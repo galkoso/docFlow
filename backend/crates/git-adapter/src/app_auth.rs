@@ -138,7 +138,10 @@ impl GitHubApp {
         let name = metadata["full_name"]
             .as_str()
             .ok_or(GitError::InvalidResponse)?;
-        Ok((token.github(name)?, token.expires_at()))
+        Ok((
+            token.github(name)?.bound_to(self.repository_id)?,
+            token.expires_at(),
+        ))
     }
 
     pub async fn installation_token(&self) -> Result<InstallationToken, GitError> {

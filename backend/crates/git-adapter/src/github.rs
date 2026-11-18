@@ -12,7 +12,10 @@ use serde_json::{Value, json};
 use specspace_domain::{BranchName, RepositoryPath};
 use std::{collections::HashSet, time::Duration};
 
+mod pull_requests;
+
 pub struct GitHub {
+    repository_id: Option<u64>,
     client: Client,
     repository: String,
     owner: String,
@@ -76,6 +79,7 @@ impl GitHub {
             .build()
             .map_err(|_| GitError::ProviderUnavailable)?;
         Ok(Self {
+            repository_id: None,
             client,
             repository: repository.into(),
             owner: parts[0].into(),
@@ -83,6 +87,14 @@ impl GitHub {
             rest_base: rest_base.into(),
             graphql_url: graphql_url.into(),
         })
+    }
+
+    pub(crate) fn bound_to(mut self, repository_id: u64) -> Result<Self, GitError> {
+        if repository_id == 0 {
+            return Err(GitError::InvalidInput);
+        }
+        self.repository_id = Some(repository_id);
+        Ok(self)
     }
 
     pub(crate) async fn response(

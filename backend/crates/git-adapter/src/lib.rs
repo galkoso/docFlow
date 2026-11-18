@@ -2,6 +2,7 @@
 pub mod app_auth;
 pub mod blob;
 pub mod github;
+pub mod pull_requests;
 pub mod receipt;
 pub use receipt::CommitReceipt;
 

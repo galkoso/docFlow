@@ -322,6 +322,23 @@ Image bodies contain only verified PNG pixels, with `X-Comparison-Image` binding
 the actor, frozen source, side and display hash. Responses are `no-store`.
 OpenAPI and the generated client describe all four shared operations.
 
+Referenced after-images, including unchanged assets absent from the changed-file
+inventory, use
+`/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/media/{asset}/image`.
+The filename must be a permitted content-addressed image and match an immutable
+receipt in that exact shared snapshot. There are no query parameters or arbitrary
+ref/path overrides. The current actor, membership and frozen repository binding
+are checked around the existing bounded image pipeline and again before response
+publication. Source bytes/OID, validation version, derivative hash and dimensions
+must match the sealed receipt. Historical head/target changes and closure do not
+reselect source. The reader shares existing image capacity and returns PNG pixels
+only, with `X-Review-Media` carrying base64url `ReviewMediaEvidence`: receipt path,
+validation version and nested actor/snapshot/source/display identities. Its media
+file identity is SHA-256 of `specspace-review-media-v1`, a NUL byte and the full
+asset path; it is distinct from a changed-file identity. Internal one-sided image
+source descriptors do not add fabricated changes to the snapshot inventory.
+Shared inline rendering and referenced before-image authority remain pending.
+
 ## Submission and shared snapshot frontend
 
 `/changes/:id/review/snapshots` is linked from proposal details and reviewer

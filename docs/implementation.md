@@ -1600,3 +1600,22 @@ Checkboxes represent verified work only.
   physical keyboard, visual RTL or 320px verification. Shared inline referenced
   images remain alt-text placeholders; PR/checks, decisions/discussions, approvals,
   merge, bundles and all remaining specification work remain open.
+
+- Shared sealed referenced-media HTTP: content-addressed after-images now have a
+  snapshot media route independent of the changed-file inventory. Current active
+  membership and the frozen repository/installation/branch gate the existing
+  bounded image reader; source OID/length/hash, policy version, display hash and
+  dimensions must match the immutable receipt. The route accepts no query/ref
+  overrides and emits only metadata-free PNG plus `X-Review-Media` identity
+  evidence. Domain-separated media IDs do not fabricate file additions. Four
+  database scenarios include unchanged reused assets, historical reads, actual
+  private snapshot rejection, foreign/path/identity substitution, binding changes
+  and membership revocation. Three HTTP scenarios cover real unchanged referenced
+  media, historical closure, sealed proof/body identity, strict scope/queries,
+  provider backoff, forged/missing bytes and mid-read revocation. All 48 review
+  authorization database tests and 109 API tests pass; the full workspace passes
+  444 tests with two existing performance measurements excluded. Workspace Clippy
+  and the frontend build pass with updated OpenAPI/generated types. Both workflows for
+  the preceding shared comparison UI commit passed. Inline rendering and referenced
+  before-image authority remain open, along with PR/checks, discussions/decisions,
+  approvals, merge, bundles and all remaining full-spec work.

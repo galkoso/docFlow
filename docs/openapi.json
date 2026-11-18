@@ -4672,6 +4672,140 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/media/{asset}/image": {
+      "get": {
+        "tags": [
+          "crate::comparisons::media"
+        ],
+        "operationId": "reviewSnapshotMediaImage",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "description": "Sealed content-addressed filename: SHA-256 and png/jpg/jpeg/webp extension",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified after-image from a sealed review media receipt, including referenced unchanged assets",
+            "headers": {
+              "X-Review-Media": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Unpadded base64url JSON ReviewMediaEvidence; source path, validation version and actor/snapshot/source/display binding"
+              }
+            },
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/PngDisplay"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/specification": {
       "get": {
         "tags": [
@@ -8607,6 +8741,28 @@
           "warning",
           "blocker"
         ]
+      },
+      "ReviewMediaEvidence": {
+        "type": "object",
+        "description": "Source identities are server-resolved from the sealed media receipt. The\nimage.file_id is a domain-separated media identity, not a changed-file ID.",
+        "required": [
+          "asset_path",
+          "media_validation_version",
+          "image"
+        ],
+        "properties": {
+          "asset_path": {
+            "type": "string"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageEvidence"
+          },
+          "media_validation_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
       },
       "ReviewMediaReceipt": {
         "type": "object",

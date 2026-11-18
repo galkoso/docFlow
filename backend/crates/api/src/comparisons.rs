@@ -1,4 +1,5 @@
 pub(crate) mod image;
+pub(crate) mod media;
 pub(crate) mod raw;
 pub(crate) mod readable;
 pub(crate) mod shared;
@@ -34,6 +35,7 @@ pub fn routes() -> Router<AppState> {
         .merge(raw::routes())
         .merge(readable::routes())
         .merge(shared::routes())
+        .merge(media::routes())
 }
 #[derive(Deserialize, utoipa::IntoParams)]
 #[serde(deny_unknown_fields)]

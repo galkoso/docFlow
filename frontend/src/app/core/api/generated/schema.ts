@@ -600,6 +600,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/media/{asset}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reviewSnapshotMediaImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/specification": {
         parameters: {
             query?: never;
@@ -1491,6 +1507,16 @@ export interface components {
         };
         /** @enum {string} */
         ReviewFindingSeverity: "warning" | "blocker";
+        /**
+         * @description Source identities are server-resolved from the sealed media receipt. The
+         *     image.file_id is a domain-separated media identity, not a changed-file ID.
+         */
+        ReviewMediaEvidence: {
+            asset_path: string;
+            image: components["schemas"]["ImageEvidence"];
+            /** Format: int32 */
+            media_validation_version: number;
+        };
         ReviewMediaReceipt: {
             blob_oid: string;
             /** Format: int64 */
@@ -4900,6 +4926,91 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reviewSnapshotMediaImage: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+                /** @description Sealed content-addressed filename: SHA-256 and png/jpg/jpeg/webp extension */
+                asset: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified after-image from a sealed review media receipt, including referenced unchanged assets */
+            200: {
+                headers: {
+                    /** @description Unpadded base64url JSON ReviewMediaEvidence; source path, validation version and actor/snapshot/source/display binding */
+                    "X-Review-Media"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": components["schemas"]["PngDisplay"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

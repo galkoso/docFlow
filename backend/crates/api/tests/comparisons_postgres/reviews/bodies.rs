@@ -318,3 +318,172 @@ async fn shared_body_backoff_forged_bytes_capacity_and_mid_io_revocation_never_p
     assert!(!denied.1.contains_key("X-Comparison-Image"));
     assert!(!denied.2.starts_with(b"\x89PNG"));
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn shared_referenced_image_http_proves_unchanged_media_from_sealed_receipts_after_closure(
+    pool: PgPool,
+) {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    use sha2::{Digest, Sha256};
+    let (f, _, _) = configured(&pool, true).await;
+    f.provider.reused_media.store(true, Ordering::SeqCst);
+    let (_, snapshot) = publish(&f, 2).await;
+    let (_, image, _) = files(&f, &snapshot).await;
+    assert!(
+        image.is_null(),
+        "Reused asset must not become a fabricated file change"
+    );
+    let path = format!("{}/{snapshot}/media", history_path(&f));
+    let receipts = get(&f.app, &f.actor, &path, true).await;
+    assert_eq!(receipts.1["total"], 1);
+    let receipt = &receipts.1["receipts"][0];
+    let filename = receipt["path"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("assets/")
+        .unwrap();
+    sqlx::query("UPDATE proposals SET state='CLOSED',head_sha=$2,version=version+1 WHERE id=$1")
+        .bind(f.proposal)
+        .bind("4".repeat(40))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let start = f.provider.reads.load(Ordering::SeqCst);
+    let (status, headers, bytes) =
+        image_response(&f.app, &f.actor, &format!("{path}/{filename}/image"), true).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&bytes)
+    );
+    assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
+    assert_eq!(headers["content-type"], "image/png");
+    assert!(!headers.contains_key("X-Comparison-Image"));
+    let evidence: Value = serde_json::from_slice(
+        &URL_SAFE_NO_PAD
+            .decode(headers["X-Review-Media"].as_bytes())
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(evidence["asset_path"], receipt["path"]);
+    assert_eq!(
+        evidence["media_validation_version"],
+        specspace_document_engine::media::VALIDATION_VERSION
+    );
+    let image = &evidence["image"];
+    assert_eq!(image["actor_id"], f.actor.id.to_string());
+    assert_eq!(image["snapshot_id"], snapshot);
+    assert_eq!(image["head_sha"], HEAD);
+    assert_eq!(image["merge_base_sha"], OLD);
+    assert_eq!(image["side"], "after");
+    assert_eq!(image["source_blob_oid"], receipt["blob_oid"]);
+    assert_eq!(image["source_sha256"], receipt["source_sha256"]);
+    assert_eq!(image["display_sha256"], receipt["display_sha256"]);
+    assert_eq!(
+        image["display_sha256"],
+        format!("{:x}", Sha256::digest(&bytes))
+    );
+    assert_eq!(
+        image["file_id"],
+        format!(
+            "{:x}",
+            Sha256::digest(format!(
+                "specspace-review-media-v1\0{}",
+                receipt["path"].as_str().unwrap()
+            ))
+        )
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), start + 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn shared_media_http_requires_captured_membership_sealed_path_and_exact_snapshot_without_ref_queries(
+    pool: PgPool,
+) {
+    let (f, _, _) = configured(&pool, true).await;
+    let (_, snapshot) = publish(&f, 2).await;
+    let filename = f
+        .provider
+        .images
+        .keys()
+        .next()
+        .unwrap()
+        .strip_prefix("assets/")
+        .unwrap();
+    let path = format!("{}/{snapshot}/media/{filename}/image", history_path(&f));
+    let start = f.provider.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        image_response(&f.app, &f.actor, &path, false).await.0,
+        StatusCode::CONFLICT
+    );
+    let foreign = fixture(&pool, true).await;
+    assert_eq!(
+        image_response(&f.app, &foreign.owner, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    for query in [
+        "side=before",
+        "snapshot=other",
+        "commit=main",
+        "ref=main",
+        "path=docs/a.md",
+        "side=after&side=after",
+    ] {
+        let response = image_response(&f.app, &f.actor, &format!("{path}?{query}"), true).await;
+        assert_eq!(response.0, StatusCode::BAD_REQUEST);
+        assert!(!response.1.contains_key("X-Review-Media"));
+    }
+    for bad in [
+        path.replace(&snapshot, &Uuid::new_v4().to_string()),
+        path.replace(filename, "bad.svg"),
+        path.replace(filename, &format!("{}.png", "0".repeat(64))),
+    ] {
+        let response = image_response(&f.app, &f.actor, &bad, true).await;
+        assert_eq!(response.0, StatusCode::NOT_FOUND);
+        assert!(!response.1.contains_key("X-Review-Media"));
+    }
+    sqlx::query("UPDATE repositories SET installation_id='99' WHERE organization_id=$1")
+        .bind(f.organization)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        image_response(&f.app, &f.actor, &path, true).await.0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), start);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn shared_media_http_preserves_backoff_and_discards_forged_missing_or_revoked_pixels(
+    pool: PgPool,
+) {
+    let (f, _, _) = configured(&pool, true).await;
+    let (_, snapshot) = publish(&f, 2).await;
+    let filename = f
+        .provider
+        .images
+        .keys()
+        .next()
+        .unwrap()
+        .strip_prefix("assets/")
+        .unwrap();
+    let path = format!("{}/{snapshot}/media/{filename}/image", history_path(&f));
+    for mode in [2, 3, 4] {
+        f.provider.backoff.store(mode, Ordering::SeqCst);
+        let (status, headers, body) = image_response(&f.app, &f.actor, &path, true).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert!(!headers.contains_key("X-Review-Media"));
+        assert!(!body.starts_with(b"\x89PNG"));
+        if mode == 2 {
+            assert_eq!(headers["retry-after"], "13");
+        }
+    }
+    f.provider.backoff.store(0, Ordering::SeqCst);
+    *f.provider.hook.lock().unwrap() = Some((pool.clone(), f.actor.id));
+    let (status, headers, body) = image_response(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(!headers.contains_key("X-Review-Media"));
+    assert!(!body.starts_with(b"\x89PNG"));
+}

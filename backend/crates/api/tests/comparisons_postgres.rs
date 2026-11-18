@@ -27,7 +27,7 @@ use std::{
     collections::BTreeMap,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -46,11 +46,21 @@ struct Provider {
     images: BTreeMap<String, Vec<u8>>,
     reads: AtomicUsize,
     backoff: AtomicUsize,
+    reused_media: AtomicBool,
     hook: Mutex<Option<(PgPool, Uuid)>>,
 }
 impl Provider {
     fn text(&self, commit: &CommitSha, path: &str) -> String {
-        let text = self.files[path].clone();
+        let mut text = self.files[path].clone();
+        if self.reused_media.load(Ordering::SeqCst)
+            && commit.as_str() == HEAD
+            && path == "docs/0.md"
+        {
+            text.push_str(&format!(
+                "\n![Reused image]({})\n",
+                self.images.keys().next().unwrap()
+            ));
+        }
         if commit.as_str() == HEAD && (path.ends_with(".md") || path == "assets/change.png") {
             text.replace("before", "edited")
         } else {
@@ -156,7 +166,7 @@ impl GitProvider for Provider {
             .chain(
                 self.images
                     .iter()
-                    .filter(|_| commit.as_str() == HEAD)
+                    .filter(|_| commit.as_str() == HEAD || self.reused_media.load(Ordering::SeqCst))
                     .map(|(path, bytes)| FileEntry {
                         path: RepositoryPath::parse(path).unwrap(),
                         blob_sha: blob::oid(bytes, 40).unwrap(),
@@ -349,6 +359,7 @@ async fn fixture_review_options(
         images,
         reads: AtomicUsize::new(0),
         backoff: AtomicUsize::new(0),
+        reused_media: AtomicBool::new(false),
         hook: Mutex::new(None),
     });
     let mut state = AppState::new(pool.clone());

@@ -6,13 +6,13 @@ use utoipa::{
 #[derive(OpenApi)]
 #[openapi(
     info(title = "SpecSpace API", version = "0.1.0"),
-    paths(crate::comparisons::shared::raw, crate::comparisons::shared::page, crate::comparisons::shared::unit, crate::comparisons::shared::image, crate::reviews::submit, crate::reviews::history, crate::reviews::snapshot, crate::reviews::files, crate::reviews::media, crate::review_configuration::read, crate::review_configuration::update, crate::review_configuration::candidates, crate::live, crate::ready, crate::auth::login, crate::auth::availability, crate::auth::callback, crate::auth::logout, crate::auth::me,
+    paths(crate::comparisons::media::read, crate::comparisons::shared::raw, crate::comparisons::shared::page, crate::comparisons::shared::unit, crate::comparisons::shared::image, crate::reviews::submit, crate::reviews::history, crate::reviews::snapshot, crate::reviews::files, crate::reviews::media, crate::review_configuration::read, crate::review_configuration::update, crate::review_configuration::candidates, crate::live, crate::ready, crate::auth::login, crate::auth::availability, crate::auth::callback, crate::auth::logout, crate::auth::me,
         crate::specification::repositories, crate::specification::specification, crate::specification::document, crate::specification::find, crate::specification::asset,
         crate::specification::highlights, crate::proposals::create, crate::proposals::job_status, crate::proposal_reads::list, crate::proposal_reads::detail, crate::proposal_reads::options, crate::creation_context::prepare,
         crate::proposal_content::specification, crate::proposal_content::document, crate::proposal_content::find, crate::proposal_content::highlights, crate::proposal_content::asset,
         crate::comparisons::read, crate::comparisons::image::read, crate::comparisons::raw::read, crate::comparisons::readable::page, crate::comparisons::readable::unit, crate::saves::submit, crate::drafts::read, crate::drafts::save, crate::drafts::discard, crate::editor::model, crate::editor::preview,
         crate::editor::source_mode::read, crate::editor::source_mode::preview),
-    components(schemas(crate::comparisons::image::ImageEvidence, crate::Health, crate::ErrorBody, crate::ApiError, crate::auth::Profile, crate::auth::Membership, crate::auth::ProfileCapabilities,
+    components(schemas(crate::comparisons::media::ReviewMediaEvidence, crate::comparisons::image::ImageEvidence, crate::Health, crate::ErrorBody, crate::ApiError, crate::auth::Profile, crate::auth::Membership, crate::auth::ProfileCapabilities,
         crate::auth::AuthAvailability, specspace_document_engine::find::MatchWindow)),
     modifiers(&SessionSecurity)
 )]

@@ -1,7 +1,7 @@
 use super::*;
 use crate::specification::PngDisplay;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use specspace_application::comparison_file::ComparisonFileReader;
+use specspace_application::comparison_file::{ComparisonFileReader, image::LoadedImage};
 use specspace_application::comparison_file::{FileReadError, image::ImageSide};
 
 pub(super) fn routes() -> Router<AppState> {
@@ -85,17 +85,24 @@ pub(super) async fn respond(
         Ok(loaded) => loaded,
         Err(error) => return image_failure(error),
     };
+    let evidence = match evidence(actor, &loaded) {
+        Ok(evidence) => evidence,
+        Err(error) => return image_failure(error),
+    };
+    display_response(reader, actor, loaded, "X-Comparison-Image", &evidence).await
+}
+pub(super) fn evidence(actor: Uuid, loaded: &LoadedImage) -> Result<ImageEvidence, FileReadError> {
     let context = loaded.context();
-    let source = match query.side {
+    let source = match loaded.side() {
         ImageSide::Before => context.change.before.as_ref(),
         ImageSide::After => context.change.after.as_ref(),
     };
     let Some(source) = source else {
-        return image_failure(FileReadError::InvalidEvidence);
+        return Err(FileReadError::InvalidEvidence);
     };
-    let evidence = ImageEvidence {
+    Ok(ImageEvidence {
         actor_id: actor,
-        proposal_id: proposal,
+        proposal_id: context.scope.proposal,
         snapshot_id: context.snapshot,
         content_id: context.content_id.clone(),
         file_id: context.change.id.clone(),
@@ -109,7 +116,15 @@ pub(super) async fn respond(
         display_bytes: loaded.image().png.len(),
         width: loaded.image().width,
         height: loaded.image().height,
-    };
+    })
+}
+pub(super) async fn display_response(
+    reader: &ComparisonFileReader,
+    actor: Uuid,
+    loaded: LoadedImage,
+    evidence_header: &'static str,
+    evidence: &impl Serialize,
+) -> Response {
     let value = match serde_json::to_vec(&evidence)
         .ok()
         .and_then(|json| HeaderValue::from_str(&URL_SAFE_NO_PAD.encode(json)).ok())
@@ -128,7 +143,7 @@ pub(super) async fn respond(
         header::CONTENT_DISPOSITION,
         HeaderValue::from_static("inline; filename=\"specspace-comparison.png\""),
     );
-    response.headers_mut().insert("X-Comparison-Image", value);
+    response.headers_mut().insert(evidence_header, value);
     response
 }
 fn invalid() -> Response {
@@ -140,7 +155,7 @@ fn invalid() -> Response {
         None,
     )
 }
-fn image_failure(error: FileReadError) -> Response {
+pub(super) fn image_failure(error: FileReadError) -> Response {
     match error {
         FileReadError::UnsupportedKind => proposals::problem(
             StatusCode::UNPROCESSABLE_ENTITY,

@@ -1,4 +1,6 @@
 use super::*;
+#[path = "reviews/pr_recovery.rs"]
+mod pr_recovery;
 use specspace_application::{
     proposal::UiImpact,
     review_configuration::{
@@ -120,7 +122,14 @@ async fn post_raw(
         assert_eq!(response.headers()["Retry-After"], "2");
     }
     if status == StatusCode::TOO_MANY_REQUESTS {
-        assert_eq!(response.headers()["Retry-After"], "60");
+        assert_eq!(
+            response.headers()["Retry-After"],
+            if uri.ends_with("/recover") {
+                "600"
+            } else {
+                "60"
+            }
+        );
     }
     let location = response
         .headers()

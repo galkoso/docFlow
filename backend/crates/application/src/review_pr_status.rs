@@ -90,6 +90,9 @@ pub struct ReviewPrStatus {
     pub sync: Option<ReviewPrSyncStatus>,
     /// Any unresolved started PR write for this proposal, including older work.
     pub uncertain_write: bool,
+    /// A current admin may request this recovery mode. The POST rechecks all
+    /// authority and journal conditions; this hint grants no mutation authority.
+    pub recovery: Option<crate::pr_recovery::PrRecoveryMode>,
     /// Last stored observation for this PR; it may refer to another snapshot.
     pub pr: Option<ReviewPrObservation>,
 }

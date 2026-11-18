@@ -87,6 +87,35 @@ impl PgPrSync {
         let now: Timestamp = sqlx::query_scalar("SELECT clock_timestamp()")
             .fetch_one(&mut *tx)
             .await?;
+        let admin: bool = sqlx::query_scalar(
+            "SELECT role='ADMIN' FROM memberships WHERE organization_id=$1 AND user_id=$2",
+        )
+        .bind(org)
+        .bind(actor)
+        .fetch_one(&mut *tx)
+        .await?;
+        // A later submission may reuse this header while an earlier intent for
+        // the same snapshot is stopped. Keep latest-publication work separate
+        // from the latest intent eligible for explicit operator recovery.
+        let recovery_work: Option<(String, String, bool, bool)> = if admin && header.binding_current
+        {
+            sqlx::query_as("SELECT j.state,o.state,EXISTS(SELECT 1 FROM pr_sync_writes w WHERE w.operation_id=i.operation_id),EXISTS(SELECT 1 FROM pr_sync_results x WHERE x.operation_id=i.operation_id) FROM pr_sync_intents i JOIN jobs j ON j.id=i.job_id JOIN git_operations o ON o.id=i.operation_id WHERE i.organization_id=$1 AND i.proposal_id=$2 AND i.snapshot_id=$3 ORDER BY i.created_at DESC,i.operation_id DESC LIMIT 1")
+                .bind(org).bind(proposal).bind(snapshot).fetch_optional(&mut *tx).await?
+        } else {
+            None
+        };
+        let recovery = recovery_work
+            .filter(|(state, _, _, resolved)| state == "FAILED" && !resolved)
+            .and_then(|(_, operation_state, has_write, _)| {
+                use specspace_application::pr_recovery::PrRecoveryMode;
+                if has_write && operation_state == "UNKNOWN" {
+                    Some(PrRecoveryMode::ObserveStarted)
+                } else if !has_write && operation_state == "FAILED" && header.current_for_sync {
+                    Some(PrRecoveryMode::RetryUnstarted)
+                } else {
+                    None
+                }
+            });
         let dispatch = dispatch(&source, work.is_some())?;
         let sync = work
             .as_ref()
@@ -114,6 +143,7 @@ impl PgPrSync {
             dispatch,
             sync,
             uncertain_write: uncertain,
+            recovery,
             pr,
         })
     }

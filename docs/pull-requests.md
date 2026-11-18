@@ -225,17 +225,69 @@ One worker runs in the API process. `PR_SYNC_WORKER_TIMEOUT_SECONDS` defaults to
 15 seconds during long provider calls and between short calls. Heartbeats never
 run alongside the worker's own journal transactions. Graceful shutdown cancels
 in-flight work; a persisted write phase forces read-only recovery after restart.
-Provider rate-limit backoff is preserved. Explicit rejection/operator recovery
-and authenticated synchronization status remain pending.
+Provider rate-limit backoff is preserved. Authenticated synchronization status
+and bounded operator recovery are available as described below.
+
+## Stored status and explicit operator recovery
+
+`GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync` is a
+current-member, actor-bound read of stored evidence. It performs no provider IO.
+Transport delivery, automatic work, unresolved writes and the last saved provider
+observation are separate. Observation receipt time is distinct from this GET's
+read time, and an older/different snapshot cannot claim current synchronization.
+Neither a PR link nor an observed match grants approval or merge readiness.
+
+Migration 017 adds append-only recovery receipts and guarded bounded job resumes.
+An active organization admin can explicitly POST to the status URL plus `/recover`
+with the session, `X-Expected-Actor`, allowed `Origin`, CSRF header and JSON:
+
+```json
+{
+  "request_id": "e807a370-7df8-4b34-977c-a0f6f6bd8b3c",
+  "expected_fingerprint": "<the selected snapshot's 64-character lowercase fingerprint>"
+}
+```
+
+The POST resumes the latest stopped intent for that exact snapshot. It never
+creates a replacement PR intent or resets attempt numbers. A queued receipt is
+202 with a Location pointing back to stored status, not a provider result. Replay
+requires the same admin, proposal, snapshot and fingerprint under the same request
+ID and checks current admin access again. It returns the original admission even
+after completion; it cannot restart the job again. Different requests cannot
+restart live/successful/cancelled work. New admissions are limited to two per
+admin and twelve per organization in ten minutes; replay does not consume quota.
+
+- `RETRY_UNSTARTED`: no write marker exists and the operation failed. Original
+  editor authority, exact current scope/digest and repository binding must still
+  match. A new eight-attempt window permits the existing worker to retry its
+  original immutable intent, with all normal checks before any provider write.
+- `OBSERVE_STARTED`: the failed job has a durable write marker and an UNKNOWN
+  operation. Eight more attempts may only observe. The marker, operation identity,
+  immutable metadata and any bound PR remain intact. Empty listings and uncertain
+  responses never authorize another write. The original editor may still observe;
+  otherwise the admin of this recovery window must remain active and an admin on
+  every heartbeat, IO boundary and final publication. An older admin grant cannot
+  replace a revoked latest window. Read-only delegation can reconcile after proposal
+  closure or editor revocation; revoked original authority yields a SUPERSEDED
+  receipt, not current synchronization or approval.
+
+The queued job, operation state, added attempt budget and admin audit commit
+together. Database guards reject blind resets, incomplete recovery receipts and
+changes to recovery history. Repository binding changes stop recovery before IO.
+The shared review page shows only a server-provided admin recovery hint; the POST
+rechecks authority and context. A lost HTTP reply retains one request ID for
+explicit replay while that page scope remains open. Refresh and polling remain
+GET-only, and scoped denial purges the shared snapshot/body. Navigating away or
+changing identity clears local recovery state; the server keeps its durable
+admission and uncertainty.
 
 ## Remaining full-spec work
 
-- Add explicit recovery for rejected, exhausted, closed-provider and
-  revoked-original-actor cases, including transport rejections after correction.
+- Add definitive provider-rejection/negative-proof resolution, external closed/
+  merged PR synchronization and transport rejections after correction. Bounded
+  observation recovery does not declare an uncertain write absent or replace a PR.
 - Connect the bounded metadata projection to persisted decisions and complete open
   product questions when those workflows exist; capture them under journal locks.
-- Expose authenticated synchronization status and explicit recovery without
-  changing the saved snapshot or reporting provider failures as proposal closure.
 - Enforce the required head-bound SpecSpace check and native branch protection;
   integrate current approvals, policy, target freshness and unresolved blockers.
 - Add explicit readiness/close/reopen/merge capabilities with their own authority

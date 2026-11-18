@@ -1,4 +1,6 @@
 use super::*;
+#[path = "recovery.rs"]
+mod recovery;
 #[path = "status.rs"]
 mod status;
 use specspace_application::pr_sync::{PrSyncDecision, PrWritePhase};

@@ -13,6 +13,7 @@ use axum::{
 use serde::Deserialize;
 use specspace_application::{
     comparison_reader::ComparisonReadError,
+    pr_recovery::{PrRecoveryAccepted, PrRecoveryRequest},
     review_context::ReviewContextError,
     review_pr_status::ReviewPrStatus,
     review_snapshot::{
@@ -48,6 +49,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/media",
             get(media),
+        )
+        .route(
+            "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync/recover",
+            post(recover_pr).layer(DefaultBodyLimit::max(1024)),
         )
         .route(
             "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync",
@@ -313,6 +318,80 @@ pub(crate) async fn pr_status(
         Err(_) => problem(
             StatusCode::SERVICE_UNAVAILABLE,
             "PR_STATUS_UNAVAILABLE",
+            true,
+        ),
+    }
+}
+#[utoipa::path(post,path="/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync/recover",operation_id="recoverProposalReviewPr",security(("sessionCookie"=[])),
+    params(("proposal"=Uuid,Path),("snapshot"=Uuid,Path),("X-Expected-Actor"=Uuid,Header),("Origin"=String,Header),("X-XSRF-TOKEN"=String,Header)),request_body=PrRecoveryRequest,
+    responses((status=202,body=PrRecoveryAccepted,description="Admin recovery queued or its receipt replayed. Recorded writes resume observation only.",headers(("Location"=String),("Retry-After"=String))),
+    (status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=403,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=413,body=ErrorBody),(status=429,body=ErrorBody),(status=503,body=ErrorBody)))]
+pub(crate) async fn recover_pr(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<(Uuid, Uuid)>, axum::extract::rejection::PathRejection>,
+    query: Result<Query<NoQuery>, axum::extract::rejection::QueryRejection>,
+    body: Result<Json<PrRecoveryRequest>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let actor = match actor(&state, &headers, true).await {
+        Ok(actor) => actor,
+        Err(error) => return error.into_response(),
+    };
+    let (Ok(Path((proposal, snapshot))), Ok(_)) = (path, query) else {
+        return proposals::invalid_query();
+    };
+    let request = match body {
+        Ok(Json(body)) => body,
+        Err(error) => {
+            return problem(
+                if error.status() == StatusCode::PAYLOAD_TOO_LARGE {
+                    StatusCode::PAYLOAD_TOO_LARGE
+                } else {
+                    StatusCode::BAD_REQUEST
+                },
+                "INVALID_PR_RECOVERY",
+                false,
+            );
+        }
+    };
+    match state
+        .pr_sync
+        .recover(actor, proposal, snapshot, &request)
+        .await
+    {
+        Ok(receipt) => {
+            let mut response = (StatusCode::ACCEPTED, Json(receipt)).into_response();
+            let location =
+                format!("/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/pr-sync");
+            response.headers_mut().insert(
+                header::LOCATION,
+                HeaderValue::from_str(&location).expect("UUID path"),
+            );
+            response
+                .headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from_static("2"));
+            response
+        }
+        Err(PrSyncStoreError::Access(error)) => failure(error),
+        Err(PrSyncStoreError::InvalidQuery) => {
+            problem(StatusCode::BAD_REQUEST, "INVALID_PR_RECOVERY", false)
+        }
+        Err(PrSyncStoreError::Stale) => {
+            problem(StatusCode::CONFLICT, "PR_RECOVERY_CONTEXT_CHANGED", false)
+        }
+        Err(PrSyncStoreError::Busy) => {
+            problem(StatusCode::CONFLICT, "PR_RECOVERY_NOT_STOPPED", false)
+        }
+        Err(PrSyncStoreError::QuotaExceeded) => {
+            let mut response = problem(StatusCode::TOO_MANY_REQUESTS, "PR_RECOVERY_LIMIT", true);
+            response
+                .headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from_static("600"));
+            response
+        }
+        Err(_) => problem(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "PR_RECOVERY_UNAVAILABLE",
             true,
         ),
     }

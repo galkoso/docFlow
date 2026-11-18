@@ -359,6 +359,49 @@ async fn due(pool: &PgPool, job: Uuid) {
         .await
         .unwrap();
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn operator_recovers_unknown_write_after_editor_revocation_using_only_provider_reads(
+    pool: PgPool,
+) {
+    let h = harness(&pool).await;
+    h.prs.write_mode.store(1, Ordering::SeqCst);
+    let worker = h.worker(&pool);
+    worker.run_once().await.unwrap();
+    assert_eq!(h.prs.creates.load(Ordering::SeqCst), 1);
+    assert_eq!(state(&pool, h.job).await.0, "UNKNOWN");
+    sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
+        .bind(h.f.owner)
+        .execute(&pool)
+        .await
+        .unwrap();
+    due(&pool, h.job).await;
+    worker.run_once().await.unwrap();
+    assert_eq!(
+        state(&pool, h.job).await,
+        ("UNKNOWN".into(), "FAILED".into())
+    );
+    let admin = user(&pool, h.f.org, "ADMIN", vec![]).await;
+    PgPrSync::new(pool.clone())
+        .recover(
+            admin,
+            h.f.proposal,
+            h.intent.source().snapshot,
+            &specspace_application::pr_recovery::PrRecoveryRequest {
+                request_id: Uuid::new_v4(),
+                expected_fingerprint: h.intent.source().fingerprint.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        worker.run_once().await.unwrap(),
+        PrSyncWork::Completed(h.job, PrSyncResolution::Superseded)
+    );
+    assert_eq!(h.prs.creates.load(Ordering::SeqCst), 1);
+    assert_eq!(h.prs.updates.load(Ordering::SeqCst), 0);
+    assert_eq!(receipts(&pool).await, (1, 1, 1));
+}
 async fn state(pool: &PgPool, job: Uuid) -> (String, String) {
     sqlx::query_as("SELECT o.state,j.state FROM jobs j JOIN git_operations o ON o.id=j.operation_id WHERE j.id=$1").bind(job).fetch_one(pool).await.unwrap()
 }

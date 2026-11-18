@@ -117,7 +117,7 @@ async fn lock_lease(conn: &mut PgConnection, lease: &PrSyncLease) -> Result<(), 
     }
     Ok(())
 }
-async fn current_binding(
+pub(super) async fn current_binding(
     conn: &mut PgConnection,
     s: &PrSyncSource,
 ) -> Result<(), PrSyncStoreError> {
@@ -129,7 +129,13 @@ async fn current_binding(
     Ok(())
 }
 async fn authorize(conn: &mut PgConnection, lease: &PrSyncLease) -> Result<(), PrSyncStoreError> {
-    let s = lease.intent.source();
+    authorize_intent(conn, &lease.intent).await
+}
+pub(super) async fn authorize_intent(
+    conn: &mut PgConnection,
+    intent: &PrSyncIntent,
+) -> Result<(), PrSyncStoreError> {
+    let s = intent.source();
     if review_submissions::access(conn, s.actor, s.proposal, true).await? != s.organization {
         return Err(PrSyncStoreError::Stale);
     }
@@ -163,8 +169,19 @@ async fn observe_authority(
     lease: &PrSyncLease,
 ) -> Result<(), PrSyncStoreError> {
     let s = lease.intent.source();
-    if review_submissions::access(conn, s.actor, s.proposal, true).await? != s.organization {
-        return Err(PrSyncStoreError::Stale);
+    match review_submissions::access(conn, s.actor, s.proposal, true).await {
+        Ok(org) if org == s.organization => (),
+        Err(error @ (SubmissionError::NotFound | SubmissionError::Forbidden)) => {
+            // This delegation can only observe an already recorded write. Its
+            // admin must remain active on every IO/heartbeat/publication check.
+            let grant: Option<Uuid> = sqlx::query_scalar("SELECT u.id FROM pr_sync_recoveries r JOIN memberships m ON m.organization_id=r.organization_id AND m.user_id=r.actor_id JOIN users u ON u.id=m.user_id WHERE r.operation_id=$1 AND r.mode='OBSERVE_STARTED' AND r.previous_attempts<$2 AND r.max_attempts>=$2 AND r.max_attempts=(SELECT j.max_attempts FROM jobs j JOIN pr_sync_intents i ON i.job_id=j.id WHERE i.operation_id=$1) AND m.role='ADMIN' AND u.status='ACTIVE' ORDER BY r.max_attempts DESC LIMIT 1 FOR SHARE OF m,u")
+                .bind(s.operation).bind(lease.attempt).fetch_optional(&mut *conn).await?;
+            if grant.is_none() || phase(conn, s.operation).await? == PrWritePhase::NotStarted {
+                return Err(error.into());
+            }
+        }
+        Err(error) => return Err(error.into()),
+        _ => return Err(PrSyncStoreError::Stale),
     }
     current_binding(conn, s).await
 }
@@ -418,10 +435,7 @@ impl PgPrSync {
         let mut tx = self.transaction().await?;
         lock_proposal(&mut tx, s).await?;
         lock_lease(&mut tx, lease).await?;
-        if review_submissions::access(&mut tx, s.actor, s.proposal, true).await? != s.organization {
-            return Err(PrSyncStoreError::Stale);
-        }
-        current_binding(&mut tx, s).await?;
+        observe_authority(&mut tx, lease).await?;
         let bound = binding(&mut tx, s).await?;
         if let Some(b) = &bound {
             if b.identity(s)?
@@ -441,6 +455,7 @@ impl PgPrSync {
             Ok(()) => true,
             Err(
                 PrSyncStoreError::Stale
+                | PrSyncStoreError::Access(SubmissionError::NotFound | SubmissionError::Forbidden)
                 | PrSyncStoreError::Access(SubmissionError::Context(
                     ReviewContextError::Stale
                     | ReviewContextError::StateChanged

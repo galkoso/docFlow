@@ -1,6 +1,7 @@
 pub(crate) mod image;
 pub(crate) mod raw;
 pub(crate) mod readable;
+pub(crate) mod shared;
 
 use crate::{
     AppState, ErrorBody, auth,
@@ -32,6 +33,7 @@ pub fn routes() -> Router<AppState> {
         .merge(image::routes())
         .merge(raw::routes())
         .merge(readable::routes())
+        .merge(shared::routes())
 }
 #[derive(Deserialize, utoipa::IntoParams)]
 #[serde(deny_unknown_fields)]

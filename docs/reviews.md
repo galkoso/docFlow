@@ -286,8 +286,7 @@ no job/operation and returns **429** with `REVIEW_SUBMISSION_LIMIT` and
 save/submit/import/merge reservations.
 
 OpenAPI and the generated TypeScript client describe these routes and read models.
-Shared diff bodies, PR/check processing, discussion/decision APIs and approvals
-remain open.
+PR/check processing, discussion/decision APIs and approvals remain open.
 
 ## Shared snapshot body authority
 
@@ -307,8 +306,22 @@ around IO, CPU processing and cache use. Shared after-image reads additionally
 require the published validation version, source/display hashes and dimensions to
 match the newly verified, metadata-free PNG derivative. A policy-version mismatch
 fails before fetching after-image bytes. Before images retain exact pinned-source
-verification. This is internal reader support; shared raw/readable/image HTTP and
-frontend wiring remain pending.
+verification.
+
+Authenticated shared reads use
+`/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/files/{file}` with
+`/raw`, `/readable`, `/readable/units/{unit}` or `/image?side=before|after`.
+These routes use shared authority explicitly and never fall back to private
+comparison snapshots. The snapshot is fixed in the path; alternative snapshot,
+head, ref or path query fields and duplicate parameters are rejected. Captured
+actor headers are required. Raw windows, readable metadata/events and PNG body
+evidence reuse the verified private-route renderers with the shared reader and
+their existing bounds, safe fallback states, capacity and provider backoff.
+Current authority is checked again after rendering before publishing any response.
+Image bodies contain only verified PNG pixels, with `X-Comparison-Image` binding
+the actor, frozen source, side and display hash. Responses are `no-store`.
+OpenAPI and the generated client describe all four shared operations. Shared body
+frontend integration remains pending.
 
 ## Submission and shared snapshot frontend
 

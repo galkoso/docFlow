@@ -20,7 +20,6 @@ use specspace_git_adapter::{
 };
 use specspace_infrastructure::{
     comparison_worker::{ComparisonWork, ComparisonWorker},
-    comparisons::PgComparisons,
     sessions::SessionStore,
 };
 use sqlx::PgPool;
@@ -215,7 +214,7 @@ struct Fixture {
     file_resolves: Arc<AtomicUsize>,
 }
 struct RevokingFileAuthorization {
-    store: Arc<PgComparisons>,
+    store: Arc<dyn ComparisonFileAuthorization>,
     pool: PgPool,
     actor: Uuid,
     calls: Arc<AtomicUsize>,
@@ -362,6 +361,19 @@ async fn fixture_review_options(
         });
         state.configure_comparison_source(source.clone());
         if let Some(fail_at) = revoke_at {
+            state.review_files = Arc::new(state.review_files.with_authorization(Arc::new(
+                RevokingFileAuthorization {
+                    store: Arc::new(
+                        specspace_infrastructure::review_files::PgReviewFileAuthorization::new(
+                            pool.clone(),
+                        ),
+                    ),
+                    pool: pool.clone(),
+                    actor: actor.id,
+                    calls: file_resolves.clone(),
+                    fail_at,
+                },
+            )));
             state.comparison_files = Arc::new(
                 ComparisonFileReader::new(
                     Arc::new(RevokingFileAuthorization {

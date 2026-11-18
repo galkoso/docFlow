@@ -69,6 +69,7 @@ pub struct AppState {
     pub comparisons: Arc<ComparisonReader>,
     pub comparison_jobs: Arc<PgComparisons>,
     pub comparison_files: Arc<ComparisonFileReader>,
+    pub review_files: Arc<ComparisonFileReader>,
     pub review_submissions: Arc<PgReviewSubmissions>,
     pub review_snapshots: Arc<PgReviewSnapshots>,
     review_preparer: Arc<ReviewPreparer>,
@@ -120,11 +121,17 @@ impl AppState {
             )
             .expect("fixed file-read timeout is valid"),
         );
+        let review_files = Arc::new(comparison_files.with_authorization(Arc::new(
+            specspace_infrastructure::review_files::PgReviewFileAuthorization::new(
+                database.clone(),
+            ),
+        )));
         let review_preparer =
             review_preparer(database.clone(), comparisons.clone(), source.clone());
         Self {
             comparison_jobs,
             comparison_files,
+            review_files,
             comparisons,
             review_preparer,
             review_submissions: Arc::new(PgReviewSubmissions::new(database.clone())),
@@ -164,6 +171,11 @@ impl AppState {
             )
             .expect("fixed file-read timeout is valid"),
         );
+        self.review_files = Arc::new(self.comparison_files.with_authorization(Arc::new(
+            specspace_infrastructure::review_files::PgReviewFileAuthorization::new(
+                self.database.clone(),
+            ),
+        )));
         self.comparisons = Arc::new(
             ComparisonReader::new(
                 Arc::new(PgComparisonAuthorization::new(self.database.clone())),

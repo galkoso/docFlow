@@ -10,12 +10,19 @@ use specspace_infrastructure::{
 };
 
 async fn configured(pool: &PgPool, media: bool) -> (Fixture, User, User) {
+    configured_options(pool, media, None).await
+}
+async fn configured_options(
+    pool: &PgPool,
+    media: bool,
+    revoke_at: Option<usize>,
+) -> (Fixture, User, User) {
     let f = fixture_review_options(
         pool,
         true,
         "PRIVATE SOURCE SENTINEL before",
         media,
-        None,
+        revoke_at,
         false,
         true,
     )
@@ -804,3 +811,6 @@ async fn proposal_detail_honors_an_optional_captured_actor_before_review_preflig
         StatusCode::OK
     );
 }
+
+#[path = "reviews/bodies.rs"]
+mod bodies;

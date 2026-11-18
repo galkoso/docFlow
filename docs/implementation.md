@@ -1563,4 +1563,22 @@ Checkboxes represent verified work only.
   Six PostgreSQL scenarios cover Reader access, historical source, private/foreign
   locators, cache isolation, provider binding changes and mid-read revocation;
   two application cases cover shared capacity and tampered image receipts.
+  The full reader-stage backend suite passed 432 tests with two existing
+  performance measurements excluded; workspace Clippy passed.
   Shared body HTTP/frontend wiring and the remaining full-spec work remain open.
+
+- Shared snapshot content HTTP: four authenticated routes expose raw source
+  windows, readable file metadata, readable unit events and verified PNG bodies
+  under the immutable shared snapshot path. Renderers receive the shared reader
+  explicitly; private comparison authorization remains separate. Queries cannot
+  replace snapshot identity or choose refs/paths, captured actors are required,
+  current authority is checked after processing, and responses retain no-store,
+  bounded capacity, safe fallback and provider backoff behavior. OpenAPI and the
+  generated TypeScript contract include the shared operations. Five PostgreSQL
+  HTTP scenarios cover all body types, sealed media receipts, historical reads,
+  Reader/foreign/private scope, strict queries, binding/cache revocation, final
+  post-processing revocation, forged source, backoff and capacity.
+  Validation passes all 106 API tests (one existing performance measurement
+  excluded), workspace Clippy, the frontend build and all 279 frontend tests.
+  Shared body UI, PR/checks, decisions/discussions, approvals and all remaining
+  specification work remain open.

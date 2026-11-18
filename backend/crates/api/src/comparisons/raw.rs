@@ -1,4 +1,5 @@
 use super::*;
+use specspace_application::comparison_file::ComparisonFileReader;
 use specspace_application::comparison_file::FileReadError;
 use specspace_document_engine::diff::window::{
     MAX_WINDOW_BYTES, MIN_WINDOW_BYTES, RawCursor, RawWindow, WindowError,
@@ -50,6 +51,24 @@ pub(crate) async fn read(
     let (Ok(Path((proposal, file))), Ok(Query(query))) = (path, query) else {
         return invalid_window();
     };
+    respond(
+        &state,
+        &state.comparison_files,
+        actor.user_id,
+        proposal,
+        &file,
+        query,
+    )
+    .await
+}
+pub(super) async fn respond(
+    state: &AppState,
+    reader: &ComparisonFileReader,
+    actor: Uuid,
+    proposal: Uuid,
+    file: &str,
+    query: RawQuery,
+) -> Response {
     let cursor = RawCursor {
         chunk: query.chunk.unwrap_or(0),
         offset: query.offset.unwrap_or(0),
@@ -62,11 +81,7 @@ pub(crate) async fn read(
     {
         return invalid_window();
     }
-    let loaded = match state
-        .comparison_files
-        .load(actor.user_id, proposal, query.snapshot, &file)
-        .await
-    {
+    let loaded = match reader.load(actor, proposal, query.snapshot, file).await {
         Ok(loaded) => loaded,
         Err(error) => return file_failure(error),
     };
@@ -94,7 +109,7 @@ pub(crate) async fn read(
         Err(WindowError::InvalidCursor | WindowError::InvalidLimit) => return invalid_window(),
         Err(WindowError::InvalidEvidence) => return file_failure(FileReadError::InvalidEvidence),
     };
-    if let Err(error) = state.comparison_files.recheck(actor.user_id, &loaded).await {
+    if let Err(error) = reader.recheck(actor, &loaded).await {
         return file_failure(error);
     }
     Json(RawFileResponse {

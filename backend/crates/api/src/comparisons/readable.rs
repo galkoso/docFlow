@@ -1,5 +1,5 @@
 use super::*;
-use specspace_application::comparison_file::{FileReadError, LoadedFile};
+use specspace_application::comparison_file::{ComparisonFileReader, FileReadError, LoadedFile};
 use specspace_document_engine::diff::readable::{
     pair::{ReadablePair, ReadableSide},
     window::{EventCursor, EventWindow, ReadablePage, ReadableWindowError, UnitSummary},
@@ -94,6 +94,24 @@ pub(crate) async fn page(
     let (Ok(Path((proposal, file))), Ok(Query(query))) = (path, query) else {
         return invalid();
     };
+    page_response(
+        &state,
+        &state.comparison_files,
+        actor,
+        proposal,
+        &file,
+        query,
+    )
+    .await
+}
+pub(super) async fn page_response(
+    state: &AppState,
+    reader: &ComparisonFileReader,
+    actor: Uuid,
+    proposal: Uuid,
+    file: &str,
+    query: PageQuery,
+) -> Response {
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(50);
     if query.snapshot.is_nil()
@@ -110,11 +128,10 @@ pub(crate) async fn page(
         return invalid();
     }
     let (loaded, page) = match render(
-        &state,
+        state,
+        reader,
         actor,
-        proposal,
-        query.snapshot,
-        &file,
+        (proposal, query.snapshot, file),
         move |pair| match query.row {
             Some(row) => pair.page_containing(&row, limit),
             None => pair.page(offset, limit),
@@ -154,6 +171,26 @@ pub(crate) async fn unit(
     let (Ok(Path((proposal, file, index))), Ok(Query(query))) = (path, query) else {
         return invalid();
     };
+    unit_response(
+        &state,
+        &state.comparison_files,
+        actor,
+        proposal,
+        &file,
+        index,
+        query,
+    )
+    .await
+}
+pub(super) async fn unit_response(
+    state: &AppState,
+    reader: &ComparisonFileReader,
+    actor: Uuid,
+    proposal: Uuid,
+    file: &str,
+    index: usize,
+    query: UnitQuery,
+) -> Response {
     let cursor = EventCursor {
         event: query.event.unwrap_or(0),
         offset: query.offset.unwrap_or(0),
@@ -168,11 +205,10 @@ pub(crate) async fn unit(
         return invalid();
     }
     let (loaded, result) = match render(
-        &state,
+        state,
+        reader,
         actor,
-        proposal,
-        query.snapshot,
-        &file,
+        (proposal, query.snapshot, file),
         move |pair| {
             let side = match query.side {
                 ReadableComparisonSide::Before => &pair.before,
@@ -257,14 +293,12 @@ impl IntoResponse for RenderFailure {
 }
 async fn render<T: Send + 'static>(
     state: &AppState,
+    reader: &ComparisonFileReader,
     actor: Uuid,
-    proposal: Uuid,
-    snapshot: Uuid,
-    file: &str,
+    (proposal, snapshot, file): (Uuid, Uuid, &str),
     build: impl FnOnce(&ReadablePair) -> Result<T, ReadableWindowError> + Send + 'static,
 ) -> Result<(LoadedFile, T), RenderFailure> {
-    let loaded = state
-        .comparison_files
+    let loaded = reader
         .load(actor, proposal, snapshot, file)
         .await
         .map_err(RenderFailure::File)?;
@@ -297,8 +331,7 @@ async fn render<T: Send + 'static>(
         .await
         .map_err(|_| RenderFailure::File(FileReadError::TimedOut))?
         .map_err(|_| RenderFailure::File(FileReadError::Unavailable))?;
-    state
-        .comparison_files
+    reader
         .recheck(actor, &loaded)
         .await
         .map_err(RenderFailure::File)?;

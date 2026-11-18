@@ -1,6 +1,7 @@
 use super::*;
 use crate::specification::PngDisplay;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use specspace_application::comparison_file::ComparisonFileReader;
 use specspace_application::comparison_file::{FileReadError, image::ImageSide};
 
 pub(super) fn routes() -> Router<AppState> {
@@ -58,12 +59,27 @@ pub(crate) async fn read(
     let (Ok(Path((proposal, file))), Ok(Query(query))) = (path, query) else {
         return invalid();
     };
+    respond(
+        &state.comparison_files,
+        actor.user_id,
+        proposal,
+        &file,
+        query,
+    )
+    .await
+}
+pub(super) async fn respond(
+    reader: &ComparisonFileReader,
+    actor: Uuid,
+    proposal: Uuid,
+    file: &str,
+    query: ImageQuery,
+) -> Response {
     if query.snapshot.is_nil() {
         return invalid();
     }
-    let loaded = match state
-        .comparison_files
-        .load_image(actor.user_id, proposal, query.snapshot, &file, query.side)
+    let loaded = match reader
+        .load_image(actor, proposal, query.snapshot, file, query.side)
         .await
     {
         Ok(loaded) => loaded,
@@ -78,7 +94,7 @@ pub(crate) async fn read(
         return image_failure(FileReadError::InvalidEvidence);
     };
     let evidence = ImageEvidence {
-        actor_id: actor.user_id,
+        actor_id: actor,
         proposal_id: proposal,
         snapshot_id: context.snapshot,
         content_id: context.content_id.clone(),
@@ -101,11 +117,7 @@ pub(crate) async fn read(
         Some(value) => value,
         None => return image_failure(FileReadError::Unavailable),
     };
-    if let Err(error) = state
-        .comparison_files
-        .recheck_image(actor.user_id, &loaded)
-        .await
-    {
+    if let Err(error) = reader.recheck_image(actor, &loaded).await {
         return image_failure(error);
     }
     let mut response = loaded.into_image().png.into_response();

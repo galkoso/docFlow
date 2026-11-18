@@ -1787,19 +1787,3 @@ Checkboxes represent verified work only.
   API/UI and required checks remain pending, together with every remaining review,
   merge, bundle, security/operations and acceptance requirement in the full scope.
 
-- Runtime PR synchronization worker: the API now runs one bounded worker using
-  separate content/PR capabilities backed by the same verified GitHub source.
-  At most two discovery candidates are retained; conflict or incomplete discovery
-  cannot justify a write, and a listed PR followed by GET 404 remains observation.
-  Live head/main and local authority are checked before and after the journal
-  boundary. One create/update is followed by direct readback, bounded discovery,
-  ref verification and fenced receipt publication. Unknown creates/updates only
-  reconcile through reads, including after shutdown or eventual list absence.
-  Long-call and between-call lease renewals avoid both expiry and self-locking
-  publication races; provider backoff survives error classification. Eighteen new
-  PostgreSQL cases cover creation/update, lost replies, scoped revocation, ref
-  disagreement, stale projection resolution, missing bound PRs, partial discovery,
-  heartbeat renewal and shutdown recovery. Local startup reports one PR worker
-  and readiness passes. Outbox dispatch, explicit rejection/operator recovery,
-  status/checks, decisions/discussions, approvals, merge, bundles and the remaining
-  full specification remain open.

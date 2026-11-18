@@ -1786,4 +1786,3 @@ Checkboxes represent verified work only.
   passed. Automatic outbox dispatch, explicit rejection/operator recovery, status
   API/UI and required checks remain pending, together with every remaining review,
   merge, bundle, security/operations and acceptance requirement in the full scope.
-

@@ -197,8 +197,9 @@ outbox dispatch and authenticated synchronization status remain pending.
 
 ## Remaining full-spec work
 
-- Dispatch publication outbox events, including stale/poison-event handling and explicit recovery for rejected,
-  exhausted, closed-provider and revoked-original-actor cases.
+- Dispatch publication outbox events, including stale/poison-event handling and
+  explicit recovery for rejected, exhausted, closed-provider and
+  revoked-original-actor cases.
 - Connect the bounded metadata projection to persisted decisions and complete open
   product questions when those workflows exist; capture them under journal locks.
 - Expose authenticated synchronization status and explicit recovery without

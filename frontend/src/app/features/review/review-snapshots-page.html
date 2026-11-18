@@ -81,7 +81,7 @@
             @if (files.next_offset != null) {<button (click)="filePage(files.next_offset)">קבצים נוספים</button>}</div>
         }
         @if (fileScope(); as scope) {
-          <app-shared-review-body [scope]="scope" [mode]="location()?.mode ?? 'readable'" [row]="location()?.unit ?? null"
+          <app-shared-review-body [scope]="scope" [mediaValidationVersion]="snapshot.media_validation_version" [mode]="location()?.mode ?? 'readable'" [row]="location()?.unit ?? null"
             (modeSelected)="setMode($event)" (rowSelected)="selectUnit($event)" (accessDenied)="bodyDenied()" />
         } @else if (location()?.file) {<p role="alert">הקובץ שנבחר אינו בעמוד הקבצים המוצג. יש לבחור קובץ מהרשימה.</p>}
         @if (state.media(); as media) {

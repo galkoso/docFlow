@@ -15,7 +15,9 @@
       @case ('rule') { <hr> }
       @case ('task_marker') { <input type="checkbox" disabled [checked]="event.checked" aria-label="מצב משימה"> }
       @case ('image') {
-        @if (imageSource(event.destination); as source) {
+        @if (reviewMedia(); as context) {
+          <app-review-media-image [context]="context" [path]="event.destination ?? null" [alt]="event.text || 'תמונה ללא תיאור'" [title]="event.title || ''" />
+        } @else if (imageSource(event.destination); as source) {
           @if (failedImages().has(source)) {<span class="unsupported" role="status">לא ניתן לטעון את התמונה: {{ event.text || 'ללא תיאור' }} <button (click)="retryImage(source)">ניסיון נוסף</button></span>}
           @else {<img [src]="source" [alt]="event.text || 'תמונה ללא תיאור'" [title]="event.title || ''" loading="lazy" decoding="async" referrerpolicy="no-referrer" (error)="imageFailed(source)">}
         } @else {<span class="unsupported" role="img" [attr.aria-label]="event.text || 'תמונה'">תמונה: {{ event.text || 'ללא תיאור' }} — ההפניה אינה זמינה</span>}

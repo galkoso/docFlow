@@ -3,6 +3,7 @@ import { SessionState } from '../../core/auth/session-state';
 import { AssetContext, TextChange } from '../specification/render-model';
 import { DocumentRenderer } from '../specification/document-renderer';
 import { ReadableUnitState } from './readable-unit-state';
+import type { ReviewMediaContext } from './review-media-evidence';
 import { UnitScope } from './readable-window';
 
 @Component({
@@ -19,7 +20,7 @@ import { UnitScope } from './readable-window';
         <button (click)="rawRequested.emit()">צפייה במקור הגולמי</button>
       } @else if (result.window; as window) {
         @if (window.cursor.event || window.cursor.offset) {<p class="continuation">המשך תוכן מאותה יחידה</p>}
-        <app-document-renderer [events]="state.events()" [changes]="changes()" [assetContext]="assetContext()"
+        <app-document-renderer [events]="state.events()" [changes]="changes()" [assetContext]="assetContext()" [reviewMedia]="reviewMedia()"
           [sectionPrefix]="'diff-' + result.side + '-' + result.unit_index + '-'" />
         @for (code of window.code_info; track code.event_index) {<p>שפת קוד: <bdi>{{ code.info || 'ללא ציון שפה' }}</bdi></p>}
         @if (window.next) {<p>התוכן ממשיך במקטע הבא.</p>}
@@ -33,6 +34,7 @@ import { UnitScope } from './readable-window';
 })
 export class ReadableSide {
   readonly scope = input<UnitScope | null>(null);
+  readonly reviewMedia = input<ReviewMediaContext | null>(null);
   readonly assetContext = input<AssetContext | null>(null);
   readonly changes = input<TextChange[]>([]);
   readonly rawRequested = output<void>();

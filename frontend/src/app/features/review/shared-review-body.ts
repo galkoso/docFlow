@@ -5,6 +5,8 @@ import { SharedReviewBodyApi } from '../../core/api/shared-review-body-api';
 import { RawState, type RawScope } from '../comparison/raw-state';
 import { sameFile } from '../comparison/readable-evidence';
 import { ReadableView } from '../comparison/readable-view';
+import type { ReviewMediaContext } from '../comparison/review-media-evidence';
+import { integer } from '../comparison/comparison-evidence';
 import { ComparisonImage } from '../comparison/image-view';
 
 @Component({
@@ -14,6 +16,7 @@ import { ComparisonImage } from '../comparison/image-view';
 })
 export class SharedReviewBody {
   readonly scope = input<RawScope | null>(null);
+  readonly mediaValidationVersion = input<number | null>(null);
   readonly mode = input<'raw' | 'readable'>('readable');
   readonly row = input<string | null>(null);
   readonly modeSelected = output<'raw' | 'readable'>();
@@ -25,6 +28,11 @@ export class SharedReviewBody {
   readonly showEqual = signal(true);
   readonly active = computed(() => {
     const scope = this.scope(); return scope && scope.actor === this.session.profile()?.user_id && !this.api.denied() ? scope : null;
+  });
+  readonly mediaContext = computed<ReviewMediaContext | null>(() => {
+    const scope = this.active(), validationVersion = this.mediaValidationVersion();
+    if (!scope || !integer(validationVersion, 2147483647, 1)) return null;
+    return { actor: scope.actor, proposal: scope.proposal, snapshot: scope.snapshot, content: scope.content, head: scope.head, base: scope.base, validationVersion };
   });
   readonly rawView = computed(() => { const scope = this.active(), data = this.raw.data(); return scope && data && sameFile(data, scope) ? data : null; });
   readonly segments = computed(() => this.rawView()?.raw.segments.filter(segment => this.showEqual() || segment.kind !== 'equal') ?? []);

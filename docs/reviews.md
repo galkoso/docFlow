@@ -337,7 +337,8 @@ validation version and nested actor/snapshot/source/display identities. Its medi
 file identity is SHA-256 of `specspace-review-media-v1`, a NUL byte and the full
 asset path; it is distinct from a changed-file identity. Internal one-sided image
 source descriptors do not add fabricated changes to the snapshot inventory.
-Shared inline rendering and referenced before-image authority remain pending.
+Shared inline after-images use this route as described below; referenced
+before-image authority remains pending.
 
 ## Submission and shared snapshot frontend
 
@@ -399,9 +400,23 @@ immediately, before the new read completes. All source stays in page memory.
 A body access denial clears the displayed snapshot and requires an explicit reload;
 source backoff retains safe retry for the same immutable selection. Source requests
 are cancelled on selection, route, identity or component changes. Shared readable
-inline images currently remain alt-text placeholders; changed image files use the
-sealed shared image endpoint. Displaying unchanged/referenced images inline under
-shared snapshot media authority remains open.
+after-images, including unchanged referenced assets, load through
+the sealed media endpoint. Only the validated after-side receives this media
+context; the before side retains alt-text placeholders until its own referenced
+media authority is implemented. Changed image files remain available in the
+before/after image comparison.
+
+Inline image requests begin near the viewport (300px margin), once per selection,
+or from an explicit labelled load button. Browsers without viewport observation
+retain that button. Transient errors require explicit retry; no timer retries
+provider reads. The captured actor, snapshot, content identity, head/base, path,
+validation version, bounded source/display metadata and after side must match.
+The client checks the domain-separated media identity and PNG body hash before
+creating a URL, rechecking live identity after each hash. Decoded dimensions must
+also match before pixels become visible. Account/selection changes and destruction
+cancel requests and revoke URLs; media access denial clears sibling source views
+through the page's existing access-denial boundary. Private book/editor image
+routing remains unchanged.
 
 Native labelled controls, RTL/LTR isolation, wrapping layouts and 44px button
 heights support keyboard and narrow-screen use. Component/router tests verify

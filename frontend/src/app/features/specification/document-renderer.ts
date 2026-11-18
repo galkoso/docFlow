@@ -3,12 +3,14 @@ import { NgTemplateOutlet } from '@angular/common';
 import { assetSource, AssetContext, externalLink, renderTree, textParts, RenderEvent, SearchHit, TextChange, TextHighlight, TextPart }
   from './render-model';
 import type { MatchWindow } from '../../core/api/book-api';
+import { ReviewMediaImage } from '../comparison/review-media-image';
+import type { ReviewMediaContext } from '../comparison/review-media-evidence';
 import { TextWindow } from './text-window';
 import { HighlightContext, VisibleHighlights } from './visible-highlights';
 
 @Component({
   selector: 'app-document-renderer',
-  imports: [NgTemplateOutlet, TextWindow],
+  imports: [NgTemplateOutlet, TextWindow, ReviewMediaImage],
   providers: [VisibleHighlights],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './document-renderer.html',
@@ -35,6 +37,7 @@ export class DocumentRenderer {
   readonly activeMatch = input<string | null>(null);
   readonly sectionPrefix = input('');
   readonly internalLinks = input<Record<string, string>>({});
+  readonly reviewMedia = input<ReviewMediaContext | null>(null);
   readonly assetContext = input<AssetContext | null>(null);
   readonly highlightContext = input<HighlightContext | null>(null);
   readonly query = input('');

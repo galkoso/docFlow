@@ -1619,3 +1619,21 @@ Checkboxes represent verified work only.
   the preceding shared comparison UI commit passed. Inline rendering and referenced
   before-image authority remain open, along with PR/checks, discussions/decisions,
   approvals, merge, bundles and all remaining full-spec work.
+
+
+- Shared inline after-images: readable after-side events now receive explicit
+  frozen media authority and use the sealed referenced-media endpoint, including
+  assets absent from the changed-file inventory. Images load once near the viewport
+  or from an accessible load button; unsupported viewport observation retains the
+  button, and failures retry only on user action. Client proof validates actor,
+  snapshot/content/head/base, path, validation version, source/display bounds,
+  media identity hash and PNG body hash before creating a URL. Live identity is
+  checked after each hash; decoded dimensions gate visible pixels. Scope/identity
+  loss cancels requests and revokes URLs; media denial purges sibling source.
+  Thirty-five new tests cover malformed/foreign evidence, lazy/manual loading,
+  hashing/account races, revocation, explicit backoff, inert destinations/alt text,
+  actor-bound media transport and after-only renderer context. All 340 frontend
+  tests across 43 files and the production build pass. Both workflows for the
+  preceding media API commit passed. Referenced before-image authority, physical
+  keyboard/RTL/320px verification, PR/checks, discussions/decisions, approvals,
+  merge, bundles and the remaining full specification remain open.

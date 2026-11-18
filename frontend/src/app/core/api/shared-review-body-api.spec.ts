@@ -41,4 +41,11 @@ describe('Shared immutable file transport', () => {
       { status: 409, statusText: 'Conflict' });
     await Promise.resolve(); await Promise.resolve(); expect(api.denied()).toBe(true); http.verify();
   });
+  it('encodes sealed media locators and carries the captured actor without any ref query', () => {
+    const { api, http } = setup(); api.mediaImage('actor', 'p/other', 's?other', 'f#other.png').subscribe();
+    const request = http.expectOne('/api/v1/proposals/p%2Fother/review/snapshots/s%3Fother/media/f%23other.png/image');
+    expect(request.request.headers.get('X-Expected-Actor')).toBe('actor'); expect(request.request.params.keys()).toEqual([]);
+    expect(request.request.responseType).toBe('blob'); request.flush(new Blob()); http.verify();
+  });
+
 });

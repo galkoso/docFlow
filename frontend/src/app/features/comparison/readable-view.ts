@@ -5,6 +5,7 @@ import { RawScope } from './raw-state';
 import { sameFile, scopeKey } from './readable-evidence';
 import { ReadableState } from './readable-state';
 import { ReadableSide } from './readable-side';
+import type { ReviewMediaContext } from './review-media-evidence';
 import { UnitScope } from './readable-window';
 import { wordChanges, WordChanges } from './word-changes';
 
@@ -47,7 +48,7 @@ import { wordChanges, WordChanges } from './word-changes';
         <h3>לפני — לקריאה בלבד @if (row.change.status === 'modified' || row.change.status === 'deleted') {<span>− {{ row.change.status === 'deleted' ? 'הוסר' : 'לפני השינוי' }}</span>}</h3><app-readable-side [scope]="before()" [changes]="words()?.before ?? []" [assetContext]="beforeAssets()"
           (rawRequested)="rawRequested.emit()" /></section>
         <section [class.added]="row.change.status === 'modified' || row.change.status === 'added'">
-          <h3>אחרי @if (row.change.status === 'modified' || row.change.status === 'added') {<span>+ {{ row.change.status === 'added' ? 'נוסף' : 'אחרי השינוי' }}</span>}</h3><app-readable-side [scope]="after()" [changes]="words()?.after ?? []" [assetContext]="afterAssets()" (rawRequested)="rawRequested.emit()" /></section></div>
+          <h3>אחרי @if (row.change.status === 'modified' || row.change.status === 'added') {<span>+ {{ row.change.status === 'added' ? 'נוסף' : 'אחרי השינוי' }}</span>}</h3><app-readable-side [scope]="after()" [changes]="words()?.after ?? []" [assetContext]="afterAssets()" [reviewMedia]="afterMedia()" (rawRequested)="rawRequested.emit()" /></section></div>
     }
     }
   `,
@@ -60,6 +61,7 @@ import { wordChanges, WordChanges } from './word-changes';
 })
 export class ReadableView {
   readonly scope = input<RawScope | null>(null);
+  readonly reviewMedia = input<ReviewMediaContext | null>(null);
   readonly repository = input<string | null>(null);
   readonly row = input<string | null>(null);
   readonly rowSelected = output<string | null>();
@@ -85,6 +87,11 @@ export class ReadableView {
   });
   readonly before = computed(() => this.side('before'));
   readonly after = computed(() => this.side('after'));
+  readonly afterMedia = computed(() => {
+    const scope = this.scope(), media = this.reviewMedia();
+    return this.trusted() && scope && media && scope.actor === media.actor && scope.proposal === media.proposal
+      && scope.snapshot === media.snapshot && scope.content === media.content && scope.head === media.head && scope.base === media.base ? media : null;
+  });
   readonly beforeAssets = computed(() => this.assets('before'));
   readonly afterAssets = computed(() => this.assets('after'));
   constructor() { effect(() => { const scope = this.scope(), row = this.row(); untracked(() => this.state.open(scope, row)); }); }

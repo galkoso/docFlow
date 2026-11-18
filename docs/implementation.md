@@ -1870,3 +1870,25 @@ Checkboxes represent verified work only.
   section coverage and blocker workflows still need integration; this evaluator
   is not advertised as runtime check enforcement or merge authorization. The full
   remaining specification stays active.
+
+- Official review persistence (migration 018): immutable snapshot decisions now
+  capture the qualified independent reviewer, domain, fingerprint, refs, policy,
+  configuration and explanation. A latest non-comment pointer keeps comments from
+  withdrawing approvals or revision requests. New decisions check current role,
+  frozen assignment and snapshot before and after bounded live provider reads;
+  all-changes approval requires a decided UI impact and an updated recorded/Git
+  merge base. Decision, pointer, audit and recalculation event commit atomically.
+  Exact replay preserves one receipt/event, including after closure, while fresh
+  role checks still apply. Revision requests change the proposal to
+  CHANGES_REQUESTED; replacing the last current qualified request restores
+  IN_REVIEW, without claiming final approval or publishing content. Seven database
+  cases cover normal decisions/comments, concurrent replay, current eligibility,
+  provider drift, outdated base, mid-IO revocation, quota and audit rollback.
+  The audit test now verifies ordinary and cascading truncate rejection with the
+  new durable review references. All 577 backend tests pass with two existing
+  performance measurements excluded; workspace Clippy and formatting pass, and
+  OpenAPI is unchanged. Migration 018 is applied locally and the API reports ready.
+  Official-review
+  HTTP/history APIs, provider-request admission/backoff, reviewer UI, section
+  coverage, current-evidence/check publication and the full remaining scope are
+  still pending.

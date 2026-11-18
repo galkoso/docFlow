@@ -101,9 +101,24 @@ async fn audit_is_append_only(pool: PgPool) {
         "UPDATE audit_events SET action = 'CHANGED'",
         "DELETE FROM audit_events",
         "TRUNCATE audit_events",
+        "TRUNCATE audit_events CASCADE",
     ] {
         let error = sqlx::query(statement).execute(&pool).await.unwrap_err();
-        assert!(error.to_string().contains("append-only"));
+        if statement == "TRUNCATE audit_events" {
+            // A referencing immutable ledger may reject plain TRUNCATE before
+            // the audit trigger runs. CASCADE must still reach that trigger.
+            assert!(
+                error.to_string().contains("append-only")
+                    || error.as_database_error().and_then(|e| e.code()).as_deref() == Some("0A000")
+            );
+        } else {
+            assert!(error.to_string().contains("append-only"));
+        }
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM audit_events")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
     }
 }
 

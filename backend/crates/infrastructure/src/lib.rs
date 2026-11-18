@@ -8,6 +8,7 @@ pub mod drafts;
 pub mod github_source;
 pub mod index_worker;
 pub mod login_flows;
+pub mod official_reviews;
 pub mod oidc;
 pub mod pr_sync;
 pub mod pr_sync_worker;

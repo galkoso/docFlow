@@ -26,6 +26,8 @@ use std::{
 };
 #[path = "snapshots/files.rs"]
 mod files;
+#[path = "snapshots/official_reviews.rs"]
+mod official_reviews;
 #[path = "snapshots/pr_sync.rs"]
 mod pr_sync;
 #[path = "snapshots/worker.rs"]
@@ -40,6 +42,7 @@ struct Source {
     started: tokio::sync::Notify,
     release: tokio::sync::Notify,
     invalid_media: AtomicBool,
+    base_updated: AtomicBool,
 }
 fn sha(digit: usize) -> CommitSha {
     CommitSha::parse(digit.to_string().repeat(40)).unwrap()
@@ -110,10 +113,16 @@ impl GitProvider for Source {
     async fn merge_base(&self, left: &CommitSha, right: &CommitSha) -> Result<CommitSha, GitError> {
         assert_eq!(left, &sha(2));
         assert_eq!(right, &sha(1));
-        Ok(sha(0))
+        Ok(if self.base_updated.load(Ordering::SeqCst) {
+            sha(2)
+        } else {
+            sha(0)
+        })
     }
     async fn is_ancestor(&self, a: &CommitSha, d: &CommitSha) -> Result<bool, GitError> {
-        Ok(a == d || a == &sha(0))
+        Ok(a == d
+            || a == &sha(0)
+            || self.base_updated.load(Ordering::SeqCst) && a == &sha(2) && d == &sha(1))
     }
 }
 struct Factory {
@@ -197,6 +206,7 @@ async fn setup_body_options(
         started: tokio::sync::Notify::new(),
         release: tokio::sync::Notify::new(),
         invalid_media: AtomicBool::new(false),
+        base_updated: AtomicBool::new(false),
     });
     let factory = Arc::new(Factory {
         source: source.clone(),

@@ -7,7 +7,7 @@
     </div>
     @if (mode() === 'readable') {
       <app-readable-view [scope]="scope" [row]="row()" [reviewMedia]="mediaContext()" (rowSelected)="selectRow($event)" (rawRequested)="setMode('raw')" />
-      <p>תמונות אחרי נבדקות מול גרסת הסקירה. תמונות לפני מוצגות כעת כתיאור חלופי; תמונות שהשתנו זמינות גם מרשימת הקבצים.</p>
+      <p>התמונות נבדקות מול המסמך וגרסת המקור המתאימים לכל צד. תמונות שהשתנו זמינות גם מרשימת הקבצים.</p>
     } @else {
       <section class="raw" aria-label="השוואת מקור"><h2>מקור גולמי — <bdi>{{ scope.file.after?.path ?? scope.file.before?.path }}</bdi></h2>
         @if (raw.busy()) {<p role="status">טוענים מקטע מקור…</p>}

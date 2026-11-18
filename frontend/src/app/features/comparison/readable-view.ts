@@ -5,7 +5,7 @@ import { RawScope } from './raw-state';
 import { sameFile, scopeKey } from './readable-evidence';
 import { ReadableState } from './readable-state';
 import { ReadableSide } from './readable-side';
-import type { ReviewMediaContext } from './review-media-evidence';
+import { BEFORE_MEDIA_VALIDATION_VERSION, type ReviewMediaContext } from './review-media-evidence';
 import { UnitScope } from './readable-window';
 import { wordChanges, WordChanges } from './word-changes';
 
@@ -45,7 +45,7 @@ import { wordChanges, WordChanges } from './word-changes';
       <p>היחידה שנבחרה: {{ label(row.after?.kind ?? row.before!.kind) }} · {{ label(row.change.status) }}</p>
       @if (words()?.precise === false) {<p>מוצג שינוי ברמת היחידה. לא זוהתה התאמת מילים ברורה.</p>}
       <div class="pair"><section [class.removed]="row.change.status === 'modified' || row.change.status === 'deleted'">
-        <h3>לפני — לקריאה בלבד @if (row.change.status === 'modified' || row.change.status === 'deleted') {<span>− {{ row.change.status === 'deleted' ? 'הוסר' : 'לפני השינוי' }}</span>}</h3><app-readable-side [scope]="before()" [changes]="words()?.before ?? []" [assetContext]="beforeAssets()"
+        <h3>לפני — לקריאה בלבד @if (row.change.status === 'modified' || row.change.status === 'deleted') {<span>− {{ row.change.status === 'deleted' ? 'הוסר' : 'לפני השינוי' }}</span>}</h3><app-readable-side [scope]="before()" [changes]="words()?.before ?? []" [assetContext]="beforeAssets()" [reviewMedia]="beforeMedia()"
           (rawRequested)="rawRequested.emit()" /></section>
         <section [class.added]="row.change.status === 'modified' || row.change.status === 'added'">
           <h3>אחרי @if (row.change.status === 'modified' || row.change.status === 'added') {<span>+ {{ row.change.status === 'added' ? 'נוסף' : 'אחרי השינוי' }}</span>}</h3><app-readable-side [scope]="after()" [changes]="words()?.after ?? []" [assetContext]="afterAssets()" [reviewMedia]="afterMedia()" (rawRequested)="rawRequested.emit()" /></section></div>
@@ -89,8 +89,14 @@ export class ReadableView {
   readonly after = computed(() => this.side('after'));
   readonly afterMedia = computed(() => {
     const scope = this.scope(), media = this.reviewMedia();
-    return this.trusted() && scope && media && scope.actor === media.actor && scope.proposal === media.proposal
+    return this.trusted() && scope && media && !Object.hasOwn(media, 'beforeDocument') && scope.actor === media.actor && scope.proposal === media.proposal
       && scope.snapshot === media.snapshot && scope.content === media.content && scope.head === media.head && scope.base === media.base ? media : null;
+  });
+  readonly beforeMedia = computed<ReviewMediaContext | null>(() => {
+    const context = this.afterMedia(), scope = this.scope(), source = scope?.file.before;
+    if (!context || !scope || scope.file.kind !== 'document' || !source?.sha256) return null;
+    return { ...context, validationVersion: BEFORE_MEDIA_VALIDATION_VERSION,
+      beforeDocument: { file: scope.file.id, path: source.path, blobOid: source.blob_oid, sha256: source.sha256 } };
   });
   readonly beforeAssets = computed(() => this.assets('before'));
   readonly afterAssets = computed(() => this.assets('after'));

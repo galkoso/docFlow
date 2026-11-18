@@ -8,11 +8,11 @@ import { DocumentRenderer } from '../specification/document-renderer';
 import type { RenderEvent } from '../specification/render-model';
 import { IMAGE_DIGEST } from './image-state';
 import { ReviewMediaImage } from './review-media-image';
-import { mediaContext, mediaScope, mediaResponse, mediaId, displayHash } from './review-media.testing';
+import { mediaContext, mediaScope, mediaResponse, mediaId, displayHash, beforeMediaContext, beforeMediaResponse } from './review-media.testing';
 
 describe('Lazy shared inline image rendering', () => {
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-  async function setup(path = mediaScope().path) {
+  async function setup(path = mediaScope().path, context = mediaContext()) {
     const profile = signal<{ user_id: string } | null>({ user_id: mediaContext().actor });
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:inline-sealed');
     const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
@@ -22,7 +22,7 @@ describe('Lazy shared inline image rendering', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(DocumentRenderer), http = TestBed.inject(HttpTestingController);
     const events: RenderEvent[] = [{ kind: 'image', source_start_byte: 0, source_end_byte: 100, destination: path, text: '<script>alt</script>', title: 'Synthetic' }];
-    fixture.componentRef.setInput('events', events); fixture.componentRef.setInput('reviewMedia', mediaContext()); fixture.detectChanges();
+    fixture.componentRef.setInput('events', events); fixture.componentRef.setInput('reviewMedia', context); fixture.detectChanges();
     const settle = async () => { await fixture.whenStable(); fixture.detectChanges(); };
     await settle();
     const child = fixture.debugElement.query(By.directive(ReviewMediaImage)).componentInstance as ReviewMediaImage;
@@ -80,4 +80,16 @@ describe('Lazy shared inline image rendering', () => {
     const { fixture, http, child } = await setup(path); child.load();
     expect(fixture.nativeElement.querySelector('img')).toBeNull(); expect(fixture.nativeElement.textContent).toContain('ההפניה אינה זמינה'); http.verify();
   });
+  it('renders before pixels only through the document-bound endpoint and revokes them when document proof changes', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined);
+    const context = beforeMediaContext(), { fixture, child, http, revoke, settle } = await setup(mediaScope().path, context);
+    child.load(); const request = http.expectOne(req => req.url.includes(`/files/${context.beforeDocument!.file}/before-media/`));
+    expect(request.request.params.keys()).toEqual([]); const response = beforeMediaResponse(); request.flush(response.body, { headers: response.headers }); await settle();
+    const image = fixture.nativeElement.querySelector('img') as HTMLImageElement;
+    expect(image.src).toBe('blob:inline-sealed'); expect(getComputedStyle(image).display).toBe('none');
+    fixture.componentRef.setInput('reviewMedia', { ...context, beforeDocument: { ...context.beforeDocument!, sha256: 'f'.repeat(64) } });
+    fixture.detectChanges(); await settle(); expect(revoke).toHaveBeenCalledWith('blob:inline-sealed'); expect(fixture.nativeElement.querySelector('img')).toBeNull();
+    http.expectNone(() => true); http.verify();
+  });
+
 });

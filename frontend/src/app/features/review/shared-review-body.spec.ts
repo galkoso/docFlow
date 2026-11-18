@@ -63,8 +63,14 @@ describe('Shared snapshot body rendering', () => {
     await settle(); expect(selected).toHaveBeenCalledWith(row.change.id);
     const sides = fixture.debugElement.queryAll(By.directive(ReadableSide));
     const before = sides.find(side => side.componentInstance.scope()?.side === 'before')!, after = sides.find(side => side.componentInstance.scope()?.side === 'after')!;
-    expect(before.componentInstance.reviewMedia()).toBeNull(); expect(after.componentInstance.reviewMedia()).toEqual(fixture.componentInstance.mediaContext());
+    const beforeMedia = before.componentInstance.reviewMedia();
+    expect(beforeMedia.beforeDocument).toEqual({ file: scope.file.id, path: scope.file.before!.path, blobOid: scope.file.before!.blob_oid, sha256: scope.file.before!.sha256 });
+    expect(before.query(By.directive(DocumentRenderer)).componentInstance.reviewMedia()).toEqual(beforeMedia);
+    expect(after.componentInstance.reviewMedia()).toEqual(fixture.componentInstance.mediaContext());
+    expect(after.componentInstance.reviewMedia().beforeDocument).toBeUndefined();
     expect(after.query(By.directive(DocumentRenderer)).componentInstance.reviewMedia()).toEqual(fixture.componentInstance.mediaContext());
+    fixture.componentRef.setInput('mediaValidationVersion', 3); fixture.detectChanges(); await settle();
+    expect(view.beforeMedia()?.validationVersion).toBe(1); expect(view.afterMedia()?.validationVersion).toBe(3);
     expect(fixture.nativeElement.textContent).toContain('אחרי'); http.expectNone(req => req.url.includes('/diff')); http.verify();
   });
   it('drops all visible source and reports denial without an automatic read retry', async () => {
@@ -101,6 +107,16 @@ describe('Shared snapshot body rendering', () => {
     api.mediaImage(scope.actor, scope.proposal, scope.snapshot, 'a'.repeat(64) + '.png').subscribe({ error: () => {} });
     http.expectOne(req => req.url.includes('/media/')).flush(new Blob(), { status: 403, statusText: 'Denied' }); await settle();
     expect(denied).toHaveBeenCalledOnce(); expect(body.rawView()).toBeNull(); expect(body.active()).toBeNull(); http.verify();
+  });
+
+  it('keeps verified sibling content when before-media reports a local missing-reference fallback', async () => {
+    const { fixture, body, http, root, settle } = await setup(), denied = vi.fn(); body.accessDenied.subscribe(denied);
+    http.expectOne(req => req.url === `${root}/raw`).flush(rawResponse()); await settle(); const original = body.rawView(); expect(original).not.toBeNull();
+    const api = fixture.debugElement.injector.get(SharedReviewBodyApi), scope = rawScope();
+    api.beforeMediaImage(scope.actor, scope.proposal, scope.snapshot, scope.file.id, 'a'.repeat(64) + '.png').subscribe({ error: () => {} });
+    http.expectOne(req => req.url.includes('/before-media/')).flush(new Blob([JSON.stringify({ error: { code: 'BEFORE_MEDIA_REFERENCE_NOT_FOUND' } })]),
+      { status: 422, statusText: 'Local fallback' }); await settle();
+    expect(denied).not.toHaveBeenCalled(); expect(body.active()).not.toBeNull(); expect(body.rawView()).toEqual(original); http.verify();
   });
 
 });

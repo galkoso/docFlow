@@ -48,4 +48,11 @@ describe('Shared immutable file transport', () => {
     expect(request.request.responseType).toBe('blob'); request.flush(new Blob()); http.verify();
   });
 
+  it('captures before-document and filename identities in the path without mutable side/ref queries', () => {
+    const { api, http } = setup(); api.beforeMediaImage('actor', 'p/other', 's?other', 'f#other', 'a?bad.png').subscribe();
+    const request = http.expectOne('/api/v1/proposals/p%2Fother/review/snapshots/s%3Fother/files/f%23other/before-media/a%3Fbad.png/image');
+    expect(request.request.headers.get('X-Expected-Actor')).toBe('actor'); expect(request.request.params.keys()).toEqual([]);
+    expect(request.request.responseType).toBe('blob'); request.flush(new Blob()); http.verify();
+  });
+
 });

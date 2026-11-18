@@ -1,7 +1,7 @@
 import { HttpHeaders, HttpResponse } from '@angular/common/http';
 import { reviewMediaEvidence, reviewMediaKey } from './review-media-evidence';
 import type { ReviewMediaEvidence } from './review-media-evidence';
-import { mediaScope, mediaResponse } from './review-media.testing';
+import { mediaScope, mediaResponse, beforeMediaScope, beforeMediaResponse } from './review-media.testing';
 
 describe('Shared referenced-image evidence', () => {
   it('binds exact frozen context, path, source and bounded display metadata', () => {
@@ -31,4 +31,28 @@ describe('Shared referenced-image evidence', () => {
     expect(reviewMediaEvidence(new HttpResponse({ body: new Blob(), headers: response.headers }), mediaScope())).toBeNull();
     expect(reviewMediaEvidence(response.clone({ headers: response.headers.set('Content-Type', 'image/jpeg') }), mediaScope())).toBeNull();
   });
+  it('keeps before and after proof namespaces separate even for identical asset bytes', () => {
+    expect(reviewMediaEvidence(beforeMediaResponse(), beforeMediaScope())).not.toBeNull();
+    expect(reviewMediaEvidence(mediaResponse(), beforeMediaScope())).toBeNull();
+    expect(reviewMediaEvidence(beforeMediaResponse(), mediaScope())).toBeNull();
+    expect(reviewMediaKey(beforeMediaScope())).not.toBe(reviewMediaKey(mediaScope()));
+  });
+  it.each([
+    { document_path: 'docs/other.md' }, { document_blob_oid: 'f'.repeat(40) }, { document_sha256: 'f'.repeat(64) },
+    { image: { file_id: 'f'.repeat(64) } }, { image: { side: 'after' } }, { image: { merge_base_sha: 'f'.repeat(40) } },
+    { media_validation_version: 2 },
+  ])('rejects mismatched before-document proof: %j', patch => {
+    const response = beforeMediaResponse(), value = JSON.parse(atob(response.headers.get('X-Review-Before-Media')!));
+    expect(reviewMediaEvidence(beforeMediaResponse({ ...value, ...patch, image: { ...value.image, ...patch.image } }), beforeMediaScope())).toBeNull();
+  });
+  it('rejects malformed before authority without silently switching to after authority', () => {
+    const base = beforeMediaScope(), doc = base.beforeDocument!;
+    expect(reviewMediaKey(Object.assign(Object.create({ beforeDocument: doc }), mediaScope()))).toBeNull();
+    for (const patch of [{ beforeDocument: undefined }, { beforeDocument: { ...doc, file: 'bad' } },
+      { beforeDocument: { ...doc, path: 'docs/../secret.md' } }, { beforeDocument: { ...doc, path: 'assets/other.md' } },
+      { beforeDocument: { ...doc, blobOid: 'main' } }, { beforeDocument: { ...doc, sha256: 'bad' } }, { validationVersion: 2 }]) {
+      expect(reviewMediaKey({ ...base, ...patch })).toBeNull();
+    }
+  });
+
 });

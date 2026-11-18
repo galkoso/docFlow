@@ -1659,3 +1659,21 @@ Checkboxes represent verified work only.
   Before-image UI integration, visual acceptance,
   PR/checks, decisions/discussions, approvals, merge, bundles and the remaining full
   specification remain open.
+
+
+- Shared inline before-images: validated readable before-units now receive their
+  original document path/OID/hash and changed-file identity and load through the
+  document-bound before-media endpoint. Before/after proof headers and scopes are
+  distinct; malformed or mismatched document proof cannot fall back to after
+  authority. The current before-image engine version is checked independently of
+  the stored after-receipt version. The existing lazy loader verifies bounded
+  image proof, PNG hash and decoded dimensions, cancels work on document/account
+  changes and revokes prior URLs. Missing before references remain local 422
+  fallbacks while scoped denial still purges sibling content. Eighteen new cases
+  cover swapped/malformed proofs, exact request scope, async identity/hash races,
+  source changes, lazy renderer integration and local fallback retention. All 358
+  frontend tests across 44 files and the production build pass. Both workflows for
+  the preceding before-media API commit passed. No browser is connected, so
+  physical keyboard, visual RTL and 320px acceptance remain open. PR/checks,
+  decisions/discussions, approvals, merge, bundles and all remaining specification
+  work remain open.

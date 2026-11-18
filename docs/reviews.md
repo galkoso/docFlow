@@ -363,7 +363,8 @@ merge base, asset source and display proof. Its validation version describes the
 current image engine; it is distinct from a sealed after receipt. Missing before
 side/reference/asset, unavailable canonical proof and tree limits return explicit
 **422** local-image fallback codes. Access denials retain their scoped **401/404**
-behavior. Before-image frontend integration remains pending.
+behavior. The shared readable frontend uses the document-bound endpoint for
+inline before-images as described below.
 
 ## Submission and shared snapshot frontend
 
@@ -425,10 +426,14 @@ immediately, before the new read completes. All source stays in page memory.
 A body access denial clears the displayed snapshot and requires an explicit reload;
 source backoff retains safe retry for the same immutable selection. Source requests
 are cancelled on selection, route, identity or component changes. Shared readable
-after-images, including unchanged referenced assets, load through
-the sealed media endpoint. Only the validated after-side receives this media
-context; the before side retains alt-text placeholders until its own referenced
-media authority is implemented. Changed image files remain available in the
+after-images, including unchanged referenced assets, load through the sealed
+media endpoint. The before side receives a separate context derived from the
+validated before-document path/OID/hash and changed-file identity. It uses the
+document-bound before-media endpoint and verifies those additional proof fields;
+a before response cannot substitute for an after receipt or vice versa. Its
+supported current engine version is independent of the historical after-receipt
+version. Missing before source/reference returns a local 422 fallback without
+purging verified sibling content. Changed image files remain available in the
 before/after image comparison.
 
 Inline image requests begin near the viewport (300px margin), once per selection,
@@ -436,8 +441,9 @@ or from an explicit labelled load button. Browsers without viewport observation
 retain that button. Transient errors require explicit retry; no timer retries
 provider reads. The captured actor, snapshot, content identity, head/base, path,
 validation version, bounded source/display metadata and after side must match.
-The client checks the domain-separated media identity and PNG body hash before
-creating a URL, rechecking live identity after each hash. Decoded dimensions must
+The client checks the after-media domain identity or the exact before-document
+identity, then the PNG body hash before creating a URL. It rechecks live identity
+after each hash. Decoded dimensions must
 also match before pixels become visible. Account/selection changes and destruction
 cancel requests and revoke URLs; media access denial clears sibling source views
 through the page's existing access-denial boundary. Private book/editor image

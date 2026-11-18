@@ -4,9 +4,9 @@ import { Subscription, timeout } from 'rxjs';
 import { SessionState } from '../../core/auth/session-state';
 import { SharedReviewBodyApi } from '../../core/api/shared-review-body-api';
 import { IMAGE_DIGEST } from './image-state';
-import { reviewMediaEvidence, reviewMediaKey, type ReviewMediaEvidence, type ReviewMediaScope } from './review-media-evidence';
+import { reviewMediaEvidence, reviewMediaKey, type ReviewInlineMediaEvidence, type ReviewMediaScope } from './review-media-evidence';
 
-/** One lazy sealed after-image. Source is never persisted, URL publication waits
+/** One lazy shared before/after image. Source is never persisted, URL publication waits
  * for path/domain identity and PNG body hashes, and every async boundary is fenced. */
 @Injectable()
 export class ReviewMediaState implements OnDestroy {
@@ -18,7 +18,7 @@ export class ReviewMediaState implements OnDestroy {
   private key: string | null = null;
   private generation = 0;
   private request?: Subscription;
-  readonly data = signal<{ url: string; evidence: ReviewMediaEvidence } | null>(null);
+  readonly data = signal<{ url: string; evidence: ReviewInlineMediaEvidence } | null>(null);
   readonly busy = signal(false);
   readonly loaded = signal(false);
   readonly error = signal('');
@@ -37,7 +37,10 @@ export class ReviewMediaState implements OnDestroy {
     const scope = this.scope;
     if (!scope || this.busy() || !this.owns(scope) || this.data()) return;
     this.drop(); this.started.set(true); this.error.set(''); this.busy.set(true); const generation = ++this.generation;
-    this.request = this.api.mediaImage(scope.actor, scope.proposal, scope.snapshot, scope.path.slice(7)).pipe(timeout(30_000)).subscribe({
+    const request = scope.beforeDocument
+      ? this.api.beforeMediaImage(scope.actor, scope.proposal, scope.snapshot, scope.beforeDocument.file, scope.path.slice(7))
+      : this.api.mediaImage(scope.actor, scope.proposal, scope.snapshot, scope.path.slice(7));
+    this.request = request.pipe(timeout(30_000)).subscribe({
       next: response => { void this.install(response, scope, generation); }, error: error => { void this.failed(error, generation); },
     });
   }
@@ -60,9 +63,12 @@ export class ReviewMediaState implements OnDestroy {
     try {
       const evidence = reviewMediaEvidence(response, scope);
       if (!evidence) throw new Error('MEDIA_EVIDENCE_MISMATCH');
-      const identity = await this.hash(new Blob([`specspace-review-media-v1\0${scope.path}`]));
+      if (!scope.beforeDocument) {
+        const identity = await this.hash(new Blob([`specspace-review-media-v1\0${scope.path}`]));
+        if (generation !== this.generation || this.scope !== scope || !this.owns(scope)) return;
+        if (identity !== evidence.image.file_id) throw new Error('MEDIA_IDENTITY_MISMATCH');
+      }
       if (generation !== this.generation || this.scope !== scope || !this.owns(scope)) return;
-      if (identity !== evidence.image.file_id) throw new Error('MEDIA_IDENTITY_MISMATCH');
       const display = await this.hash(response.body!);
       if (generation !== this.generation || this.scope !== scope || !this.owns(scope)) return;
       if (display !== evidence.image.display_sha256) throw new Error('MEDIA_DISPLAY_MISMATCH');

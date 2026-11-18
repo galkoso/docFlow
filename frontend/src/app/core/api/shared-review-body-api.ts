@@ -39,6 +39,11 @@ export class SharedReviewBodyApi implements ComparisonBodyApi {
       headers: this.actor(actor), responseType: 'blob', observe: 'response',
     }));
   }
+  beforeMediaImage(actor: string, proposal: string, snapshot: string, file: string, filename: string) {
+    return this.observe(this.http.get(`${this.path(proposal, snapshot, file)}/before-media/${encodeURIComponent(filename)}/image`, {
+      headers: this.actor(actor), responseType: 'blob', observe: 'response',
+    }));
+  }
   private observe<T>(request: Observable<T>): Observable<T> {
     return request.pipe(tap({ error: (error: unknown) => {
       if (!(error instanceof HttpErrorResponse)) return;

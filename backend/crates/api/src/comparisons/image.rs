@@ -100,6 +100,14 @@ pub(super) fn evidence(actor: Uuid, loaded: &LoadedImage) -> Result<ImageEvidenc
     let Some(source) = source else {
         return Err(FileReadError::InvalidEvidence);
     };
+    evidence_for_source(actor, loaded, source)
+}
+pub(super) fn evidence_for_source(
+    actor: Uuid,
+    loaded: &LoadedImage,
+    source: &specspace_application::comparison::Side,
+) -> Result<ImageEvidence, FileReadError> {
+    let context = loaded.context();
     Ok(ImageEvidence {
         actor_id: actor,
         proposal_id: context.scope.proposal,

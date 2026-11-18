@@ -136,47 +136,11 @@ impl ComparisonFileReader {
         self.check(actor, &context).await?;
         let (loaded, _permit) = tokio::task::spawn_blocking(move || {
             let held = permit;
-            let source = selected(&context, side).ok_or(FileReadError::InvalidEvidence)?;
-            if bytes.len() as u64 != source.bytes
-                || blob::oid(&bytes, source.blob_oid.len())
-                    .ok()
-                    .as_ref()
-                    .map(CommitSha::as_str)
-                    != Some(source.blob_oid.as_str())
-            {
-                return Err(FileReadError::InvalidEvidence);
-            }
-            let source_sha256 = format!("{:x}", Sha256::digest(&bytes));
-            if source
-                .sha256
-                .as_ref()
-                .is_some_and(|hash| hash != &source_sha256)
-            {
-                return Err(FileReadError::InvalidEvidence);
-            }
-            let image =
-                media::display(&source.path, &bytes).map_err(FileReadError::InvalidImage)?;
-            let display_sha256 = format!("{:x}", Sha256::digest(&image.png));
-            if side == ImageSide::After
-                && let Some(proof) = &context.published_after_image
-                && (proof.validation_version != media::VALIDATION_VERSION
-                    || proof.source_sha256 != source_sha256
-                    || proof.display_sha256 != display_sha256
-                    || proof.width != image.width
-                    || proof.height != image.height)
-            {
-                return Err(FileReadError::InvalidEvidence);
-            }
-            Ok::<_, FileReadError>((
-                LoadedImage {
-                    context,
-                    side,
-                    source_sha256,
-                    display_sha256,
-                    image,
-                },
-                held,
-            ))
+            let source = selected(&context, side)
+                .ok_or(FileReadError::InvalidEvidence)?
+                .clone();
+            let loaded = prepare_image(context, side, source, bytes)?;
+            Ok::<_, FileReadError>((loaded, held))
         })
         .await
         .map_err(|_| FileReadError::Unavailable)??;
@@ -184,6 +148,50 @@ impl ComparisonFileReader {
         Ok(loaded)
     }
 }
+pub(super) fn prepare_image(
+    context: FileReadContext,
+    side: ImageSide,
+    source: Side,
+    bytes: Vec<u8>,
+) -> Result<LoadedImage, FileReadError> {
+    if bytes.len() as u64 != source.bytes
+        || blob::oid(&bytes, source.blob_oid.len())
+            .ok()
+            .as_ref()
+            .map(CommitSha::as_str)
+            != Some(source.blob_oid.as_str())
+    {
+        return Err(FileReadError::InvalidEvidence);
+    }
+    let source_sha256 = format!("{:x}", Sha256::digest(&bytes));
+    if source
+        .sha256
+        .as_ref()
+        .is_some_and(|hash| hash != &source_sha256)
+    {
+        return Err(FileReadError::InvalidEvidence);
+    }
+    let image = media::display(&source.path, &bytes).map_err(FileReadError::InvalidImage)?;
+    let display_sha256 = format!("{:x}", Sha256::digest(&image.png));
+    if side == ImageSide::After
+        && let Some(proof) = &context.published_after_image
+        && (proof.validation_version != media::VALIDATION_VERSION
+            || proof.source_sha256 != source_sha256
+            || proof.display_sha256 != display_sha256
+            || proof.width != image.width
+            || proof.height != image.height)
+    {
+        return Err(FileReadError::InvalidEvidence);
+    }
+    Ok(LoadedImage {
+        context,
+        side,
+        source_sha256,
+        display_sha256,
+        image,
+    })
+}
+
 fn selected(context: &FileReadContext, side: ImageSide) -> Option<&Side> {
     match side {
         ImageSide::Before => context.change.before.as_ref(),

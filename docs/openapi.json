@@ -3941,6 +3941,147 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/files/{file}/before-media/{asset}/image": {
+      "get": {
+        "tags": [
+          "crate::comparisons::media"
+        ],
+        "operationId": "reviewSnapshotBeforeMediaImage",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified before-image referenced by the exact before-document, read from the frozen merge base",
+            "headers": {
+              "X-Review-Before-Media": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Unpadded base64url JSON ReviewBeforeMediaEvidence; document reference, pinned base source and verified display identities"
+              }
+            },
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/PngDisplay"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/files/{file}/image": {
       "get": {
         "tags": [
@@ -8634,6 +8775,40 @@
           "DEVELOPMENT",
           "DESIGN"
         ]
+      },
+      "ReviewBeforeMediaEvidence": {
+        "type": "object",
+        "description": "Before-media derives from a verified document reference and pinned base-tree\nentry. It is not an after receipt or a newly published review manifest.",
+        "required": [
+          "asset_path",
+          "media_validation_version",
+          "document_path",
+          "document_blob_oid",
+          "document_sha256",
+          "image"
+        ],
+        "properties": {
+          "asset_path": {
+            "type": "string"
+          },
+          "document_blob_oid": {
+            "type": "string"
+          },
+          "document_path": {
+            "type": "string"
+          },
+          "document_sha256": {
+            "type": "string"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageEvidence"
+          },
+          "media_validation_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
       },
       "ReviewConfiguration": {
         "type": "object",

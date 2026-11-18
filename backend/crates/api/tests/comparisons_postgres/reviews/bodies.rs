@@ -487,3 +487,172 @@ async fn shared_media_http_preserves_backoff_and_discards_forged_missing_or_revo
     assert!(!headers.contains_key("X-Review-Media"));
     assert!(!body.starts_with(b"\x89PNG"));
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn before_media_http_binds_document_reference_base_source_and_png_after_closure(
+    pool: PgPool,
+) {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    use sha2::{Digest, Sha256};
+    let (f, _, _) = configured(&pool, true).await;
+    f.provider.reused_media.store(true, Ordering::SeqCst);
+    f.provider.before_media.store(true, Ordering::SeqCst);
+    let (_, snapshot) = publish(&f, 2).await;
+    let (document, image, base) = files(&f, &snapshot).await;
+    assert!(image.is_null());
+    let filename = f
+        .provider
+        .images
+        .keys()
+        .next()
+        .unwrap()
+        .strip_prefix("assets/")
+        .unwrap();
+    sqlx::query("UPDATE proposals SET state='CLOSED',head_sha=$2,target_sha=$2,version=version+1 WHERE id=$1").bind(f.proposal).bind("4".repeat(40)).execute(&pool).await.unwrap();
+    let path = body_path(&base, &document, &format!("before-media/{filename}/image"));
+    let (status, headers, bytes) = image_response(&f.app, &f.actor, &path, true).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&bytes)
+    );
+    assert!(!headers.contains_key("X-Review-Media"));
+    assert!(!headers.contains_key("X-Comparison-Image"));
+    let proof: Value = serde_json::from_slice(
+        &URL_SAFE_NO_PAD
+            .decode(headers["X-Review-Before-Media"].as_bytes())
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(proof["asset_path"], format!("assets/{filename}"));
+    assert_eq!(
+        proof["media_validation_version"],
+        specspace_document_engine::media::VALIDATION_VERSION
+    );
+    assert_eq!(proof["document_path"], document["before"]["path"]);
+    assert_eq!(proof["document_blob_oid"], document["before"]["blob_oid"]);
+    assert_eq!(proof["document_sha256"], document["before"]["sha256"]);
+    let image = &proof["image"];
+    assert_eq!(image["file_id"], document["id"]);
+    assert_eq!(image["actor_id"], f.actor.id.to_string());
+    assert_eq!(image["snapshot_id"], snapshot);
+    assert_eq!(image["side"], "before");
+    assert_eq!(image["head_sha"], HEAD);
+    assert_eq!(image["merge_base_sha"], OLD);
+    assert_eq!(image["source_sha256"], &filename[..64]);
+    assert_eq!(
+        image["display_sha256"],
+        format!("{:x}", Sha256::digest(&bytes))
+    );
+    assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
+    assert_eq!(headers["content-type"], "image/png");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn before_media_http_rejects_missing_before_reference_queries_and_foreign_scope_without_media_io(
+    pool: PgPool,
+) {
+    let (f, _, _) = configured(&pool, true).await;
+    f.provider.reused_media.store(true, Ordering::SeqCst);
+    let (_, snapshot) = publish(&f, 2).await;
+    let (document, _, base) = files(&f, &snapshot).await;
+    let filename = f
+        .provider
+        .images
+        .keys()
+        .next()
+        .unwrap()
+        .strip_prefix("assets/")
+        .unwrap();
+    let path = body_path(&base, &document, &format!("before-media/{filename}/image"));
+    assert_eq!(
+        image_response(&f.app, &f.actor, &path, false).await.0,
+        StatusCode::CONFLICT
+    );
+    let foreign = fixture(&pool, true).await;
+    assert_eq!(
+        image_response(&f.app, &foreign.owner, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    for query in [
+        "side=after",
+        "ref=main",
+        "snapshot=other",
+        "commit=main",
+        "path=assets/other.png",
+    ] {
+        assert_eq!(
+            image_response(&f.app, &f.actor, &format!("{path}?{query}"), true)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    assert_eq!(
+        get(&f.app, &f.actor, &body_path(&base, &document, "raw"), true)
+            .await
+            .0,
+        StatusCode::OK
+    );
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let (status, headers, bytes) = image_response(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        serde_json::from_slice::<Value>(&bytes).unwrap()["error"]["code"],
+        "BEFORE_MEDIA_REFERENCE_NOT_FOUND"
+    );
+    assert!(!headers.contains_key("X-Review-Before-Media"));
+    assert!(!bytes.starts_with(b"\x89PNG"));
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn before_media_http_final_authorization_and_mid_binary_revocation_never_emit_pixels(
+    pool: PgPool,
+) {
+    let (f, _, _) = configured_options(&pool, true, Some(12)).await;
+    f.provider.reused_media.store(true, Ordering::SeqCst);
+    f.provider.before_media.store(true, Ordering::SeqCst);
+    let (_, snapshot) = publish(&f, 2).await;
+    let (document, _, base) = files(&f, &snapshot).await;
+    let filename = f
+        .provider
+        .images
+        .keys()
+        .next()
+        .unwrap()
+        .strip_prefix("assets/")
+        .unwrap();
+    let path = body_path(&base, &document, &format!("before-media/{filename}/image"));
+    let (status, headers, bytes) = image_response(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(!headers.contains_key("X-Review-Before-Media"));
+    assert!(!bytes.starts_with(b"\x89PNG"));
+    assert_eq!(f.file_resolves.load(Ordering::SeqCst), 12);
+    let (f, _, _) = configured(&pool, true).await;
+    f.provider.reused_media.store(true, Ordering::SeqCst);
+    f.provider.before_media.store(true, Ordering::SeqCst);
+    let (_, snapshot) = publish(&f, 2).await;
+    let (document, _, base) = files(&f, &snapshot).await;
+    let filename = f
+        .provider
+        .images
+        .keys()
+        .next()
+        .unwrap()
+        .strip_prefix("assets/")
+        .unwrap();
+    assert_eq!(
+        get(&f.app, &f.actor, &body_path(&base, &document, "raw"), true)
+            .await
+            .0,
+        StatusCode::OK
+    );
+    *f.provider.hook.lock().unwrap() = Some((pool.clone(), f.actor.id));
+    let path = body_path(&base, &document, &format!("before-media/{filename}/image"));
+    let (status, headers, bytes) = image_response(&f.app, &f.actor, &path, true).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(!headers.contains_key("X-Review-Before-Media"));
+    assert!(!bytes.starts_with(b"\x89PNG"));
+}

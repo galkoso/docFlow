@@ -337,8 +337,33 @@ validation version and nested actor/snapshot/source/display identities. Its medi
 file identity is SHA-256 of `specspace-review-media-v1`, a NUL byte and the full
 asset path; it is distinct from a changed-file identity. Internal one-sided image
 source descriptors do not add fabricated changes to the snapshot inventory.
-Shared inline after-images use this route as described below; referenced
-before-image authority remains pending.
+Shared inline after-images use this route as described below.
+
+Referenced before-images use
+`/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/files/{file}/before-media/{asset}/image`.
+The captured actor is required and query parameters cannot override refs, paths or
+sides. The file must be a document in that exact shared snapshot. The reader first
+verifies its complete frozen before-source, then uses the bounded canonical
+readable parser to prove an image event in an unprotected unit names the requested
+asset. Code examples, HTML, ordinary links and after-only references grant no
+authority. The canonical source supplies the path used for provider IO.
+
+The frozen merge-base tree must contain exactly one regular image entry at that
+path, with supported blob identity and bounded size. Tree reads are capped at
+20,000 entries and share the existing two reader slots with source parsing and
+image verification. OID, length, content-addressed SHA-256, actual image type and
+safe re-encoded pixels are checked before display. Current authority is rechecked
+after reference parsing, connection, tree IO/selection, binary IO and image CPU,
+and once more before the HTTP response. CPU work retains its permit through
+timeout/cancellation. No ref is reselected and no before-image receipt is invented.
+
+The PNG body carries `X-Review-Before-Media`, whose `ReviewBeforeMediaEvidence`
+binds the original before-document path/OID/hash, changed-file identity, snapshot,
+merge base, asset source and display proof. Its validation version describes the
+current image engine; it is distinct from a sealed after receipt. Missing before
+side/reference/asset, unavailable canonical proof and tree limits return explicit
+**422** local-image fallback codes. Access denials retain their scoped **401/404**
+behavior. Before-image frontend integration remains pending.
 
 ## Submission and shared snapshot frontend
 

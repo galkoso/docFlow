@@ -18,7 +18,7 @@ struct PublishedMedia {
     path: String,
 }
 async fn published(pool: &PgPool, reused: bool) -> PublishedMedia {
-    let (f, source, preparer) = setup_body_options(pool, true, None, reused).await;
+    let (f, source, preparer) = setup_body_options(pool, true, None, reused, None).await;
     let (lease, verified) = prepared(pool, &f, &preparer, 2).await;
     if reused {
         assert!(

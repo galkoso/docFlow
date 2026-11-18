@@ -47,6 +47,7 @@ struct Provider {
     reads: AtomicUsize,
     backoff: AtomicUsize,
     reused_media: AtomicBool,
+    before_media: AtomicBool,
     hook: Mutex<Option<(PgPool, Uuid)>>,
 }
 impl Provider {
@@ -58,6 +59,13 @@ impl Provider {
         {
             text.push_str(&format!(
                 "\n![Reused image]({})\n",
+                self.images.keys().next().unwrap()
+            ));
+        }
+        if self.before_media.load(Ordering::SeqCst) && commit.as_str() == OLD && path == "docs/0.md"
+        {
+            text.push_str(&format!(
+                "\n![Before image]({})\n",
                 self.images.keys().next().unwrap()
             ));
         }
@@ -123,7 +131,10 @@ impl GitProvider for Provider {
         path: &RepositoryPath,
         limit: usize,
     ) -> Result<Vec<u8>, GitError> {
-        assert_eq!(commit.as_str(), HEAD);
+        assert!(
+            commit.as_str() == HEAD
+                || self.before_media.load(Ordering::SeqCst) && commit.as_str() == OLD
+        );
         assert_eq!(limit, specspace_document_engine::media::MAX_ASSET_BYTES);
         self.reads.fetch_add(1, Ordering::SeqCst);
         match self.backoff.load(Ordering::SeqCst) {
@@ -360,6 +371,7 @@ async fn fixture_review_options(
         reads: AtomicUsize::new(0),
         backoff: AtomicUsize::new(0),
         reused_media: AtomicBool::new(false),
+        before_media: AtomicBool::new(false),
         hook: Mutex::new(None),
     });
     let mut state = AppState::new(pool.clone());

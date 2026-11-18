@@ -520,6 +520,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/files/{file}/before-media/{asset}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reviewSnapshotBeforeMediaImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/files/{file}/image": {
         parameters: {
             query?: never;
@@ -1475,6 +1491,19 @@ export interface components {
         };
         /** @enum {string} */
         ReviewArea: "PRODUCT" | "DEVELOPMENT" | "DESIGN";
+        /**
+         * @description Before-media derives from a verified document reference and pinned base-tree
+         *     entry. It is not an after receipt or a newly published review manifest.
+         */
+        ReviewBeforeMediaEvidence: {
+            asset_path: string;
+            document_blob_oid: string;
+            document_path: string;
+            document_sha256: string;
+            image: components["schemas"]["ImageEvidence"];
+            /** Format: int32 */
+            media_validation_version: number;
+        };
         ReviewConfiguration: {
             branch: string;
             can_edit: boolean;
@@ -4511,6 +4540,91 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reviewSnapshotBeforeMediaImage: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+                file: string;
+                asset: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified before-image referenced by the exact before-document, read from the frozen merge base */
+            200: {
+                headers: {
+                    /** @description Unpadded base64url JSON ReviewBeforeMediaEvidence; document reference, pinned base source and verified display identities */
+                    "X-Review-Before-Media"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": components["schemas"]["PngDisplay"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1637,3 +1637,25 @@ Checkboxes represent verified work only.
   preceding media API commit passed. Referenced before-image authority, physical
   keyboard/RTL/320px verification, PR/checks, discussions/decisions, approvals,
   merge, bundles and the remaining full specification remain open.
+
+- Referenced before-image authority and HTTP: the exact shared before-document is
+  verified before its bounded canonical image events can authorize a media path.
+  The frozen base tree must contain one regular, size-bounded asset; Git OID,
+  length, content-addressed hash, real image type and metadata-free PNG derivative
+  are verified. Tree/reference/image work shares the existing two reader slots
+  and CPU permits survive cancellation. Current access is rechecked after every
+  async step and before response publication. A dedicated before-media route and
+  evidence header bind original document path/OID/hash, snapshot, base, asset and
+  display; no after receipt or artificial file change is claimed. Missing local
+  source/reference and bounded-parser/tree failures are distinct 422 fallbacks;
+  scoped access denials retain their normal behavior. Two application tests cover
+  tree entry/type/size/count limits, four PostgreSQL scenarios cover canonical
+  versus inert references, historical source, foreign/private/provider scope,
+  forged bytes and each revocation boundary, and three HTTP scenarios cover proof,
+  strict scope/queries, local fallback and post-CPU/mid-binary revocation. OpenAPI
+  and generated types are updated. All 453 backend tests pass with two existing
+  performance measurements excluded; workspace Clippy and the frontend build pass.
+  Both workflows for the preceding inline after-image commit passed.
+  Before-image UI integration, visual acceptance,
+  PR/checks, decisions/discussions, approvals, merge, bundles and the remaining full
+  specification remain open.

@@ -139,13 +139,14 @@ async fn setup_body(
     include_media: bool,
     body: Option<&str>,
 ) -> (Fixture, Arc<Source>, ReviewPreparer) {
-    setup_body_options(pool, include_media, body, false).await
+    setup_body_options(pool, include_media, body, false, None).await
 }
 async fn setup_body_options(
     pool: &PgPool,
     include_media: bool,
     body: Option<&str>,
     reuse_media: bool,
+    before_body: Option<&str>,
 ) -> (Fixture, Arc<Source>, ReviewPreparer) {
     let f = fixture(pool).await;
     sqlx::query("UPDATE proposals SET base_sha=$2,target_sha=$3 WHERE id=$1")
@@ -165,7 +166,7 @@ async fn setup_body_options(
     };
     let image=include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),"/../../../fixtures/repository/assets/5e3d382db4dd83d59aa5742793ad6b7903409e865c83bcbc54835049f043bc15.png")).to_vec();
     let path = format!("assets/{:x}.png", Sha256::digest(&image));
-    let mut before = tree("Before");
+    let mut before = tree(before_body.unwrap_or("Before"));
     if reuse_media {
         before.insert(path.clone(), image.clone());
     }
@@ -740,3 +741,6 @@ async fn text_only_reviews_seal_an_explicit_empty_media_set(pool: PgPool) {
 
 #[path = "snapshots/media.rs"]
 mod media;
+
+#[path = "snapshots/before_media.rs"]
+mod before_media;

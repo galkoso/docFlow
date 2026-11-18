@@ -2,9 +2,12 @@ use async_trait::async_trait;
 use specspace_application::{
     book::BookError,
     comparison_reader::{BoundProviderFactory, ComparisonReadError, RepositoryBinding},
+    pr_sync::{PrProviderError, PrProviderFactory},
     reader::BookProviderFactory,
 };
-use specspace_git_adapter::{GitProvider, app_auth::GitHubAppKey};
+use specspace_git_adapter::{
+    GitProvider, app_auth::GitHubAppKey, github::GitHub, pull_requests::PullRequestProvider,
+};
 use sqlx::{FromRow, PgPool};
 use std::{
     collections::VecDeque,
@@ -26,7 +29,7 @@ struct Connection {
     remote_id: u64,
     installation_id: u64,
     expires_at: u64,
-    provider: Arc<dyn GitProvider>,
+    provider: Arc<GitHub>,
 }
 
 pub struct PgGitHubSource {
@@ -51,7 +54,7 @@ impl PgGitHubSource {
         repository: Uuid,
         remote_id: u64,
         installation_id: u64,
-    ) -> Option<Arc<dyn GitProvider>> {
+    ) -> Option<Arc<GitHub>> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs();
         let mut connections = self.connections.lock().await;
         connections.retain(|entry| entry.expires_at > now.saturating_add(120));
@@ -76,7 +79,7 @@ impl PgGitHubSource {
         &self,
         repository: Uuid,
         settings: RepositoryConnection,
-    ) -> Result<Arc<dyn GitProvider>, BookError> {
+    ) -> Result<Arc<GitHub>, BookError> {
         let remote_id = settings
             .remote_id
             .parse::<u64>()
@@ -110,7 +113,7 @@ impl PgGitHubSource {
             .connect_repository()
             .await
             .map_err(BookError::Provider)?;
-        let provider: Arc<dyn GitProvider> = Arc::new(provider);
+        let provider = Arc::new(provider);
         let mut connections = self.connections.lock().await;
         connections.push_back(Connection {
             repository,
@@ -124,12 +127,38 @@ impl PgGitHubSource {
         }
         Ok(provider)
     }
+
+    async fn connect_bound(
+        &self,
+        binding: &RepositoryBinding,
+    ) -> Result<Arc<GitHub>, PrProviderError> {
+        if binding.repository.is_nil() || binding.remote_id == 0 || binding.installation_id == 0 {
+            return Err(PrProviderError::BindingChanged);
+        }
+        let settings = self
+            .settings(binding.repository)
+            .await
+            .map_err(PrProviderError::Source)?;
+        if settings.remote_id.parse::<u64>().ok() != Some(binding.remote_id)
+            || settings.installation_id.parse::<u64>().ok() != Some(binding.installation_id)
+            || settings.default_branch != "main"
+        {
+            return Err(PrProviderError::BindingChanged);
+        }
+        // These exact settings select the cache entry/token even if configuration
+        // changes while connecting. The caller rechecks current actor authority.
+        self.connect(binding.repository, settings)
+            .await
+            .map_err(PrProviderError::Source)
+    }
 }
 #[async_trait]
 impl BookProviderFactory for PgGitHubSource {
     async fn provider(&self, repository: Uuid) -> Result<Arc<dyn GitProvider>, BookError> {
-        self.connect(repository, self.settings(repository).await?)
-            .await
+        let provider = self
+            .connect(repository, self.settings(repository).await?)
+            .await?;
+        Ok(provider)
     }
 }
 #[async_trait]
@@ -138,20 +167,27 @@ impl BoundProviderFactory for PgGitHubSource {
         &self,
         binding: &RepositoryBinding,
     ) -> Result<Arc<dyn GitProvider>, ComparisonReadError> {
-        let settings = self
-            .settings(binding.repository)
+        let provider = self
+            .connect_bound(binding)
             .await
-            .map_err(ComparisonReadError::Source)?;
-        if settings.remote_id.parse::<u64>().ok() != Some(binding.remote_id)
-            || settings.installation_id.parse::<u64>().ok() != Some(binding.installation_id)
-            || settings.default_branch != "main"
-        {
-            return Err(ComparisonReadError::ContextChanged);
-        }
-        // Connect with the exact settings just matched, never another mutable
-        // lookup. The caller separately rechecks current proposal authorization.
-        self.connect(binding.repository, settings)
-            .await
-            .map_err(ComparisonReadError::Source)
+            .map_err(|error| match error {
+                PrProviderError::BindingChanged => ComparisonReadError::ContextChanged,
+                PrProviderError::Source(error) => ComparisonReadError::Source(error),
+            })?;
+        Ok(provider)
     }
 }
+
+#[async_trait]
+impl PrProviderFactory for PgGitHubSource {
+    async fn pr_provider_bound(
+        &self,
+        binding: &RepositoryBinding,
+    ) -> Result<Arc<dyn PullRequestProvider>, PrProviderError> {
+        let provider = self.connect_bound(binding).await?;
+        Ok(provider)
+    }
+}
+
+#[cfg(test)]
+mod tests;

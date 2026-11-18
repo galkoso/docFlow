@@ -1716,3 +1716,17 @@ Checkboxes represent verified work only.
   passed. Database outbox admission, leases, durable PR identity/results, runtime
   synchronization/check workers and frontend status remain pending, together with
   all remaining review, merge, bundle, security/operations and pilot requirements.
+
+- Bound PR provider factory: PR synchronization now has an explicit provider
+  capability separate from content access. The GitHub source checks the captured
+  repository UUID, numeric repository, installation and main target before
+  connecting, and shares its verified adapter/token cache across both interfaces.
+  Cache entries remain scoped to the complete binding and expire with the existing
+  safety margin. Malformed bindings fail before database/provider IO; changed
+  configuration fails before credential selection. Three focused checks cover
+  isolation, expiry, invalid bindings and actual PostgreSQL configuration changes.
+  All 477 backend tests pass with two existing performance measurements excluded;
+  workspace Clippy and formatting checks pass.
+  The synchronization journal, outbox delivery, worker, durable PR identity/results,
+  required checks and frontend status remain pending alongside the full remaining
+  specification.

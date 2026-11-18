@@ -28,6 +28,15 @@ Canonical PR URLs are reconstructed from the configured repository and validated
 positive PR number. Responses include provider ID/node identity, observed commits,
 draft flag and distinct open/closed/merged state.
 
+`PrProviderFactory` resolves the PR capability separately from content providers.
+The PostgreSQL GitHub source checks the frozen repository UUID, numeric repository,
+installation and main target before selecting a connection. Content and PR
+capabilities share the same verified adapter/token cache, keyed by all three
+repository/installation identities, with the existing expiry margin and bounded
+capacity. Connecting uses the exact settings just checked; it does not reselect
+mutable configuration after validation. This is connection binding, not actor or
+journal authorization, which the synchronization worker must independently recheck.
+
 Metadata input is bounded to a proposal-sized title and 64KiB UTF-8 body. Provider
 bodies and models deliberately have no Debug/Serialize/Deserialize implementations;
 private proposal context cannot accidentally become logged or browser-owned

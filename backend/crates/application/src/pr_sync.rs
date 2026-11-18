@@ -2,20 +2,41 @@
 //! journal must resolve current actor scope and the exact active sealed snapshot.
 //! Retrying a stored intent reuses its exact metadata, never a newly rendered body.
 use crate::{
+    book::BookError,
     comparison_reader::RepositoryBinding,
     proposal::{LinkKind, ProposalLink, UiImpact},
 };
+use async_trait::async_trait;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use specspace_domain::BranchName;
 use specspace_git_adapter::{
     CommitSha,
     pull_requests::{
-        PullRequest, PullRequestContent, PullRequestNumber, PullRequestScope, PullRequestState,
+        PullRequest, PullRequestContent, PullRequestNumber, PullRequestProvider, PullRequestScope,
+        PullRequestState,
     },
 };
+use std::sync::Arc;
 use url::{Host, Url};
 use uuid::Uuid;
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum PrProviderError {
+    BindingChanged,
+    Source(BookError),
+}
+/// A separate capability: content readers cannot obtain PR mutation authority
+/// by downcasting a content provider. Callers still enforce actor/journal scope.
+#[async_trait]
+pub trait PrProviderFactory: Send + Sync {
+    /// Resolve exactly this frozen numeric binding. Never perform another
+    /// mutable repository lookup between validation and token selection.
+    async fn pr_provider_bound(
+        &self,
+        binding: &RepositoryBinding,
+    ) -> Result<Arc<dyn PullRequestProvider>, PrProviderError>;
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct PrSyncSource {

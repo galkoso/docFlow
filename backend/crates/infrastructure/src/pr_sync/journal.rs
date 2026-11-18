@@ -179,7 +179,7 @@ async fn audit(
     Ok(())
 }
 impl PgPrSync {
-    async fn transaction(&self) -> Result<Transaction<'_, Postgres>, PrSyncStoreError> {
+    pub(super) async fn transaction(&self) -> Result<Transaction<'_, Postgres>, PrSyncStoreError> {
         let mut tx = self.pool.begin().await?;
         sqlx::query("SET LOCAL lock_timeout='5s'")
             .execute(&mut *tx)

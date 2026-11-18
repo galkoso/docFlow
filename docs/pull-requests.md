@@ -1,6 +1,6 @@
 # Dedicated proposal PR synchronization
 
-## Current stage: runtime provider worker and fenced durable journal
+## Current stage: automatic outbox dispatch and fenced provider work
 
 The Git adapter exposes `PullRequestProvider` separately from content operations.
 It reads one PR, discovers PRs for a proposal branch across all states, creates a
@@ -8,7 +8,8 @@ draft, and updates title/body metadata. A provider observation is not an approva
 merge receipt or proof that a saved review snapshot is current. PostgreSQL admission
 now freezes publication outbox events into dedicated PR operations/jobs and stores
 fenced write phases, PR identities and observation results. A bounded runtime
-worker now performs provider orchestration. Outbox dispatch, required checks and
+worker performs provider orchestration and a transactional dispatcher delivers
+publication events automatically. Required checks, explicit operator recovery and
 the user-facing synchronization status remain pending.
 
 The [GitHub PR REST API](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10)
@@ -127,8 +128,40 @@ are serialized per organization and limited to two active/ten recent per actor a
 twelve active/sixty recent per organization, with a ten-minute recent window.
 Exact replay precedes quotas. Database guards freeze intents, source events, jobs
 and operation scope, require atomic admission evidence, and reject generic success.
-Generic job leasing/completion excludes PR jobs. No runtime dispatcher invokes
-this admission method yet.
+Generic job leasing/completion excludes PR jobs. Automatic and explicit admission
+share the same transaction-local implementation and durable transport record.
+
+## Automatic publication-event dispatch
+
+Migration 015 adds a dedicated transport record and canonical source validation.
+The dispatcher derives the original actor from the actual succeeded submission,
+publication result, sealed snapshot and exact event flags; it never trusts an
+event-owned actor or approval claim. Payload parsing is bounded to 8KiB. A valid
+current event is admitted under current edit authority. The frozen intent/job,
+transport ENQUEUED result, audit and delivery marker commit together. A copied
+backed publication can acknowledge the existing operation without creating work
+or granting current write authority to a revoked actor.
+
+Superseded, closed or redirected snapshots become audited SKIPPED transport
+outcomes. Malformed/unbacked events or invalid projections become REJECTED, leaving
+saved snapshots and proposal state intact. Busy work retries after 30 seconds,
+admission quota after 60, and missing actor access or review setup after 300.
+WAITING events remain unsent and cannot hold later eligible publications at the
+front of the queue. Current access is checked again when a retry becomes due.
+Unchanged retry reasons do not duplicate audit entries. Database unavailability
+rolls back the attempt rather than inventing an outcome.
+
+Proposal-before-event locking, transaction advisory selection and a savepoint
+around admission make concurrent dispatch/manual replay safe. No provider IO
+occurs here. Database guards freeze captured envelopes and terminal transport
+outcomes and require matching audit/delivery evidence. Migration upgrades backfill
+already delivered intents without changing original jobs, writes or uncertainty.
+
+One dispatcher runs alongside the PR worker when `APP_PUBLIC_URL` is configured.
+It requires a validated HTTPS root origin, with loopback HTTP allowed only in
+explicit development mode. Without a configured origin dispatch stays disabled;
+the API startup log reports `pr_dispatchers=0`. A transport outcome describes
+event delivery, not provider synchronization, review approval or publication.
 
 ## Fenced writes and observation results
 
@@ -192,14 +225,13 @@ One worker runs in the API process. `PR_SYNC_WORKER_TIMEOUT_SECONDS` defaults to
 15 seconds during long provider calls and between short calls. Heartbeats never
 run alongside the worker's own journal transactions. Graceful shutdown cancels
 in-flight work; a persisted write phase forces read-only recovery after restart.
-Provider rate-limit backoff is preserved. Explicit rejection/operator recovery,
-outbox dispatch and authenticated synchronization status remain pending.
+Provider rate-limit backoff is preserved. Explicit rejection/operator recovery
+and authenticated synchronization status remain pending.
 
 ## Remaining full-spec work
 
-- Dispatch publication outbox events, including stale/poison-event handling and
-  explicit recovery for rejected, exhausted, closed-provider and
-  revoked-original-actor cases.
+- Add explicit recovery for rejected, exhausted, closed-provider and
+  revoked-original-actor cases, including transport rejections after correction.
 - Connect the bounded metadata projection to persisted decisions and complete open
   product questions when those workflows exist; capture them under journal locks.
 - Expose authenticated synchronization status and explicit recovery without

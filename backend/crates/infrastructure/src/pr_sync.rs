@@ -15,9 +15,11 @@ use specspace_application::{
 };
 use specspace_domain::BranchName;
 use specspace_git_adapter::CommitSha;
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, PgConnection, PgPool};
 use uuid::Uuid;
+mod dispatch;
 mod journal;
+pub use dispatch::{PrDispatchWork, PrSyncDispatcher};
 pub use journal::{PrSyncLease, PrSyncObservation, PrSyncResolution};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -196,7 +198,7 @@ impl PgPrSync {
     }
 
     /// `actor` is the publication's original human actor, resolved server-side
-    /// by the eventual dispatcher. Current edit authority is required on replay.
+    /// by the dispatcher. Current edit authority is required on replay.
     /// An event marked sent means delivered into this journal, not synced to Git.
     pub async fn reserve(
         &self,
@@ -208,28 +210,45 @@ impl PgPrSync {
         if actor.is_nil() || proposal.is_nil() || event_id.is_nil() {
             return Err(PrSyncStoreError::InvalidEvent);
         }
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SET LOCAL lock_timeout='5s'")
-            .execute(&mut *tx)
+        let mut tx = self.transaction().await?;
+        let receipt = self
+            .reserve_in(&mut tx, actor, proposal, event_id, site)
             .await?;
-        sqlx::query("SET LOCAL statement_timeout='10s'")
-            .execute(&mut *tx)
-            .await?;
-        let org = review_submissions::access(&mut tx, actor, proposal, true).await?;
+        self.record_enqueued_in(&mut tx, &receipt).await?;
+        tx.commit().await?;
+        Ok(receipt)
+    }
+    async fn reserve_in(
+        &self,
+        tx: &mut PgConnection,
+        actor: Uuid,
+        proposal: Uuid,
+        event_id: Uuid,
+        site: &PrSiteOrigin,
+    ) -> Result<PrSyncReservation, PrSyncStoreError> {
+        if actor.is_nil() || proposal.is_nil() || event_id.is_nil() {
+            return Err(PrSyncStoreError::InvalidEvent);
+        }
+        let org = review_submissions::access(tx, actor, proposal, true).await?;
         let event = sqlx::query_as::<_,Event>("SELECT payload,sent_at IS NOT NULL AS delivered FROM outbox WHERE id=$1 AND organization_id=$2 AND entity_id=$3 AND event_type='REVIEW_SNAPSHOT_PUBLISHED' FOR UPDATE")
             .bind(event_id).bind(org).bind(proposal).fetch_optional(&mut *tx).await?.ok_or(PrSyncStoreError::InvalidEvent)?;
         if let Some(old) = sqlx::query_as::<_,Frozen>("SELECT i.* FROM pr_sync_intents i WHERE source_event=$1 AND organization_id=$2 AND proposal_id=$3")
             .bind(event_id).bind(org).bind(proposal).fetch_optional(&mut *tx).await? {
             if old.actor_id != actor { return Err(SubmissionError::Forbidden.into()); }
             let receipt = old.restore()?;
-            tx.commit().await?;
             return Ok(receipt);
         }
         if event.delivered {
             return Err(PrSyncStoreError::InvalidEvent);
         }
+        let payload = event.payload;
         let event: PublicationEvent =
-            serde_json::from_value(event.payload).map_err(|_| PrSyncStoreError::InvalidEvent)?;
+            serde_json::from_value(payload.clone()).map_err(|_| PrSyncStoreError::InvalidEvent)?;
+        if payload
+            != json!({"snapshot_id":event.snapshot_id,"operation_id":event.operation_id,"pr_sync_required":event.pr_sync_required,"approvals_granted":event.approvals_granted,"activated":event.activated})
+        {
+            return Err(PrSyncStoreError::InvalidEvent);
+        }
         if event.snapshot_id.is_nil()
             || event.operation_id.is_nil()
             || !event.pr_sync_required
@@ -237,8 +256,10 @@ impl PgPrSync {
         {
             return Err(PrSyncStoreError::InvalidEvent);
         }
-        let original: Option<Uuid> = sqlx::query_scalar("SELECT s.actor_id FROM review_submission_results x JOIN review_submissions s ON s.operation_id=x.operation_id AND s.organization_id=x.organization_id AND s.proposal_id=x.proposal_id JOIN git_operations o ON o.id=s.operation_id AND o.organization_id=s.organization_id JOIN jobs j ON j.id=s.job_id AND j.operation_id=o.id AND j.organization_id=o.organization_id JOIN review_snapshots h ON h.id=x.snapshot_id AND h.organization_id=x.organization_id AND h.proposal_id=x.proposal_id WHERE x.operation_id=$1 AND x.organization_id=$2 AND x.proposal_id=$3 AND x.snapshot_id=$4 AND x.activated=$5 AND h.state='READY' AND o.kind='SUBMIT' AND o.state='SUCCEEDED' AND o.result_sha=h.head_sha AND j.kind='SUBMIT_REVIEW' AND j.state='SUCCEEDED' AND j.result=jsonb_build_object('phase','SNAPSHOT_READY','snapshot_id',h.id)")
-            .bind(event.operation_id).bind(org).bind(proposal).bind(event.snapshot_id).bind(event.activated).fetch_optional(&mut *tx).await?;
+        let original: Option<Uuid> = sqlx::query_scalar("SELECT pr_sync_publication_actor($1)")
+            .bind(event_id)
+            .fetch_one(&mut *tx)
+            .await?;
         let original = original.ok_or(PrSyncStoreError::InvalidEvent)?;
         if original != actor {
             return Err(SubmissionError::Forbidden.into());
@@ -252,7 +273,7 @@ impl PgPrSync {
             configuration_version: version(header.configuration_version)?,
             policy_version: version(header.policy_version)?,
         };
-        let scope = review_authorization::context_in(&mut tx, actor, proposal, &expectation)
+        let scope = review_authorization::context_in(tx, actor, proposal, &expectation)
             .await
             .map_err(SubmissionError::from)?;
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
@@ -337,7 +358,6 @@ impl PgPrSync {
             .bind(event_id)
             .execute(&mut *tx)
             .await?;
-        tx.commit().await?;
         Ok(PrSyncReservation {
             operation_id: operation,
             job_id: job,

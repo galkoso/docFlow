@@ -2,6 +2,8 @@ use super::*;
 use serde_json::json;
 use specspace_application::{pr_sync::PrSiteOrigin, review_submission::ReviewPublication};
 use specspace_infrastructure::pr_sync::{PgPrSync, PrSyncStoreError};
+#[path = "pr_sync/dispatch.rs"]
+mod dispatch;
 #[path = "pr_sync/journal.rs"]
 mod journal;
 #[path = "pr_sync/worker.rs"]

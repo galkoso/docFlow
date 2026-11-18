@@ -1786,3 +1786,22 @@ Checkboxes represent verified work only.
   passed. Automatic outbox dispatch, explicit rejection/operator recovery, status
   API/UI and required checks remain pending, together with every remaining review,
   merge, bundle, security/operations and acceptance requirement in the full scope.
+
+- Automatic PR publication dispatch (migration 015): a runtime dispatcher derives
+  the original actor from canonical, backed publication evidence and atomically
+  admits current snapshots into the existing PR journal. Explicit admission and
+  background delivery share one implementation, transport record and audit.
+  Busy/quota/access/setup cases schedule durable retries; stale snapshots are
+  skipped and malformed/unbacked/invalid projections are quarantined without
+  changing saved proposal content or state. Captured envelopes and terminal
+  outcomes are immutable, and delivery never claims provider synchronization or
+  approval. Existing intents are backfilled without changing jobs or unknown
+  writes. Sixteen dispatcher cases plus a synthetic saved-review-to-draft-provider
+  case cover races, retries, rollback, malformed scope, current access, upgrades
+  and preservation of saved snapshots. All 537 backend tests pass with two existing
+  performance measurements excluded; Clippy and formatting pass, and OpenAPI is
+  unchanged. Migration 015 is applied locally, and API startup confirms one
+  dispatcher, one PR worker and readiness with a configured public origin.
+  Explicit recovery after correction/rejection/exhaustion/revocation, status API/UI,
+  required checks, decisions/discussions, approvals, merge, bundles and the full
+  remaining security/operations and acceptance scope remain open.

@@ -42,6 +42,49 @@ fn record(intent: &PrSyncIntent) -> PullRequest {
         url: "https://github.com/synthetic/specs/pull/9".into(),
     }
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn saved_review_publication_dispatches_and_synchronizes_a_draft_without_manual_admission(
+    pool: PgPool,
+) {
+    let (f, source, snapshot, event) = publication(&pool).await;
+    let journal = Arc::new(PgPrSync::new(pool.clone()));
+    let dispatch =
+        specspace_infrastructure::pr_sync::PrSyncDispatcher::new(journal.clone(), site());
+    let specspace_infrastructure::pr_sync::PrDispatchWork::Enqueued(e, job) =
+        dispatch.run_once().await.unwrap()
+    else {
+        panic!("expected automatic admission");
+    };
+    assert_eq!(e, event);
+    let prs = Arc::new(Provider::new(pool.clone()));
+    let factory = Arc::new(WorkerFactory {
+        source,
+        prs: prs.clone(),
+        repository: f.repository,
+    });
+    let worker =
+        PrSyncWorker::new(journal, factory.clone(), factory, Duration::from_secs(30)).unwrap();
+    assert_eq!(
+        worker.run_once().await.unwrap(),
+        PrSyncWork::Completed(job, PrSyncResolution::Synced)
+    );
+    assert_eq!(
+        (
+            prs.creates.load(Ordering::SeqCst),
+            prs.updates.load(Ordering::SeqCst)
+        ),
+        (1, 0)
+    );
+    assert_eq!(receipts(&pool).await, (1, 1, 1));
+    let current: (String, Option<Uuid>) =
+        sqlx::query_as("SELECT state,active_review_snapshot_id FROM proposals WHERE id=$1")
+            .bind(f.proposal)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(current, ("IN_REVIEW".into(), Some(snapshot.snapshot_id)));
+}
 struct Provider {
     pool: PgPool,
     pr: Mutex<Option<PullRequest>>,

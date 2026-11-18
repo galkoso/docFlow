@@ -1,7 +1,9 @@
 use specspace_api::auth::CookiePolicy;
 use specspace_api::{AppState, router};
+use specspace_application::pr_sync::PrSiteOrigin;
 use specspace_git_adapter::app_auth::GitHubAppKey;
 use specspace_infrastructure::oidc::{Deployment, Oidc};
+use specspace_infrastructure::pr_sync::PrSyncDispatcher;
 use specspace_infrastructure::secrets;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
@@ -75,6 +77,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(public_url) = &public_url {
         state.cookies = CookiePolicy::new(public_url, development)?;
     }
+    let pr_dispatcher=public_url.as_deref().map(|origin| {
+        PrSiteOrigin::parse(origin,development).map(|site|PrSyncDispatcher::new(state.pr_sync.clone(),site))
+    }).transpose().map_err(|_|"APP_PUBLIC_URL must be an HTTPS root origin (loopback HTTP is allowed in development)")?;
+    let pr_dispatchers = usize::from(pr_dispatcher.is_some());
     if let Ok(issuer) = std::env::var("OIDC_ISSUER") {
         let public_url = public_url.ok_or("APP_PUBLIC_URL is required for OIDC")?;
         let client_id = std::env::var("OIDC_CLIENT_ID")?;
@@ -135,6 +141,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::spawn(async move { worker.run(stopped).await })
         })
         .collect();
+    if let Some(dispatcher) = pr_dispatcher {
+        let dispatch_stopped = stopped.clone();
+        handles.push(tokio::spawn(async move {
+            dispatcher.run(dispatch_stopped).await
+        }));
+    }
     let comparison_stopped = stopped.clone();
     handles.push(tokio::spawn(async move {
         comparison_worker.run(comparison_stopped).await
@@ -158,7 +170,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         async move { proposal_worker.run(stopped).await },
     ));
     let shutdown_stop = stop.clone();
-    tracing::info!(%address, index_workers = 2, proposal_workers = 1, save_workers=1, comparison_workers=1, review_workers=1, pr_sync_workers=1, "API listening");
+    tracing::info!(%address, index_workers = 2, proposal_workers = 1, save_workers=1, comparison_workers=1, review_workers=1, pr_sync_workers=1,pr_dispatchers, "API listening");
     let result = axum::serve(listener, router(state))
         .with_graceful_shutdown(async move {
             shutdown_signal().await;

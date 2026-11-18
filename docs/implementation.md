@@ -1838,3 +1838,22 @@ Checkboxes represent verified work only.
   warnings. Browser verification could not run because no browser is connected;
   physical keyboard, RTL and 320px acceptance remain open. Explicit PR recovery,
   required checks and every remaining full-spec requirement remain pending.
+
+- Explicit PR recovery (migration 017): active organization admins can admit a
+  bounded eight-attempt window for the same stopped operation. Attempt numbers,
+  original metadata and write markers remain immutable; untouched work requires
+  fresh original editor authority and context, while started writes only observe.
+  Current admin delegation permits observation after editor revocation or proposal
+  closure, with SUPERSEDED receipts when original authority is gone. Revoked/latest
+  grants, replay scope, quotas and database guards prevent blind resets or another
+  provider write. Latest-publication status stays separate from stopped work when
+  an identical snapshot is resubmitted. Twelve database/worker cases and four HTTP
+  cases cover recovery, rollback, migration upgrade, access, races and lost replies.
+  All 562 backend tests pass with two existing performance measurements excluded;
+  Clippy and formatting pass. OpenAPI and generated client are updated. Migration
+  017 is applied locally. Admin controls retain the same request ID after an
+  uncertain response and only POST on explicit action; 404 frontend tests and the
+  production build pass. Commits e84a488 and 0d8fc6c are pushed, and both CI
+  workflows passed. Definitive provider rejection/negative-proof resolution,
+  external closed/merged PR synchronization, transport correction, required checks
+  and all remaining review, merge, bundle and operational requirements stay open.

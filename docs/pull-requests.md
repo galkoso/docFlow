@@ -1,13 +1,14 @@
 # Dedicated proposal PR synchronization
 
-## Current stage: provider capability, immutable intent and durable admission
+## Current stage: provider capability and fenced durable journal
 
 The Git adapter exposes `PullRequestProvider` separately from content operations.
 It reads one PR, discovers PRs for a proposal branch across all states, creates a
 draft, and updates title/body metadata. A provider observation is not an approval,
 merge receipt or proof that a saved review snapshot is current. PostgreSQL admission
-now freezes publication outbox events into dedicated PR operations/jobs. Dispatch,
-provider orchestration, PR identity/results, required checks and the user-facing
+now freezes publication outbox events into dedicated PR operations/jobs and stores
+fenced write phases, PR identities and observation results. Dispatch,
+provider orchestration, required checks and the user-facing
 synchronization status remain pending.
 
 The [GitHub PR REST API](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10)
@@ -127,16 +128,54 @@ are serialized per organization and limited to two active/ten recent per actor a
 twelve active/sixty recent per organization, with a ten-minute recent window.
 Exact replay precedes quotas. Database guards freeze intents, source events, jobs
 and operation scope, require atomic admission evidence, and reject generic success.
-Generic job leasing/completion excludes PR jobs. This stage grants no provider
-mutation lease; the database prevents these operations crossing the mutation or
-success boundary until the dedicated fenced worker/result protocol is installed.
-No dispatcher or existing runtime worker invokes this admission method yet.
+Generic job leasing/completion excludes PR jobs. No dispatcher or existing runtime
+worker invokes this admission method yet.
+
+## Fenced writes and observation results
+
+`PrSyncLease` is server-owned and binds worker UUID, attempt, job and the restored
+immutable intent. Claiming an expired lease increments the attempt even when the
+worker UUID is reused. Current edit access and the frozen repository binding are
+required for observation. An untouched intent additionally requires its original
+active snapshot and authority digest before heartbeats or writes. Once a write
+starts, read-only reconciliation may continue after metadata advances or the
+proposal closes; it cannot authorize another write.
+
+`start_write` independently resolves the durable PR binding, checks current local
+authority and applies the reconciliation decision to the caller's complete bounded
+discovery. Before returning, it atomically appends an immutable CREATE/UPDATE
+record with its original fence and audits the boundary. Updates require the exact
+persisted provider identity; an absent bound PR never authorizes a create. The
+caller must check live provider refs around IO: database fences cannot atomically
+assert external refs. No database transaction is held during provider calls.
+
+A started write is never repeated by this journal. Reclaim/defer changes the
+operation to UNKNOWN and preserves the write record. Eight attempts bound automatic
+work. Exhaustion before any write ends as a definite failure; exhaustion after a
+write ends automatic observation while retaining UNKNOWN and its admission slot.
+An exact provider observation can reconcile an uncertain outcome without another
+write. Closed/ready/foreign candidates, changed metadata or missing identities
+cannot be treated as exact receipts. Explicit recovery for provider rejections,
+closed provider PRs, revoked original actors and exhausted observations remains
+part of the pending recovery workflow; started writes currently retain uncertainty
+even when the adapter reports a definite rejection.
+
+Completion requires current edit access, the original repository/installation,
+exact owned title/body and an open draft PR with the expected identity. A current
+source/ref pair records SYNCED. A superseded local context or observed ref pair
+records SUPERSEDED while retaining the provider identity for the next projection;
+it grants no approval and changes no content or proposal state. The immutable
+binding, result, job/operation outcome and audit commit together. Late fences and
+audit failures roll back the entire receipt, including a newly discovered binding.
+Database guards prevent unbacked writes, forged generic success, identity changes
+and incomplete terminal outcomes. The runtime worker that performs provider IO and
+honors these boundaries is still pending.
 
 ## Remaining full-spec work
 
-- Persist one scoped PR identity per proposal and fenced mutation/reconciliation
-  phases/results; dispatch publication outbox events, including stale/poison-event
-  handling and recovery when the original actor loses authority.
+- Connect the journal to a bounded provider worker and dispatch publication outbox
+  events, including stale/poison-event handling and explicit recovery for rejected,
+  exhausted, closed-provider and revoked-original-actor cases.
 - Connect the bounded metadata projection to persisted decisions and complete open
   product questions when those workflows exist; capture them under journal locks.
 - Expose authenticated synchronization status and explicit recovery without

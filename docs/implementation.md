@@ -1750,3 +1750,22 @@ Checkboxes represent verified work only.
   handling, fenced PR mutation/reconciliation leases, durable PR identity/results,
   required checks and frontend synchronization status remain pending, together
   with decisions/discussions, approvals, merge, bundles and all remaining scope.
+
+- Fenced PR journal (migration 014): worker/attempt/deadline leases now restore the
+  exact stored intent. Fresh authority gates new writes; an immutable CREATE/UPDATE
+  record and audit precede provider IO. Unknown/reclaimed writes stay read-only,
+  and same-worker reuse cannot bypass attempt fencing. Bounded exhaustion releases
+  only untouched work; started uncertainty retains its proposal slot. Exact owned
+  observations atomically persist one scoped provider PR identity, immutable result,
+  audit and job/operation outcome. Superseded contexts resolve without claiming the
+  old snapshot is synchronized and preserve the PR identity for later updates.
+  Current editor access and frozen binding still gate read-only recovery after
+  proposal closure. Fourteen new PostgreSQL cases verify complete/rollback paths,
+  lost leases, metadata/access/binding changes, exhausted/crashed workers, generic
+  success rejection, identity immutability and updating the same PR. All 502 backend
+  tests pass with two existing performance measurements excluded; Clippy and
+  formatting pass, and OpenAPI is unchanged. Both workflows for the preceding
+  admission commit passed. Runtime
+  provider orchestration/outbox dispatch, explicit rejection/operator recovery,
+  synchronization status/checks, decisions/discussions, approvals, merge, bundles
+  and every remaining full-spec requirement remain open.

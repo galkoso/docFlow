@@ -2,6 +2,8 @@ use super::*;
 use serde_json::json;
 use specspace_application::{pr_sync::PrSiteOrigin, review_submission::ReviewPublication};
 use specspace_infrastructure::pr_sync::{PgPrSync, PrSyncStoreError};
+#[path = "pr_sync/journal.rs"]
+mod journal;
 fn site() -> PrSiteOrigin {
     PrSiteOrigin::parse("https://specs.example", false).unwrap()
 }

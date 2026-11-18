@@ -1,5 +1,5 @@
-//! Atomic outbox admission only. No provider IO or mutation lease is granted by
-//! this journal; queued PR jobs are excluded from generic workers/completion.
+//! Atomic outbox admission and fenced PR journal. Provider IO never holds DB
+//! locks; generic workers cannot claim or complete these dedicated jobs.
 use crate::{
     review_authorization,
     review_submissions::{self, SubmissionError},
@@ -17,6 +17,8 @@ use specspace_domain::BranchName;
 use specspace_git_adapter::CommitSha;
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
+mod journal;
+pub use journal::{PrSyncLease, PrSyncObservation, PrSyncResolution};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum PrSyncStoreError {
@@ -26,6 +28,10 @@ pub enum PrSyncStoreError {
     Stale,
     Busy,
     QuotaExceeded,
+    InvalidQuery,
+    LeaseLost,
+    InvalidReceipt,
+    WriteAlreadyStarted,
     Projection(PrSyncError),
     Unavailable,
 }
@@ -130,6 +136,21 @@ fn version(value: i64) -> Result<u64, PrSyncStoreError> {
 }
 fn sha(value: String) -> Result<CommitSha, PrSyncStoreError> {
     CommitSha::parse(value).map_err(|_| PrSyncStoreError::InvalidIntent)
+}
+fn authority_digest(scope: &str, number: i64, title: &str, links: &[ProposalLink]) -> String {
+    format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&json!([
+                "specspace-pr-authority-v1",
+                scope,
+                number,
+                title,
+                links
+            ]))
+            .expect("fixed serializable authority")
+        )
+    )
 }
 impl Frozen {
     fn restore(self) -> Result<PrSyncReservation, PrSyncStoreError> {
@@ -252,20 +273,13 @@ impl PgPrSync {
         }
         let links: Vec<ProposalLink> =
             serde_json::from_value(header.links).map_err(|_| PrSyncStoreError::InvalidIntent)?;
-        // Include projection metadata absent from the review scope digest. A
-        // future worker must compare this current digest before provider writes.
-        let authority_digest = format!(
-            "{:x}",
-            Sha256::digest(
-                serde_json::to_vec(&json!([
-                    "specspace-pr-authority-v1",
-                    scope.authority_digest(),
-                    header.current_number,
-                    &header.current_title,
-                    &links
-                ]))
-                .map_err(|_| PrSyncStoreError::InvalidIntent)?
-            )
+        // Include projection metadata absent from the review scope digest. The
+        // journal compares this current digest before granting provider writes.
+        let authority_digest = authority_digest(
+            &scope.authority_digest(),
+            header.current_number,
+            &header.current_title,
+            &links,
         );
         let operation = Uuid::new_v4();
         let job = Uuid::new_v4();

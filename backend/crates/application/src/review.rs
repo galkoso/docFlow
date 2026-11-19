@@ -5,6 +5,7 @@
 use crate::{
     comparison::{Change, Kind},
     comparison_reader::LoadedComparison,
+    review_snapshot::ReviewBookDocument,
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -101,6 +102,7 @@ pub struct PreparedReview {
     context: ReviewContext,
     summary: ReviewSummary,
     files: Vec<Change>,
+    book_documents: Vec<ReviewBookDocument>,
     assignments: Vec<AssignedReviewer>,
     media: Vec<RequiredMedia>,
     validation: SaveValidation,
@@ -114,6 +116,9 @@ impl PreparedReview {
     }
     pub fn files(&self) -> &[Change] {
         &self.files
+    }
+    pub fn book_documents(&self) -> &[ReviewBookDocument] {
+        &self.book_documents
     }
     pub fn assignments(&self) -> &[AssignedReviewer] {
         &self.assignments
@@ -212,6 +217,30 @@ impl PreparedReview {
         if !validation.ready() {
             return Err(ReviewError::Validation(validation));
         }
+        let mut book_documents = Vec::with_capacity(catalog.documents.len());
+        for entry in &catalog.documents {
+            let side = after
+                .get(entry.path.as_str())
+                .ok_or(ReviewError::Invalid("REVIEW_SOURCE_MISSING"))?;
+            if side.document_id.as_deref() != Some(entry.document_id.as_str())
+                || side.catalog_position != Some(book_documents.len())
+                || side.sha256.is_none()
+                || side.executable
+            {
+                return Err(ReviewError::Invalid("REVIEW_DOCUMENT_IDENTITY_INVALID"));
+            }
+            let identity = serde_json::to_vec(&(
+                "specspace-review-book-document-v1",
+                loaded.repository(),
+                loaded.head().as_str(),
+                side,
+            ))
+            .map_err(|_| ReviewError::Invalid("REVIEW_FINGERPRINT_FAILED"))?;
+            book_documents.push(ReviewBookDocument {
+                id: format!("{:x}", Sha256::digest(identity)),
+                source: (*side).clone(),
+            });
+        }
         let mut media_paths = validation.required_assets.clone();
         for change in &loaded.inventory().changes {
             if change.kind == Kind::Other {
@@ -252,7 +281,7 @@ impl PreparedReview {
         serde_json::to_writer(
             &mut writer,
             &(
-                "specspace-review-plan-v1",
+                "specspace-review-plan-v2",
                 loaded.organization(),
                 loaded.repository(),
                 loaded.binding().remote_id,
@@ -278,6 +307,7 @@ impl PreparedReview {
                 &assignments,
                 &loaded.inventory().changes,
                 &media,
+                &book_documents,
             ),
         )
         .map_err(|_| ReviewError::Invalid("REVIEW_FINGERPRINT_FAILED"))?;
@@ -315,6 +345,7 @@ impl PreparedReview {
             context,
             summary,
             files: loaded.inventory().changes.clone(),
+            book_documents,
             assignments,
             media,
             validation,

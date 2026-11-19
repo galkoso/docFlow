@@ -2070,3 +2070,12 @@ Checkboxes represent verified work only.
   no available browser; physical keyboard/RTL/320px review remains pending.
   Unchanged-document/media anchors, provider/check/merge integration, bundles and
   every other unfinished requirement in the full specification remain active.
+
+- Complete review-book preparation: review plans now retain all head documents
+  in catalog order, including unchanged documents, with immutable source
+  descriptors and identities bound to repository/head/source metadata. Source
+  bodies stay outside the manifest. Plan fingerprint version 2 includes this
+  complete manifest while preserving actor/order/state-only stability. An
+  unchanged-document case verifies that the diff still contains only actual
+  changes. All 120 application tests pass. Durable publication and discussion
+  reads from this evidence are subsequent stages; the full goal remains active.

@@ -85,6 +85,46 @@ async fn complete_manifest_binds_saved_git_pair_and_configuration_without_publis
     assert!(!json.contains("approved"));
 }
 #[tokio::test]
+async fn complete_book_manifest_retains_unchanged_documents_in_catalog_order_without_inventing_changes()
+ {
+    let f = fixture_book_documents("proposal edit", vec![], true);
+    let source = loaded(&f).await;
+    let ctx = context(&f);
+    let plan = PreparedReview::prepare(ctx.clone(), &source).unwrap();
+    assert_eq!(plan.files().len(), 1);
+    assert_eq!(plan.files()[0].after.as_ref().unwrap().path, "docs/a.md");
+    let documents = plan.book_documents();
+    assert_eq!(documents.len(), 2);
+    assert_eq!(documents[0].source.document_id.as_deref(), Some("DOC-B"));
+    assert_eq!(documents[0].source.catalog_position, Some(0));
+    assert_eq!(documents[1].source.document_id.as_deref(), Some("DOC-A"));
+    for document in documents {
+        assert_eq!(document.id.len(), 64);
+        assert!(document.source.sha256.is_some());
+        assert_eq!(
+            document.source.blob_oid,
+            specspace_git_adapter::blob::oid(
+                source
+                    .after()
+                    .source(&document.source.path)
+                    .unwrap()
+                    .as_bytes(),
+                40
+            )
+            .unwrap()
+            .as_str()
+        );
+    }
+    let encoded = serde_json::to_string(documents).unwrap();
+    assert!(!encoded.contains("Original unchanged text"));
+    assert!(!encoded.contains("proposal edit"));
+    let mut ctx = ctx;
+    ctx.assignments.reverse();
+    let reordered = PreparedReview::prepare(ctx, &source).unwrap();
+    assert_eq!(documents, reordered.book_documents());
+    assert_eq!(plan.summary().fingerprint, reordered.summary().fingerprint);
+}
+#[tokio::test]
 async fn canonical_fingerprint_is_shared_and_ignores_list_order_actor_and_state_only_version_changes()
  {
     let f = fixture();

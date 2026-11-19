@@ -1,8 +1,20 @@
 //! Owned read models. Deserializing metadata never creates sealed review
 //! evidence or grants permission to publish, approve or merge a snapshot.
-use crate::{comparison::Change, review_configuration::ReviewerSelection};
+use crate::{
+    comparison::{Change, Side},
+    review_configuration::ReviewerSelection,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+/// Complete head-book identity, including documents absent from the diff.
+/// Deserializing this read model does not construct a source proof.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewBookDocument {
+    pub id: String,
+    pub source: Side,
+}
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

@@ -758,6 +758,13 @@ mod tests {
         fixture_assets(proposal_body, asset.into_iter().collect())
     }
     fn fixture_assets(proposal_body: &str, assets: Vec<(String, Vec<u8>)>) -> Fixture {
+        fixture_book_documents(proposal_body, assets, false)
+    }
+    fn fixture_book_documents(
+        proposal_body: &str,
+        assets: Vec<(String, Vec<u8>)>,
+        unchanged_document: bool,
+    ) -> Fixture {
         let actor = Uuid::new_v4();
         let proposal = Uuid::new_v4();
         let binding = RepositoryBinding {
@@ -791,6 +798,12 @@ mod tests {
             (HEAD.into(), tree(proposal_body)),
             (MAIN.into(), tree("main-only change")),
         ]);
+        if unchanged_document {
+            for tree in trees.values_mut() {
+                tree.insert(".specspace/catalog.json".into(), br#"{"schema_version":1,"documents":[{"document_id":"DOC-B","path":"docs/b.md"},{"document_id":"DOC-A","path":"docs/a.md"}]}"#.to_vec());
+                tree.insert("docs/b.md".into(), b"---\ndocument_id: DOC-B\ntitle: Unchanged\nowner_team: fixture\nschema_version: 1\n---\n<!-- ss:section:SEC-B -->\n# Unchanged\n\nOriginal unchanged text\n".to_vec());
+            }
+        }
         for (path, bytes) in assets {
             trees.get_mut(HEAD).unwrap().insert(path, bytes);
         }

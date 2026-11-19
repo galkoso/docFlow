@@ -34,6 +34,8 @@ mod files;
 mod official_reviews;
 #[path = "snapshots/pr_sync.rs"]
 mod pr_sync;
+#[path = "snapshots/units.rs"]
+mod units;
 #[path = "snapshots/worker.rs"]
 mod worker;
 struct Source {
@@ -567,6 +569,13 @@ async fn outbox_failure_rolls_back_every_publication_write_and_safe_retry_succee
             .unwrap(),
         0
     );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM review_snapshot_units")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
     sqlx::query("DROP TRIGGER fail_review_event ON outbox")
         .execute(&pool)
         .await
@@ -726,6 +735,7 @@ async fn database_refuses_incomplete_headers_missing_files_and_activation_withou
             sqlx::query("INSERT INTO review_snapshot_files SELECT organization_id,proposal_id,$2,ordinal,file_id,change FROM review_snapshot_files WHERE snapshot_id=$1").bind(published.snapshot_id).bind(id).execute(&mut *tx).await.unwrap();
         }
         if fault == 4 {
+            sqlx::query("INSERT INTO review_snapshot_units SELECT organization_id,proposal_id,$2,ordinal,unit_id,file_id,unit FROM review_snapshot_units WHERE snapshot_id=$1").bind(published.snapshot_id).bind(id).execute(&mut *tx).await.unwrap();
             sqlx::query("INSERT INTO review_snapshot_books SELECT organization_id,proposal_id,$2,documents FROM review_snapshot_books WHERE snapshot_id=$1").bind(published.snapshot_id).bind(id).execute(&mut *tx).await.unwrap();
             sqlx::query("INSERT INTO review_snapshot_media SELECT organization_id,proposal_id,$2,ordinal,path,receipt FROM review_snapshot_media WHERE snapshot_id=$1").bind(published.snapshot_id).bind(id).execute(&mut *tx).await.unwrap();
             sqlx::query("UPDATE review_snapshots SET state='READY' WHERE id=$1")

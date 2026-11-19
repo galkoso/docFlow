@@ -2187,3 +2187,19 @@ Checkboxes represent verified work only.
   actor/order/state-only stability. Six new application cases cover raw source,
   add/delete, metadata/layout, non-documents and limits; all 136 application cases
   pass. Persistence and visit/approval integration follow as separate stages.
+
+- Durable mandatory review units: migration 025 and the fenced publisher seal
+  the exact ordered requirement set with snapshot IDs/counts, unchanged source
+  descriptors, stable section identities and bounded byte/line ranges. Every
+  changed file must be represented. Missing or malformed evidence prevents
+  publication; sealed units resist changes, extensions, deletion and truncation,
+  and outbox failure rolls them back with the other evidence. Existing snapshots
+  retain requirement version 0 without synthesized coverage; resubmission creates
+  complete new evidence. Three new database cases cover publication, guards and
+  migration/reuse, and the full backend run passes 684 tests with two existing
+  performance measurements excluded. Final focused guards also pass. Visits,
+  section decisions, current coverage reads/UI and required-check/merge integration
+  remain unfinished; a requirement manifest alone supplies no approval authority.
+  Workspace Clippy and formatting pass, and the exported OpenAPI remains unchanged.
+  Migration 025 is applied locally; the rebuilt API passes readiness and retains
+  authentication and no-store responses on review reads.

@@ -196,6 +196,12 @@ impl PgReviewSnapshots {
             .map_err(|_| SnapshotError::InvalidEvidence)?;
         let book_documents = serde_json::to_value(plan.book_documents())
             .map_err(|_| SnapshotError::InvalidEvidence)?;
+        let units: Vec<_> = plan
+            .required_units()
+            .iter()
+            .map(serde_json::to_value)
+            .collect::<Result<_, _>>()
+            .map_err(|_| SnapshotError::InvalidEvidence)?;
         let media: Vec<_> = verified
             .media()
             .iter()
@@ -226,7 +232,7 @@ impl PgReviewSnapshots {
             state.as_str(),
             "IN_REVIEW" | "APPROVED" | "CHANGES_REQUESTED"
         ) {
-            sqlx::query_scalar("SELECT id FROM review_snapshots WHERE id=$1 AND organization_id=$2 AND proposal_id=$3 AND state='READY' AND fingerprint=$4 AND book_manifest_version=1")
+            sqlx::query_scalar("SELECT id FROM review_snapshots WHERE id=$1 AND organization_id=$2 AND proposal_id=$3 AND state='READY' AND fingerprint=$4 AND book_manifest_version=1 AND review_units_version=1")
                 .bind(active).bind(lease.organization()).bind(lease.proposal()).bind(verified.fingerprint()).fetch_optional(&mut *tx).await?
         } else {
             None
@@ -235,14 +241,15 @@ impl PgReviewSnapshots {
         let snapshot = reused.unwrap_or_else(Uuid::new_v4);
         if activated {
             let ids: Vec<_> = plan.files().iter().map(|file| &file.id).collect();
-            sqlx::query("INSERT INTO review_snapshots(id,organization_id,proposal_id,repository_id,created_operation,created_by,fingerprint,plan_fingerprint,evidence_digest,media_validation_version,head_sha,target_sha,merge_base_sha,recorded_base_sha,prepared_version,configuration_version,policy_version,branch,remote_id,installation_id,proposal_number,title,delivery_status,metadata,file_count,file_ids,media_count,media_required) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)")
+            let unit_ids: Vec<_> = plan.required_units().iter().map(|unit| &unit.id).collect();
+            sqlx::query("INSERT INTO review_snapshots(id,organization_id,proposal_id,repository_id,created_operation,created_by,fingerprint,plan_fingerprint,evidence_digest,media_validation_version,head_sha,target_sha,merge_base_sha,recorded_base_sha,prepared_version,configuration_version,policy_version,branch,remote_id,installation_id,proposal_number,title,delivery_status,metadata,file_count,file_ids,media_count,media_required,unit_count,unit_ids) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)")
                 .bind(snapshot).bind(lease.organization()).bind(lease.proposal()).bind(read.connection.repository).bind(lease.operation_id()).bind(lease.actor())
                 .bind(verified.fingerprint()).bind(&summary.fingerprint).bind(verified.evidence_digest()).bind(verified.media_validation_version() as i32)
                 .bind(&summary.head_sha).bind(&summary.target_sha).bind(&summary.merge_base_sha).bind(&summary.recorded_base_sha)
                 .bind(summary.expected_proposal_version).bind(summary.configuration_version as i64).bind(summary.policy_version as i64)
                 .bind(&summary.branch).bind(read.connection.remote_id.to_string()).bind(read.connection.installation_id.to_string())
                 .bind(number).bind(title).bind(delivery).bind(metadata).bind(files.len() as i32).bind(json!(ids))
-                .bind(media.len() as i32).bind(json!(plan.required_media())).execute(&mut *tx).await?;
+                .bind(media.len() as i32).bind(json!(plan.required_media())).bind(units.len() as i32).bind(json!(unit_ids)).execute(&mut *tx).await?;
             sqlx::query("INSERT INTO review_snapshot_books(organization_id,proposal_id,snapshot_id,documents) VALUES($1,$2,$3,$4)")
                 .bind(lease.organization()).bind(lease.proposal()).bind(snapshot).bind(book_documents)
                 .execute(&mut *tx).await?;
@@ -256,6 +263,22 @@ impl PgReviewSnapshots {
                         .push_bind(snapshot)
                         .push_bind((chunk * 500 + index) as i32)
                         .push_bind(&plan.files()[chunk * 500 + index].id)
+                        .push_bind(value);
+                });
+                query.build().execute(&mut *tx).await?;
+            }
+            for (chunk, values) in units.chunks(500).enumerate() {
+                let mut query = QueryBuilder::<Postgres>::new(
+                    "INSERT INTO review_snapshot_units(organization_id,proposal_id,snapshot_id,ordinal,unit_id,file_id,unit) ",
+                );
+                query.push_values(values.iter().enumerate(), |mut row, (index, value)| {
+                    let unit = &plan.required_units()[chunk * 500 + index];
+                    row.push_bind(lease.organization())
+                        .push_bind(lease.proposal())
+                        .push_bind(snapshot)
+                        .push_bind((chunk * 500 + index) as i32)
+                        .push_bind(&unit.id)
+                        .push_bind(&unit.file_id)
                         .push_bind(value);
                 });
                 query.build().execute(&mut *tx).await?;

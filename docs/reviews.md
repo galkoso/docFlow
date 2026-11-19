@@ -109,8 +109,19 @@ requirement for every changed file; exceeding the section budget replaces that
 file's section set with complete whole-file review work instead of dropping it.
 Plan fingerprint version 3 includes the exact requirement set. Matching unit IDs
 do not transfer visits or approvals across snapshot/policy contexts. These data
-are preparation evidence, not a visit receipt or an approval; durable coverage
-and reviewer actions are separate integration stages.
+are preparation evidence, not a visit receipt or an approval.
+
+Migration 025 seals the complete ordered requirement set in the same fenced
+publication transaction. Header IDs/counts, per-file coverage, source descriptors,
+stable identities and byte/line bounds must agree before a snapshot becomes
+ready. Rows cannot be changed, extended, deleted or truncated after publication;
+an outbox failure rolls them back with the snapshot. Existing snapshots retain
+their original evidence as requirement version 0. They cannot be upgraded in place
+or reused as a complete requirement publication; resubmission creates new sealed
+evidence. This manifest does not assert visits, approvals or merge readiness.
+Reviewer visit receipts, section decisions, coverage reads/UI and policy-check
+assembly remain separate integration stages. Approve-all still warns about
+unviewed content until real visit evidence is connected.
 
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks

@@ -2033,3 +2033,24 @@ Checkboxes represent verified work only.
   delay. All 11 official-review database cases pass with this extraction, and
   workspace Clippy passes. Discussion source orchestration and write HTTP are
   separate integration stages; the full remaining specification stays active.
+
+- Discussion write orchestration and HTTP: authorized sessions can now open
+  proposal/snapshot/file discussions and submit versioned replies, edits,
+  tombstones, resolution/reopening and blocking changes. Actor/Origin/CSRF checks,
+  strict intent decoding, 128-KiB limits, current authority and immutable source
+  proofs precede persistence. General comments and other actions do not require
+  Git IO; new anchors share durable provider cooldown with official reviews.
+  Source failures/cooldown and content-free audit commit atomically; lost access
+  never exposes source, and a late failed duplicate read returns any exact
+  receipt already committed by an overlapping request. Migration 022 prevents
+  newly unresolved blockers entering `MERGING` in both service and database,
+  preserving safe commenting and receipt replay. Seven new HTTP cases, a real
+  source/replay database case, a database merge-barrier case and nested-delay
+  unit coverage pass. The full backend run passes all 646 tests, with two existing
+  performance measurements excluded; workspace Clippy and formatting pass.
+  OpenAPI and the generated client are updated; the frontend production build
+  passes. Migration 022 is applied locally; the restarted API is ready and both
+  live write routes require authentication with no-store responses. The full
+  specification, including unchanged-document/media anchors, reviewer UI,
+  provider/check/merge integration, bundles and remaining requirements, stays
+  active.

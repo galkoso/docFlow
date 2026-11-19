@@ -1,6 +1,8 @@
 use super::*;
 #[path = "history.rs"]
 mod history;
+#[path = "orchestration.rs"]
+mod orchestration;
 use serde_json::{Value, json};
 use specspace_application::{
     comparison_file::{

@@ -2,8 +2,8 @@
 
 Implementation of specification REV-03–06 is in progress. The source-selection
 engine, pure authorization rules, append-only database schema and authenticated
-mutation services and member-scoped read APIs are available. Mutation HTTP
-orchestration, reviewer UI and required-check integration are not yet connected.
+mutation services and member-scoped read/write APIs are available. Reviewer UI,
+unchanged-document anchoring and required-check integration are not yet connected.
 
 ## Source anchors
 
@@ -159,9 +159,8 @@ Audit failure rolls back thread/revision/event creation while retaining the
 earlier admission. Reusing that admission after recovery yields one durable
 receipt. Database proposal locks serialize competing expected-version updates.
 
-Mutation HTTP orchestration, source backoff/error presentation, UI,
-unchanged-document resolution and check/provider synchronization still need
-integration. These services do not enforce merge readiness on their own.
+UI, unchanged-document resolution and check/provider synchronization still need
+integration. These services do not authorize a merge on their own.
 
 ## Current discussion reads
 
@@ -205,3 +204,54 @@ Both require the current session and `X-Expected-Actor`, reject unknown query
 parameters, and return `Cache-Control: no-store`. Invalid cursors/queries return
 400; lost scope returns 404; changed paging context returns 409. OpenAPI and the
 generated client describe the response data, capabilities and cursor contract.
+
+## Discussion write HTTP
+
+- `POST /api/v1/proposals/{proposal}/threads` accepts `OpenThreadRequest`.
+- `POST /api/v1/proposals/{proposal}/threads/{thread}/actions` accepts
+  `ThreadMutationRequest` for reply, edit, tombstone, resolve, reopen or changing
+  blocking status.
+
+Both require the current session, captured actor, expected Origin and CSRF token;
+unknown query/body fields are rejected and bodies are limited to 128 KiB. A first
+action returns 201 and an exact successful replay returns its original receipt
+with 200. A receipt does not claim that the thread is still at that version:
+refresh current history before another action. Stale context/versions and
+idempotency conflicts return 409; denied role/ownership/independence returns 403.
+
+`open_thread` commits admission before source work and uses the shared review
+file-reader namespace. Provider failures never write to Git or close the proposal.
+Unverifiable source cannot become an anchor. Current authority is checked again
+before storing the thread and before returning a late failure/replay. If another
+identical request has already committed while a read fails, the exact receipt is
+returned rather than losing that successful result.
+
+New file-anchor creation respects the durable cooldown keyed by exact repository
+connection, shared with official reviews through `provider_backoff`. A provider
+429 persists both cooldown and a content-free `DISCUSSION_SOURCE_STOPPED` audit
+before returning Retry-After. Delays have a minimum of one second, a default of
+60 seconds, and a u32 upper bound; remaining delays are rounded up. Other actors
+cannot bypass the saved delay, and checking it does not prolong it. General and
+snapshot-wide discussions, replies, other actions and stored history remain
+available without provider IO. Failed/abandoned admissions stay charged against
+the existing actor/organization quotas.
+
+Failure audits use the immutable admission identity and contain actor, proposal,
+snapshot/request IDs and a bounded reason code, with no body, quote or provider
+error text. Access loss during IO is recorded against its original authorized
+admission without publishing any source. Cooldown/audit failure returns an
+unavailable response instead of claiming the rate limit was durably recorded.
+Unknown replies remain safe to replay with the same immutable intent; history
+refresh never resubmits an action.
+
+## Active merge barrier
+
+Migration 022 and the mutation service share the proposal lock with merge
+authorization. While state is `MERGING`, opening a blocking thread, reopening a
+resolved blocker or marking an unresolved nonblocking thread blocking is rejected.
+Commenting and transitions that do not introduce an unresolved blocker remain
+available. Stored current-role capabilities reflect that barrier, including
+`can_open_blocking_thread`; an existing action receipt can still replay without
+introducing a new change. This prepares the discussion side of merge
+serialization; the merge/check workflow itself remains a separate unfinished
+integration.

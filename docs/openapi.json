@@ -5868,6 +5868,156 @@
             "sessionCookie": []
           }
         ]
+      },
+      "post": {
+        "tags": [
+          "crate::discussions"
+        ],
+        "operationId": "openProposalDiscussion",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenThreadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Exact original receipt replay; current discussion state is read separately",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscussionRecorded"
+                }
+              }
+            }
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscussionRecorded"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/proposals/{proposal}/threads/{thread}": {
@@ -5962,6 +6112,167 @@
             }
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/threads/{thread}/actions": {
+      "post": {
+        "tags": [
+          "crate::discussions"
+        ],
+        "operationId": "mutateProposalDiscussion",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThreadMutationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Original action receipt replayed without applying a second change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscussionRecorded"
+                }
+              }
+            }
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscussionRecorded"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
             "content": {
               "application/json": {
                 "schema": {
@@ -7437,6 +7748,65 @@
           }
         }
       },
+      "DiscussionRecorded": {
+        "type": "object",
+        "required": [
+          "id",
+          "request_id",
+          "actor_id",
+          "proposal_id",
+          "thread_id",
+          "thread_version",
+          "recorded_at",
+          "replayed"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "comment_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "thread_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "thread_version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "DiscussionResolution": {
         "type": "object",
         "required": [
@@ -7643,6 +8013,7 @@
           "actor_id",
           "proposal_version",
           "can_comment",
+          "can_open_blocking_thread",
           "unresolved_blockers",
           "read_at",
           "threads"
@@ -7653,6 +8024,9 @@
             "format": "uuid"
           },
           "can_comment": {
+            "type": "boolean"
+          },
+          "can_open_blocking_thread": {
             "type": "boolean"
           },
           "next_after": {
@@ -9138,6 +9512,31 @@
           },
           "explanation": {
             "type": "string"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OpenThreadRequest": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "origin",
+          "blocking",
+          "body"
+        ],
+        "properties": {
+          "blocking": {
+            "type": "boolean"
+          },
+          "body": {
+            "type": "string"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ThreadOrigin"
           },
           "request_id": {
             "type": "string",
@@ -11878,6 +12277,50 @@
           }
         }
       },
+      "SnapshotAnchor": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "proposal"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "file_id",
+              "side",
+              "selection",
+              "kind"
+            ],
+            "properties": {
+              "file_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "file"
+                ]
+              },
+              "selection": {
+                "$ref": "#/components/schemas/TextSelection"
+              },
+              "side": {
+                "$ref": "#/components/schemas/AnchorSide"
+              }
+            }
+          }
+        ]
+      },
       "SourcePreview": {
         "type": "object",
         "required": [
@@ -12032,6 +12475,266 @@
             "format": "uuid"
           }
         }
+      },
+      "TextSelection": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "document"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "section_id",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "section"
+                ]
+              },
+              "section_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "start_line",
+              "end_line",
+              "kind"
+            ],
+            "properties": {
+              "end_line": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "lines"
+                ]
+              },
+              "start_line": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        ],
+        "description": "A browser selects identities and bounded lines, never a path, Git ref, source\nbody, quote, digest or byte offset. The document identity comes from the\nverified manifest and is checked again against actual source front matter."
+      },
+      "ThreadMutation": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "body",
+              "kind"
+            ],
+            "properties": {
+              "body": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "reply"
+                ]
+              },
+              "reply_to_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "comment_id",
+              "expected_comment_version",
+              "body",
+              "kind"
+            ],
+            "properties": {
+              "body": {
+                "type": "string"
+              },
+              "comment_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expected_comment_version": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "edit"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "comment_id",
+              "expected_comment_version",
+              "kind"
+            ],
+            "properties": {
+              "comment_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expected_comment_version": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "tombstone"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "resolve"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "reopen"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "blocking",
+              "kind"
+            ],
+            "properties": {
+              "blocking": {
+                "type": "boolean"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "set_blocking"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ThreadMutationRequest": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "expected_thread_version",
+          "mutation"
+        ],
+        "properties": {
+          "expected_thread_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mutation": {
+            "$ref": "#/components/schemas/ThreadMutation"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ThreadOrigin": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "expected_proposal_version",
+              "kind"
+            ],
+            "properties": {
+              "expected_proposal_version": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "proposal"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "snapshot_id",
+              "expected_fingerprint",
+              "anchor",
+              "kind"
+            ],
+            "properties": {
+              "anchor": {
+                "$ref": "#/components/schemas/SnapshotAnchor"
+              },
+              "expected_fingerprint": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "snapshot"
+                ]
+              },
+              "snapshot_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ]
       },
       "UiImpact": {
         "type": "string",

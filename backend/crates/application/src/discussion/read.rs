@@ -113,6 +113,7 @@ pub struct DiscussionThreads {
     pub recorded_head_sha: Option<String>,
     pub recorded_target_sha: Option<String>,
     pub can_comment: bool,
+    pub can_open_blocking_thread: bool,
     /// Includes outdated threads and tombstoned messages.
     pub unresolved_blockers: i64,
     pub read_at: String,

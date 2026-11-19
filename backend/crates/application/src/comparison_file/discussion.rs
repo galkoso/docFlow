@@ -17,6 +17,7 @@ pub enum AnchorSide {
 /// body, quote, digest or byte offset. The document identity comes from the
 /// verified manifest and is checked again against actual source front matter.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TextSelection {
     Document {},

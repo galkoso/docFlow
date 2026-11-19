@@ -16,6 +16,7 @@ use specspace_domain::{
 use sqlx::{FromRow, PgConnection, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 mod history;
+mod source;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DiscussionStoreError {
@@ -28,6 +29,10 @@ pub enum DiscussionStoreError {
     Tombstoned,
     IdempotencyMismatch,
     Quota,
+    ProviderRateLimited(u32),
+    SourceUnavailable,
+    InvalidSource,
+    Capacity,
     Unavailable,
 }
 impl From<sqlx::Error> for DiscussionStoreError {
@@ -65,6 +70,11 @@ struct Scope {
     state: String,
 }
 impl Scope {
+    fn allows_blocker_change(&self, previous: Option<ThreadState>, next: ThreadState) -> bool {
+        self.state != "MERGING"
+            || !next.blocks_merge()
+            || previous.is_some_and(ThreadState::blocks_merge)
+    }
     fn policy<T>(
         &self,
         actor: Uuid,
@@ -305,6 +315,10 @@ impl PgDiscussions {
             return Ok(OpenAdmissionResult::Recorded(old));
         }
         let snapshot = origin(&mut tx, &scope, proposal, &request).await?;
+        let initial = scope.policy(actor, |c| ThreadState::open(c, request.blocking))?;
+        if !scope.allows_blocker_change(None, initial) {
+            return Err(DiscussionStoreError::NotReady);
+        }
         admit(&mut tx, &identity).await?;
         tx.commit().await?;
         Ok(OpenAdmissionResult::Ready(Box::new(OpenAdmission {
@@ -336,6 +350,9 @@ impl PgDiscussions {
         let state = current.policy(identity.actor, |c| {
             ThreadState::open(c, admission.request.blocking)
         })?;
+        if !current.allows_blocker_change(None, state) {
+            return Err(DiscussionStoreError::NotReady);
+        }
         let revision = NewRevision {
             id: Uuid::new_v4(),
             thread: Uuid::new_v4(),
@@ -414,6 +431,7 @@ impl PgDiscussions {
             reply_to: None,
             body: None,
         };
+        let previous_state = revision.state;
         match &request.mutation {
             ThreadMutation::Reply { body, reply_to_id } => {
                 if let Some(reply) = reply_to_id {
@@ -479,6 +497,9 @@ impl PgDiscussions {
                         .transition(c, ThreadAction::SetBlocking(*blocking))
                 })?;
             }
+        }
+        if !scope.allows_blocker_change(Some(previous_state), revision.state) {
+            return Err(DiscussionStoreError::NotReady);
         }
         admit(&mut tx, &identity).await?;
         let result = append(&mut tx, &identity, &revision).await?;

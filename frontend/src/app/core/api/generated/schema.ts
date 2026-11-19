@@ -721,7 +721,7 @@ export interface paths {
         };
         get: operations["proposalDiscussionThreads"];
         put?: never;
-        post?: never;
+        post: operations["openProposalDiscussion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -738,6 +738,22 @@ export interface paths {
         get: operations["proposalDiscussionComments"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}/threads/{thread}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mutateProposalDiscussion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1047,6 +1063,26 @@ export interface components {
             can_resolve: boolean;
             can_toggle_blocking: boolean;
         };
+        DiscussionRecorded: {
+            /** Format: uuid */
+            actor_id: string;
+            /** Format: uuid */
+            comment_id?: string | null;
+            /** Format: int64 */
+            comment_version?: number | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            proposal_id: string;
+            recorded_at: string;
+            replayed: boolean;
+            /** Format: uuid */
+            request_id: string;
+            /** Format: uuid */
+            thread_id: string;
+            /** Format: int64 */
+            thread_version: number;
+        };
         DiscussionResolution: {
             actor: components["schemas"]["DiscussionActor"];
             recorded_at: string;
@@ -1101,6 +1137,7 @@ export interface components {
             /** Format: uuid */
             actor_id: string;
             can_comment: boolean;
+            can_open_blocking_thread: boolean;
             /** Format: uuid */
             next_after?: string | null;
             /** Format: uuid */
@@ -1500,6 +1537,13 @@ export interface components {
             domain: components["schemas"]["ReviewArea"];
             expected_fingerprint: string;
             explanation: string;
+            /** Format: uuid */
+            request_id: string;
+        };
+        OpenThreadRequest: {
+            blocking: boolean;
+            body: string;
+            origin: components["schemas"]["ThreadOrigin"];
             /** Format: uuid */
             request_id: string;
         };
@@ -2225,6 +2269,16 @@ export interface components {
             path: string;
             sha256?: string | null;
         };
+        SnapshotAnchor: {
+            /** @enum {string} */
+            kind: "proposal";
+        } | {
+            file_id: string;
+            /** @enum {string} */
+            kind: "file";
+            selection: components["schemas"]["TextSelection"];
+            side: components["schemas"]["AnchorSide"];
+        };
         SourcePreview: {
             base_parse_error?: string | null;
             /**
@@ -2263,6 +2317,76 @@ export interface components {
             repository_ids: string[];
             /** Format: uuid */
             team_id: string;
+        };
+        /**
+         * @description A browser selects identities and bounded lines, never a path, Git ref, source
+         *     body, quote, digest or byte offset. The document identity comes from the
+         *     verified manifest and is checked again against actual source front matter.
+         */
+        TextSelection: {
+            /** @enum {string} */
+            kind: "document";
+        } | {
+            /** @enum {string} */
+            kind: "section";
+            section_id: string;
+        } | {
+            end_line: number;
+            /** @enum {string} */
+            kind: "lines";
+            start_line: number;
+        };
+        ThreadMutation: {
+            body: string;
+            /** @enum {string} */
+            kind: "reply";
+            /** Format: uuid */
+            reply_to_id?: string | null;
+        } | {
+            body: string;
+            /** Format: uuid */
+            comment_id: string;
+            /** Format: int64 */
+            expected_comment_version: number;
+            /** @enum {string} */
+            kind: "edit";
+        } | {
+            /** Format: uuid */
+            comment_id: string;
+            /** Format: int64 */
+            expected_comment_version: number;
+            /** @enum {string} */
+            kind: "tombstone";
+        } | {
+            /** @enum {string} */
+            kind: "resolve";
+        } | {
+            /** @enum {string} */
+            kind: "reopen";
+        } | {
+            blocking: boolean;
+            /** @enum {string} */
+            kind: "set_blocking";
+        };
+        ThreadMutationRequest: {
+            /** Format: int64 */
+            expected_thread_version: number;
+            mutation: components["schemas"]["ThreadMutation"];
+            /** Format: uuid */
+            request_id: string;
+        };
+        ThreadOrigin: {
+            /** Format: int64 */
+            expected_proposal_version: number;
+            /** @enum {string} */
+            kind: "proposal";
+        } | {
+            anchor: components["schemas"]["SnapshotAnchor"];
+            expected_fingerprint: string;
+            /** @enum {string} */
+            kind: "snapshot";
+            /** Format: uuid */
+            snapshot_id: string;
         };
         /** @enum {string} */
         UiImpact: "yes" | "no" | "undecided";
@@ -6088,6 +6212,108 @@ export interface operations {
             };
         };
     };
+    openProposalDiscussion: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+            };
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenThreadRequest"];
+            };
+        };
+        responses: {
+            /** @description Exact original receipt replay; current discussion state is read separately */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscussionRecorded"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscussionRecorded"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     proposalDiscussionComments: {
         parameters: {
             query?: {
@@ -6139,6 +6365,109 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    mutateProposalDiscussion: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+            };
+            path: {
+                proposal: string;
+                thread: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThreadMutationRequest"];
+            };
+        };
+        responses: {
+            /** @description Original action receipt replayed without applying a second change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscussionRecorded"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscussionRecorded"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

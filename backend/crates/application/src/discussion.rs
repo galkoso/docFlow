@@ -7,6 +7,7 @@ use specspace_domain::discussion::CommentBody;
 use uuid::Uuid;
 
 #[derive(Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(deny_unknown_fields)]
 pub struct OpenThreadRequest {
     pub request_id: Uuid,
@@ -16,6 +17,7 @@ pub struct OpenThreadRequest {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ThreadOrigin {
     Proposal {
@@ -29,6 +31,7 @@ pub enum ThreadOrigin {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SnapshotAnchor {
     Proposal {},
@@ -40,6 +43,7 @@ pub enum SnapshotAnchor {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ThreadMutationRequest {
     pub request_id: Uuid,
@@ -48,6 +52,7 @@ pub struct ThreadMutationRequest {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ThreadMutation {
     Reply {
@@ -71,6 +76,7 @@ pub enum ThreadMutation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DiscussionRecorded {
     pub id: Uuid,
     pub request_id: Uuid,

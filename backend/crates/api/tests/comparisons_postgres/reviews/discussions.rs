@@ -1,4 +1,6 @@
 use super::*;
+#[path = "discussions/writes.rs"]
+mod writes;
 use specspace_application::discussion::{
     DiscussionRecorded, OpenThreadRequest, ThreadMutation, ThreadMutationRequest, ThreadOrigin,
 };

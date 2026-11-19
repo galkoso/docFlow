@@ -343,3 +343,45 @@ async fn concurrent_discussion_transitions_serialize_on_the_proposal_without_los
             .unwrap();
     assert_eq!(count, 2);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn merge_phase_database_guard_rejects_new_blockers_but_preserves_commenting(pool: PgPool) {
+    let f = fixture(&pool).await;
+    let open = Revision::opening(f.owner, false);
+    write(&pool, &f, &open, true).await.unwrap();
+    write(&pool, &f, &open.state(2, f.owner, "RESOLVE", true), true)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE proposals SET state='MERGING' WHERE id=$1")
+        .bind(f.proposal)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        write(&pool, &f, &Revision::opening(f.owner, false), true)
+            .await
+            .is_err()
+    );
+    assert!(
+        write(&pool, &f, &open.state(3, f.owner, "REOPEN", false), true)
+            .await
+            .is_err()
+    );
+    let reply = Revision {
+        thread: open.thread,
+        version: 3,
+        actor: f.product,
+        kind: "REPLY",
+        blocking: true,
+        resolved: true,
+        independent: false,
+        comment: Some(Uuid::new_v4()),
+        comment_version: Some(1),
+        comment_author: Some(f.product),
+        body: Some("Comment during merge".into()),
+    };
+    write(&pool, &f, &reply, true).await.unwrap();
+    let mut unmark = open.state(4, f.owner, "SET_BLOCKING", true);
+    unmark.blocking = false;
+    write(&pool, &f, &unmark, true).await.unwrap();
+}

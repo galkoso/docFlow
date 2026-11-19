@@ -78,13 +78,13 @@ impl Header {
             && state.resolved
             && scope
                 .policy(actor, |c| state.transition(c, ThreadAction::Reopen))
-                .is_ok();
+                .is_ok_and(|next| scope.allows_blocker_change(Some(state), next));
         let can_toggle_blocking = can_comment
             && scope
                 .policy(actor, |c| {
                     state.transition(c, ThreadAction::SetBlocking(!state.blocking))
                 })
-                .is_ok();
+                .is_ok_and(|next| scope.allows_blocker_change(Some(state), next));
         let binding_changed = self.repository_id != scope.repository_id
             || self.remote_id != scope.remote_id
             || self.installation_id != scope.installation_id
@@ -252,6 +252,7 @@ impl PgDiscussions {
             recorded_head_sha: access.scope.head_sha.clone(),
             recorded_target_sha: access.scope.target_sha.clone(),
             can_comment: access.can_comment(actor),
+            can_open_blocking_thread: access.can_comment(actor) && access.scope.state != "MERGING",
             unresolved_blockers,
             read_at: now.to_rfc3339(),
             threads,

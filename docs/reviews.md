@@ -143,14 +143,29 @@ opaque proof retains actor/proposal/snapshot/fingerprint, exact source and windo
 bounds; it can be rechecked after later awaits. It shares the file reader's
 verified cache, source capacity and deadline. Binary requirements need separate
 display verification. This internal proof is not a visit receipt or an approval;
-HTTP delivery, durable receipts and reviewer acknowledgement remain to be wired.
+HTTP delivery and browser acknowledgement remain to be wired.
 PostgreSQL unit authorization resolves only the selected ready snapshot's sealed
 manifest under current organization access and the exact repository/installation
 binding. It preserves the snapshot's immutable head/base/fingerprint if proposal
 metadata advances, while a proof captured under an earlier current scope fails
 recheck. Legacy requirement version 0 returns unavailable authority; metadata
 alone cannot be promoted to a source proof. This read path adds no migration.
-Reviewer visit receipts, section decisions, coverage reads/UI and policy-check
+
+Migration 026 adds separate immutable source attempts, deliveries and explicit
+window acknowledgements. The internal service checks an independent qualified
+assignment and current snapshot before source IO, charges failed attempts too
+(600 per reviewer / 6,000 per organization in ten minutes), and respects the shared
+provider cooldown. No transaction spans provider IO. A final locked check prevents
+role, snapshot or repository changes from publishing stale delivery evidence.
+Attempts expire after three minutes; deliveries allow acknowledgement for thirty
+minutes. Stored delivery data includes exact source/range/window hashes, never
+source bodies. Only an explicit actor/domain/snapshot-bound acknowledgement creates
+a visit, atomically with audit and event records. An exact recorded retry remains
+replayable after delivery expiry, subject to current authority; nonce reuse for
+another intent is rejected. Neither a delivery nor one window acknowledgement
+asserts whole-unit coverage or approval. HTTP endpoints, coverage assembly and
+review UI acknowledgement controls remain to be connected.
+HTTP visit receipt endpoints, section decisions, coverage reads/UI and policy-check
 assembly remain separate integration stages. Approve-all still warns about
 unviewed content until real visit evidence is connected.
 

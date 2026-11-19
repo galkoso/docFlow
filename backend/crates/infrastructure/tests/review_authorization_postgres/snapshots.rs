@@ -36,6 +36,8 @@ mod official_reviews;
 mod pr_sync;
 #[path = "snapshots/units.rs"]
 mod units;
+#[path = "snapshots/visits.rs"]
+mod visits;
 #[path = "snapshots/worker.rs"]
 mod worker;
 struct Source {

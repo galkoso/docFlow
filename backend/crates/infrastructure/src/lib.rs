@@ -22,6 +22,7 @@ pub mod review_configuration;
 pub mod review_files;
 pub mod review_snapshots;
 pub mod review_submissions;
+pub mod review_visits;
 pub mod review_worker;
 pub mod save_verification;
 pub mod save_worker;

@@ -2257,3 +2257,21 @@ Checkboxes represent verified work only.
   The full backend run passes 693 tests with the same two performance measurements
   excluded; workspace Clippy and formatting pass. No API/runtime wiring or schema
   contract changes are part of these internal reader/authority stages.
+
+- Durable source delivery and explicit acknowledgement: migration 026 separates
+  quota-charged source attempts, verified window deliveries and immutable visits.
+  The internal service checks current independent reviewer qualification and
+  assignment before source IO and again under locked authority before publication.
+  Failed reads count toward bounded quotas; provider cooldowns are shared with
+  existing review/discussion paths. Deliveries retain exact metadata and window
+  hashes without source bodies. Explicit acknowledgement binds reviewer, domain,
+  snapshot/fingerprint, delivery and request nonce, and atomically records audit
+  and event evidence. Exact retries reuse their receipt; expired unacknowledged
+  deliveries, changed authority and nonce/intent conflicts are rejected. Eight
+  database cases cover the lifecycle, races, quota/backoff, forgery and rollback.
+  HTTP/UI integration, whole-unit coverage and section approvals remain unfinished;
+  delivering source never records a visit or approval by itself.
+  The full backend run passes 701 tests with the same two performance measurements
+  excluded. Workspace Clippy, formatting and builds pass; the exported OpenAPI is
+  unchanged. Migration 026 is applied locally, all three evidence tables exist,
+  and the rebuilt API is ready with authenticated no-store review responses.

@@ -719,6 +719,7 @@ async fn a_failed_final_authorization_never_admits_verified_source_to_the_cache(
     assert_eq!(f.factory.provider.reads.load(Ordering::SeqCst), 4);
 }
 
+mod discussion;
 mod image;
 
 #[tokio::test]

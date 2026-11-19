@@ -69,3 +69,29 @@ audit and outbox events atomically. They are not runtime merge enforcement yet.
 Comment bodies preserve exact submitted text, with a limit of 10,000 Unicode
 scalar values (PostgreSQL `char_length`), rather than UTF-8 bytes or JavaScript
 UTF-16 code units. Whitespace-only text and NUL are rejected.
+
+## Verified changed-file anchors
+
+`ComparisonFileReader::load_discussion_anchor` connects source selection to the
+existing immutable file reader. It resolves scope and manifest from its configured
+server authorization, verifies provider bytes against the recorded size, blob and
+SHA-256, then captures a selection from the requested before/after side. Renamed
+and historical files retain their original path and merge-base/head commit; the
+current proposal head is never substituted. An absent side cannot borrow the
+other side, and an empty side has no selectable text line.
+
+The opaque `VerifiedFileAnchor` retains complete actor/organization/proposal/
+snapshot/provider-binding context and exact selected-side metadata. It cannot be
+deserialized from a request. Input selections reject unknown fields, including
+paths, quotes and hashes. Malformed section IDs and line bounds fail before any
+source call. Processing uses the reader's shared capacity and overall deadline;
+source and anchor computation both recheck current authorization, including cache
+hits. A further explicit recheck is available for later awaits.
+
+This layer grants read evidence only. A future mutation service must check comment
+permission before source I/O and lock/recheck current write authorization, expected
+snapshot/fingerprint and context when storing the thread. Configure this reader
+with shared-review authorization for shared discussion operations, never the
+private comparison-job namespace. Document/section anchors for unchanged files
+still need an authorized full-book resolver; the source-selection engine already
+supports their content independently of the changed-file manifest.

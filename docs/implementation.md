@@ -1948,3 +1948,19 @@ Checkboxes represent verified work only.
   boundaries. These pure rules await authenticated database/context integration;
   no discussion endpoints or runtime merge enforcement are claimed. All remaining
   specification requirements stay active.
+
+- Verified changed-file discussion anchors: the immutable file reader now builds
+  opaque before/after anchor evidence from size/blob/SHA-256-verified Git source,
+  preserving historical snapshot, provider binding, rename path and exact commit.
+  Bounded selection processing shares reader capacity/deadlines and rechecks
+  access before/after CPU work; absent and empty sides remain distinct. Strict
+  selection decoding rejects forged source locators/quotes/hashes, including
+  unknown fields on document selections. Six new application cases cover renamed
+  historical sides, cache reuse, empty/absent sides, tampering, invalid requests,
+  mid-processing revocation/context drift and later actor/scope rechecks. This is
+  read evidence, not permission to write a discussion. Full-book unchanged-file
+  resolution, transactional discussion persistence, APIs/UI and full-spec runtime
+  integration remain pending. All 611 backend tests pass, with two existing
+  performance measurements excluded; workspace Clippy and formatting pass. No
+  migration or public API contract changed. The first two discussion stages also
+  passed both Backend and Frontend CI before this integration stage was pushed.

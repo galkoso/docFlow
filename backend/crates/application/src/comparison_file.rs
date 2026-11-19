@@ -2,6 +2,7 @@
 //! and refs never enter provider calls; only server-resolved immutable evidence.
 pub mod before_image;
 mod cache;
+pub mod discussion;
 pub mod image;
 
 use crate::{

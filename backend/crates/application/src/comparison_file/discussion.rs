@@ -15,7 +15,7 @@ pub enum AnchorSide {
 /// A browser selects identities and bounded lines, never a path, Git ref, source
 /// body, quote, digest or byte offset. The document identity comes from the
 /// verified manifest and is checked again against actual source front matter.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TextSelection {
     Document {},
@@ -82,7 +82,7 @@ impl ComparisonFileReader {
         side: AnchorSide,
         selection: TextSelection,
     ) -> Result<VerifiedFileAnchor, AnchorReadError> {
-        validate_selection(&selection)?;
+        selection.validate()?;
         tokio::time::timeout(self.timeout, async {
             let loaded = self.load(actor, proposal, snapshot, file).await?;
             let permit = self
@@ -116,21 +116,25 @@ impl ComparisonFileReader {
     }
 }
 
-fn validate_selection(selection: &TextSelection) -> Result<(), AnchorReadError> {
-    match selection {
-        TextSelection::Section { section_id } if !crate::draft::valid_document_id(section_id) => {
-            Err(AnchorError::SectionNotFound.into())
+impl TextSelection {
+    pub fn validate(&self) -> Result<(), AnchorError> {
+        match self {
+            TextSelection::Section { section_id }
+                if !crate::draft::valid_document_id(section_id) =>
+            {
+                Err(AnchorError::SectionNotFound)
+            }
+            TextSelection::Lines {
+                start_line,
+                end_line,
+            } if *start_line == 0
+                || end_line < start_line
+                || end_line - start_line >= MAX_SELECTED_LINES =>
+            {
+                Err(AnchorError::InvalidLines)
+            }
+            _ => Ok(()),
         }
-        TextSelection::Lines {
-            start_line,
-            end_line,
-        } if *start_line == 0
-            || end_line < start_line
-            || end_line - start_line >= MAX_SELECTED_LINES =>
-        {
-            Err(AnchorError::InvalidLines.into())
-        }
-        _ => Ok(()),
     }
 }
 

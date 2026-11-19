@@ -1,4 +1,5 @@
 pub mod book;
+pub mod discussion;
 pub mod draft;
 pub mod proposal;
 pub mod proposal_reader;

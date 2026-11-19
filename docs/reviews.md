@@ -126,7 +126,13 @@ current membership. Pages echo actor/proposal/snapshot/fingerprint/head identity
 remain pinned if the proposal advances, and contain descriptors and ranges only.
 Legacy snapshots return `available: false` with no requirements. These reads need
 no provider IO and do not record a visit or an approval. The typed Angular client
-requests pages of 20; the review coverage UI remains to be connected.
+requests pages of 20. The review screen loads this list on demand, displays the
+original before/after ranges and explicit section/file requirements, and opens
+document links at the snapshot head or merge base. Missing sides and legacy
+unavailability stay explicit. The `requirements` URL parameter restores paging
+without changing the selected comparison or discussion draft. Actor/context
+changes cancel reads and hide stale data; denied access purges the parent review
+scope. This list exposes no visit checkbox, approval count or completion claim.
 Reviewer visit receipts, section decisions, coverage reads/UI and policy-check
 assembly remain separate integration stages. Approve-all still warns about
 unviewed content until real visit evidence is connected.

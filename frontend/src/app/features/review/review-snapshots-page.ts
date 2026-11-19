@@ -6,6 +6,7 @@ import { SessionState } from '../../core/auth/session-state';
 import { stateLabel } from '../proposals/proposal-labels';
 import { ReviewSubmission } from './review-submission';
 import { SharedReviewBody } from './shared-review-body';
+import { ReviewUnitsView } from './review-units-view';
 import { ReviewPrStatusView } from './review-pr-status';
 import { OfficialReviewsView } from './official-reviews-view';
 import { DiscussionsView, type DiscussionScope } from './discussions-view';
@@ -14,7 +15,7 @@ import { SharedReviewState } from './shared-review-state';
 import { reviewLocation, type ReviewPageLocation } from './review-location';
 
 @Component({
-  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody, ReviewPrStatusView, OfficialReviewsView, DiscussionsView],
+  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody, ReviewPrStatusView, OfficialReviewsView, DiscussionsView, ReviewUnitsView],
   providers: [ReviewSubmission, SharedReviewState],
   changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './review-snapshots-page.html', styleUrl: './review-snapshots-page.css',
 })
@@ -77,7 +78,7 @@ export class ReviewSnapshotsPage implements OnDestroy {
         if (!actor || actor !== this.submission.owner() || this.blocked()) return;
         const key = result ? `${result.job_id}:${result.snapshot_id}` : '';
         if (result && this.applied !== key) {
-          this.applied = key; this.navigate({ job: result.job_id, snapshot: result.snapshot_id, files: null, media: null, file: null, mode: null, unit: null }, true);
+          this.applied = key; this.navigate({ job: result.job_id, snapshot: result.snapshot_id, files: null, media: null, requirements: null, file: null, mode: null, unit: null }, true);
         } else if (job && this.query().get('job') !== job) this.navigate({ job }, true);
       });
     });
@@ -132,7 +133,7 @@ export class ReviewSnapshotsPage implements OnDestroy {
   private ownsSubmission(): boolean {
     return !this.blocked() && !!this.session.profile() && this.session.profile()?.user_id === this.submission.owner();
   }
-  select(snapshot: string): void { this.navigate({ snapshot, files: null, media: null, file: null, mode: null, unit: null }); }
+  select(snapshot: string): void { this.navigate({ snapshot, files: null, media: null, requirements: null, file: null, mode: null, unit: null }); }
   filePage(offset: number): void { this.navigate({ snapshot: this.state.selected(), files: offset, file: null, mode: null, unit: null }); }
   selectFile(file: string): void {
     if (this.visible() && this.state.files()?.files.some(item => item.id === file)) this.navigate({ snapshot: this.state.selected(), file, mode: null, unit: null });
@@ -144,6 +145,7 @@ export class ReviewSnapshotsPage implements OnDestroy {
     const actor = this.session.profile()?.user_id, proposal = this.proposal();
     if (actor && proposal && this.visible()) this.state.refreshHistory(actor, proposal);
   }
+  requirementPage(offset: number): void { this.navigate({ snapshot: this.state.selected(), requirements: offset }); }
   mediaPage(offset: number): void { this.navigate({ snapshot: this.state.selected(), media: offset }); }
   historyPage(after: string | null): void { this.navigate({ after }); }
   previous(offset: number): number { return Math.max(0, offset - 50); }

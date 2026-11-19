@@ -7,11 +7,12 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { By } from '@angular/platform-browser';
 import { SessionState } from '../../core/auth/session-state';
 import { ReviewSnapshotsPage } from './review-snapshots-page';
+import { ReviewUnitsView } from './review-units-view';
 import { DiscussionsView } from './discussions-view';
 import { discussionThreads } from '../../../testing/discussion-fixtures';
 import { reviewSnapshotExit } from './review-snapshot-exit';
 import { actor, proposal, snapshot, other, configuration, detail, history, metadata, files, media,
-  ticket, publication, job, prStatus, officialHistory, product, reviewDocuments } from '../../../testing/review-fixtures';
+  ticket, publication, job, prStatus, officialHistory, product, reviewDocuments, reviewUnits } from '../../../testing/review-fixtures';
 
 @Component({ template: '<p>Elsewhere</p>' })
 class Away {}
@@ -80,6 +81,27 @@ describe('Review snapshots page', () => {
     page.reload(); http.expectNone(req => req.url === snapshots);
     const unload = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent; page.beforeUnload(unload); expect(unload.defaultPrevented).toBe(true);
     confirm.mockReturnValue(true); expect(await router.navigateByUrl('/away')).toBe(true); http.verify();
+  });
+  it('pages mandatory items independently without replacing snapshot content or discussion drafts', async () => {
+    const { harness, page, http, router, load, settle } = await create(); load(); await settle();
+    const snapshotBody = page.state.snapshot(), discussion = harness.routeDebugElement!.query(By.directive(DiscussionsView)).componentInstance as DiscussionsView;
+    const requirements = harness.routeDebugElement!.query(By.directive(ReviewUnitsView)).componentInstance as ReviewUnitsView;
+    requirements.show(); harness.detectChanges();
+    http.expectOne(req => req.url === `${snapshots}/${snapshot}/units`).flush(reviewUnits(actor, 0, 22)); await settle();
+    discussion.beginOpen(); discussion.body.set('Unsent discussion remains');
+    requirements.move(20); await settle();
+    expect(router.url).toContain('requirements=20');
+    const next = http.expectOne(req => req.url === `${snapshots}/${snapshot}/units`);
+    expect(next.request.params.get('offset')).toBe('20'); next.flush(reviewUnits(actor, 20, 22)); await settle();
+    expect(page.state.snapshot()).toBe(snapshotBody); expect(discussion.body()).toBe('Unsent discussion remains');
+    http.expectNone(req => req.url === snapshots); http.expectNone(req => req.method === 'POST'); http.verify();
+  });
+  it('purges shared private content when mandatory item access is denied', async () => {
+    const { harness, page, http, load, settle } = await create(); load(); await settle();
+    const requirements = harness.routeDebugElement!.query(By.directive(ReviewUnitsView)).componentInstance as ReviewUnitsView;
+    requirements.show(); harness.detectChanges();
+    http.expectOne(req => req.url === `${snapshots}/${snapshot}/units`).flush({}, { status: 403, statusText: 'Forbidden' }); await settle();
+    expect(page.blocked()).toBe(true); expect(page.state.snapshot()).toBeNull(); http.verify();
   });
   it('refreshes proposal metadata after a decision without replacing the displayed snapshot', async () => {
     const { page, http, load, settle } = await create(); load(); await settle(); const displayed = page.state.snapshot();

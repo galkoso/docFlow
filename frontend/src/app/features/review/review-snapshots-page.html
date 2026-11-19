@@ -58,6 +58,8 @@
         <p>{{ snapshot.created_at | date:'dd/MM/yyyy HH:mm:ss' }} · {{ current() ? 'מתאימה לפרטי ההצעה השמורים כעת' : 'גרסה היסטורית או שאינה תואמת למצב השמור כעת' }}</p>
         <p>מצב הענפים, האישורים ובדיקות המיזוג נבדק בנפרד.</p>
         <app-review-pr-status [actor]="session.profile()!.user_id" [proposal]="proposal()!" [snapshot]="snapshot" (accessDenied)="bodyDenied()" />
+        <app-review-units [actor]="session.profile()!.user_id" [proposal]="proposal()!" [snapshot]="snapshot" [offset]="location()?.requirements ?? 0"
+          (offsetSelected)="requirementPage($event)" (accessDenied)="bodyDenied()" />
         <app-official-reviews [actor]="session.profile()!.user_id" [proposal]="proposal()!" [snapshot]="snapshot" (accessDenied)="bodyDenied()" (recorded)="decisionRecorded()" />
         <dl><dt>ענף</dt><dd><bdi>{{ snapshot.metadata.summary.branch }}</bdi></dd><dt>ראש הענף</dt><dd><bdi>{{ snapshot.metadata.summary.head_sha }}</bdi></dd>
           <dt>יעד הסקירה</dt><dd><bdi>{{ snapshot.metadata.summary.target_sha }}</bdi></dd><dt>בסיס ההשוואה</dt><dd><bdi>{{ snapshot.metadata.summary.merge_base_sha }}</bdi></dd></dl>

@@ -2218,3 +2218,17 @@ Checkboxes represent verified work only.
   The full backend run passes 686 tests with the same two performance
   measurements excluded. Visit receipts, section decisions and the coverage UI/check assembly
   remain unfinished; metadata reads do not count as review actions.
+
+- Mandatory review item browsing: the review screen now loads the sealed list
+  on demand in bounded pages, including section work, non-section content,
+  ordering and complete-file requirements. It shows exact original source ranges
+  and pins before/after document links to the sealed merge base/head. Missing
+  sides and unavailable legacy evidence remain explicit. URL paging is independent
+  of comparison/discussion drafts; actor/snapshot changes cancel reads and hide
+  stale data, while access denial purges the parent scope. Source descriptors,
+  ranges, counts and page identities are checked before rendering, paths render
+  inertly, and timed-out reads require explicit retry. All 509 frontend tests in
+  54 files and the production build pass. Browser discovery still reports no
+  connection, so physical keyboard/RTL/320px verification remains pending. This
+  list does not record visits or approvals; visit receipts, section decisions,
+  actual coverage and required-check/merge integration remain unfinished.

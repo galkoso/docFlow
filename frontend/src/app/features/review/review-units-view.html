@@ -1,0 +1,36 @@
+<section aria-labelledby="review-units-title">
+  <h3 id="review-units-title">פריטים שנדרשים לסקירה</h3>
+  <p>הרשימה כוללת גם שינויים בפרטי מסמכים, בסדר ובקבצים. פתיחת הרשימה או קישור לקריאה אינה מסמנת פריט כנקרא או מאושר.</p>
+  @if (!opened() && offset() === 0) {<button type="button" (click)="show()">הצגת פריטי הסקירה</button>}
+  @else {
+    @if (busy()) {<p role="status">טוענים פריטי סקירה…</p>}
+    @if (error(); as message) {<p role="alert">{{ message }}</p><button type="button" (click)="refresh()" [disabled]="busy()">ניסיון נוסף</button>}
+    @if (view(); as page) {
+      @if (!page.available) {<p>אין רשימת סקירה מלאה בגרסה היסטורית זו. כדי לקבל רשימה מלאה, יש לשלוח גרסה חדשה לסקירה.</p>}
+      @else {
+        <p>{{ page.total }} פריטים בגרסה זו.@if (page.units.length) { מוצגים {{ page.units.length }} פריטים, החל מפריט {{ page.offset + 1 }}.}</p>
+        @if (!page.units.length) {<p>אין פריטים בעמוד זה.</p>}
+        <ol [start]="page.offset + 1">@for (unit of page.units; track unit.id) {
+          <li><strong>{{ label(unit) }}</strong>
+            @if (unit.requirement.kind === 'section') {<p>מסמך <bdi>{{ unit.requirement.document_id }}</bdi> · סעיף <bdi>{{ unit.requirement.section_id }}</bdi></p>}
+            @for (side of sides; track side) {
+              <div class="source"><span>{{ side === 'before' ? 'לפני — לקריאה בלבד' : 'אחרי' }}</span>
+                @if (unit[side]; as evidence) {
+                  <p><bdi>{{ evidence.source.path }}</bdi></p>
+                  @if (evidence.range; as range) {<p>שורות {{ range.start_line }}–{{ range.end_line }} במקור</p>}
+                  @else {<p>יש לבדוק את הקובץ בהשוואת הקבצים.</p>}
+                  @if (bookHref(unit, side); as href) {<a [href]="href" target="_blank" rel="noopener noreferrer">קריאת {{ side === 'before' ? 'הבסיס' : 'ההצעה' }} בגרסה זו בכרטיסייה חדשה</a>}
+                } @else {<p>הפריט אינו קיים בצד זה.</p>}
+              </div>
+            }
+          </li>
+        }</ol>
+        <nav aria-label="עמודי פריטי הסקירה">
+          @if (page.offset > 0) {<button type="button" (click)="move(page.offset > 20 ? page.offset - 20 : 0)" [disabled]="busy()">פריטים קודמים</button>}
+          @if (page.next_offset != null) {<button type="button" (click)="move(page.next_offset)" [disabled]="busy()">פריטים נוספים</button>}
+        </nav>
+      }
+      <button type="button" (click)="refresh()" [disabled]="busy()">טעינת רשימת הפריטים מחדש</button>
+    }
+  }
+</section>

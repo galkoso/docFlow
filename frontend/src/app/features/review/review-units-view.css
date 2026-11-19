@@ -1,0 +1,11 @@
+:host { display: block; min-width: 0; }
+section { margin-block: 1.5rem; }
+ol { padding-inline-start: 1.5rem; }
+li { margin-block: 1rem; padding-block-end: 1rem; border-block-end: 1px solid var(--border, #ccd2d8); }
+p, bdi, a { overflow-wrap: anywhere; }
+bdi { direction: ltr; unicode-bidi: isolate; }
+.source { border-inline-start: 2px solid var(--border, #ccd2d8); padding-inline-start: .75rem; margin-block: .75rem; }
+.source p { margin-block: .3rem; }
+nav { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
+button { max-width: 100%; white-space: normal; }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--accent, #216eac); outline-offset: 3px; }

@@ -1,6 +1,6 @@
 import type { ReviewConfiguration } from '../app/core/api/review-configuration-api';
 import type { ReviewAccepted, ReviewDetail, ReviewFiles, ReviewHistory, ReviewJob, ReviewMedia,
-  ReviewPublication, ReviewSnapshot, ReviewPrStatus, OfficialHistory, ReviewDocuments } from '../app/core/api/review-api';
+  ReviewPublication, ReviewSnapshot, ReviewPrStatus, OfficialHistory, ReviewDocuments, ReviewUnits } from '../app/core/api/review-api';
 
 export const reviewDocuments = (viewer = actor, offset = 0, total = 2): ReviewDocuments => ({ actor_id: viewer, proposal_id: proposal,
   snapshot_id: snapshot, fingerprint: metadata().fingerprint, head_sha: head, available: true, offset, total,
@@ -8,6 +8,17 @@ export const reviewDocuments = (viewer = actor, offset = 0, total = 2): ReviewDo
   documents: Array.from({ length: Math.min(20, Math.max(0, total - offset)) }, (_, n) => ({ id: (offset + n + 128).toString(16).padStart(64, '0'),
     source: { path: `docs/book-${offset + n}.md`, document_id: `DOC-BOOK-${offset + n}`, catalog_position: offset + n,
       blob_oid: head, bytes: 100, executable: false, sha256: '3'.repeat(64) },
+  })),
+});
+
+export const reviewUnits = (viewer = actor, offset = 0, total = 2): ReviewUnits => ({ actor_id: viewer, proposal_id: proposal,
+  snapshot_id: snapshot, fingerprint: metadata().fingerprint, head_sha: head, available: true, offset, total,
+  next_offset: offset + Math.min(20, Math.max(0, total - offset)) < total ? offset + 20 : null,
+  units: Array.from({ length: Math.min(20, Math.max(0, total - offset)) }, (_, n) => ({
+    id: (offset + n + 256).toString(16).padStart(64, '0'), file_id: '1'.repeat(64),
+    requirement: { kind: 'section', document_id: 'DOC-A', section_id: `SEC-${offset + n}` },
+    before: { source: files().files[0].before!, range: { start_byte: 1, end_byte: 10, start_line: 1, end_line: 2, sha256: '4'.repeat(64) } },
+    after: { source: files().files[0].after!, range: { start_byte: 1, end_byte: 20, start_line: 1, end_line: 3, sha256: '5'.repeat(64) } },
   })),
 });
 

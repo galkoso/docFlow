@@ -1924,3 +1924,14 @@ Checkboxes represent verified work only.
   because no browser is connected; physical keyboard/RTL/320px acceptance remains
   open. Required policy/check integration, sections/discussions/product decisions,
   merge, bundles and all unfinished full-spec requirements remain pending.
+
+- Discussion source anchors: exact document, stable-section and before/after
+  line-range evidence can now be captured without accepting browser-supplied byte
+  positions, hashes or quotes. Original UTF-8/CRLF bytes, full-source/range hashes
+  and bounded plain-text context survive; changed source never relocates an
+  anchor. Sections retain non-visible content and work independently of the
+  changed-file manifest. Ten new tests cover Unicode, bounds, duplicate/missing
+  section identities, code-fence markers, images and missing final newlines.
+  This is the source-processing layer only; authenticated snapshot binding,
+  discussion persistence/API/UI, blocking resolution and all remaining full-spec
+  work are still pending. See `docs/discussions.md`.

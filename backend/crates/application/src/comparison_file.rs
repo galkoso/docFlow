@@ -5,6 +5,7 @@ pub mod book;
 mod cache;
 pub mod discussion;
 pub mod image;
+pub mod review_unit;
 
 use crate::{
     comparison::{Change, Kind, Side},

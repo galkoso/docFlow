@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [features]
-openapi = ["dep:utoipa"]
+openapi = ["dep:utoipa", "specspace-document-engine/openapi"]
 
 [dependencies]
 specspace-domain = { path = "../domain" }

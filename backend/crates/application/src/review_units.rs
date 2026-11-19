@@ -95,6 +95,36 @@ pub(crate) fn prepare_with_limit(
     Ok(units)
 }
 
+/// Re-derive complete requirement evidence from actual, verified source. A
+/// sealed manifest fallback is deliberately whole-file, never an arbitrary span.
+pub(crate) fn verify_source_unit(
+    required: &RequiredReviewUnit,
+    change: &Change,
+    before: Option<&str>,
+    after: Option<&str>,
+) -> Result<(), &'static str> {
+    let expected = if matches!(
+        required.requirement,
+        Requirement::File {
+            reason: FileRequirement::ManifestLimit
+        }
+    ) {
+        vec![whole_file(
+            change,
+            before,
+            after,
+            FileRequirement::ManifestLimit,
+        )?]
+    } else {
+        file_units(change, before, after)?
+    };
+    if expected.iter().any(|unit| unit == required) {
+        Ok(())
+    } else {
+        Err("REVIEW_UNIT_SOURCE_MISMATCH")
+    }
+}
+
 fn file_units(
     change: &Change,
     before: Option<&str>,

@@ -2232,3 +2232,16 @@ Checkboxes represent verified work only.
   connection, so physical keyboard/RTL/320px verification remains pending. This
   list does not record visits or approvals; visit receipts, section decisions,
   actual coverage and required-check/merge integration remain unfinished.
+
+- Exact required-source windows: an internal reader now re-derives sealed review
+  requirements from the verified file pair before returning at most 64 KiB of
+  original UTF-8 source per window. Whole-file fallbacks retain front matter and
+  trailing/protected text; truncated spans with valid hashes are rejected. Opaque
+  proofs retain actor/snapshot/fingerprint/source/range identity, use shared file
+  cache/capacity/deadlines, and require fresh authority checks after later awaits.
+  Six new application cases cover reconstruction, CRLF/Unicode, forged evidence,
+  missing sides, invalid offsets, authority races, capacity and timeout recovery.
+  The application OpenAPI feature now forwards the document-engine feature, so
+  standalone application builds support the source-range schemas. Delivery,
+  durable visit receipts and actual reviewer acknowledgement remain unfinished.
+  All 142 application tests pass, along with workspace Clippy and formatting.

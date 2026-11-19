@@ -10,6 +10,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 mod book;
+mod review_unit;
 
 fn sha(n: char) -> CommitSha {
     CommitSha::parse(n.to_string().repeat(40)).unwrap()

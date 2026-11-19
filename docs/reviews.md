@@ -133,6 +133,17 @@ unavailability stay explicit. The `requirements` URL parameter restores paging
 without changing the selected comparison or discussion draft. Actor/context
 changes cancel reads and hide stale data; denied access purges the parent review
 scope. This list exposes no visit checkbox, approval count or completion claim.
+
+The internal mandatory-unit source reader re-derives each requirement from the
+verified immutable file pair before exposing any text. This includes complete
+whole-file fallbacks; a correctly hashed but truncated range cannot replace the
+sealed work. It returns at most 64 KiB per UTF-8 window, preserves original CRLF
+and protected source, and distinguishes an absent side from an empty span. The
+opaque proof retains actor/proposal/snapshot/fingerprint, exact source and window
+bounds; it can be rechecked after later awaits. It shares the file reader's
+verified cache, source capacity and deadline. Binary requirements need separate
+display verification. This internal proof is not a visit receipt or an approval;
+HTTP delivery, durable receipts and reviewer acknowledgement remain to be wired.
 Reviewer visit receipts, section decisions, coverage reads/UI and policy-check
 assembly remain separate integration stages. Approve-all still warns about
 unviewed content until real visit evidence is connected.

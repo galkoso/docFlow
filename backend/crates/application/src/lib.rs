@@ -23,3 +23,5 @@ pub mod review_units;
 
 pub mod pr_recovery;
 pub mod pr_sync;
+
+pub mod review_visits;

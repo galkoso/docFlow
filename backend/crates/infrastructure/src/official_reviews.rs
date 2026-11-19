@@ -35,20 +35,20 @@ impl From<sqlx::Error> for OfficialReviewError {
     }
 }
 #[derive(FromRow, PartialEq, Eq)]
-struct Scope {
-    organization_id: Uuid,
-    repository_id: Uuid,
-    remote_id: String,
-    installation_id: String,
+pub(crate) struct Scope {
+    pub(crate) organization_id: Uuid,
+    pub(crate) repository_id: Uuid,
+    pub(crate) remote_id: String,
+    pub(crate) installation_id: String,
     branch: String,
-    fingerprint: String,
+    pub(crate) fingerprint: String,
     head_sha: String,
     target_sha: String,
     recorded_base_sha: String,
     merge_base_sha: String,
     policy_version: i64,
     configuration_version: i64,
-    current: bool,
+    pub(crate) current: bool,
     role: String,
     review_domains: Vec<String>,
     author_id: Uuid,
@@ -107,13 +107,19 @@ async fn scope(
     snapshot: Uuid,
     request: &OfficialReviewRequest,
 ) -> Result<Scope, OfficialReviewError> {
+    reviewer_scope(conn, actor, proposal, snapshot, request.domain).await
+}
+pub(crate) async fn reviewer_scope(
+    conn: &mut PgConnection,
+    actor: Uuid,
+    proposal: Uuid,
+    snapshot: Uuid,
+    domain: specspace_application::review_configuration::ReviewArea,
+) -> Result<Scope, OfficialReviewError> {
     let mut row=sqlx::query_as::<_,Scope>("SELECT p.organization_id,h.repository_id,h.remote_id,h.installation_id,h.branch,h.fingerprint,h.head_sha,h.target_sha,h.recorded_base_sha,h.merge_base_sha,h.policy_version,h.configuration_version,false AS current,m.role,m.review_domains,p.author_id,h.metadata FROM proposals p JOIN review_snapshots h ON h.organization_id=p.organization_id AND h.proposal_id=p.id JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id JOIN organizations o ON o.id=p.organization_id JOIN memberships m ON m.organization_id=p.organization_id JOIN users u ON u.id=m.user_id WHERE p.id=$1 AND h.id=$2 AND h.state='READY' AND u.id=$3 AND u.status='ACTIVE' FOR UPDATE OF p FOR SHARE OF h,r,o,m,u")
         .bind(proposal).bind(snapshot).bind(actor).fetch_optional(&mut *conn).await?.ok_or(OfficialReviewError::NotFound)?;
     if !matches!(row.role.as_str(), "REVIEWER" | "MAINTAINER" | "ADMIN")
-        || !row
-            .review_domains
-            .iter()
-            .any(|d| d == request.domain.as_str())
+        || !row.review_domains.iter().any(|d| d == domain.as_str())
         || row.author_id == actor
         || row
             .metadata
@@ -127,7 +133,7 @@ async fn scope(
             .is_some_and(|a| {
                 a.iter().any(|v| {
                     v.get("reviewer_id").and_then(Value::as_str) == Some(&actor.to_string())
-                        && v.get("domain").and_then(Value::as_str) == Some(request.domain.as_str())
+                        && v.get("domain").and_then(Value::as_str) == Some(domain.as_str())
                 })
             })
     {

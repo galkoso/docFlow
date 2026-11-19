@@ -106,19 +106,32 @@ pub fn front_matter(source: &str) -> Result<(FrontMatter, usize), &'static str> 
     if source.len() > 2 * 1024 * 1024 {
         return Err("FILE_TOO_LARGE");
     }
-    let after_open = source
-        .strip_prefix("---\n")
-        .ok_or("FRONT_MATTER_REQUIRED")?;
-    let closing = after_open.find("\n---\n").ok_or("INVALID_FRONT_MATTER")?;
+    let opening = if source.starts_with("---\r\n") {
+        5
+    } else if source.starts_with("---\n") {
+        4
+    } else {
+        return Err("FRONT_MATTER_REQUIRED");
+    };
+    let mut closing = opening;
+    let mut body = None;
+    for line in source[opening..].split_inclusive('\n') {
+        if matches!(line, "---\n" | "---\r\n") {
+            body = Some(closing + line.len());
+            break;
+        }
+        closing += line.len();
+    }
+    let body = body.ok_or("INVALID_FRONT_MATTER")?;
     let metadata: FrontMatter =
-        serde_yaml_ng::from_str(&after_open[..closing]).map_err(|_| "INVALID_FRONT_MATTER")?;
+        serde_yaml_ng::from_str(&source[opening..closing]).map_err(|_| "INVALID_FRONT_MATTER")?;
     if !identifier(&metadata.document_id)
         || metadata.schema_version != 1
         || metadata.title.trim().is_empty()
     {
         return Err("INVALID_FRONT_MATTER");
     }
-    Ok((metadata, 4 + closing + 5))
+    Ok((metadata, body))
 }
 
 pub fn parse(source: &str) -> Result<Document, &'static str> {
@@ -278,6 +291,25 @@ mod tests {
 
     const PREFIX: &str =
         "---\ndocument_id: DOC-TEST\ntitle: בדיקה\nowner_team: media\nschema_version: 1\n---\n\n";
+
+    #[test]
+    fn front_matter_accepts_exact_lf_and_crlf_delimiters_without_normalizing_source() {
+        let metadata =
+            "document_id: DOC-TEST\r\ntitle: בדיקה\r\nowner_team: media\r\nschema_version: 1\r\n";
+        for open in ["---\n", "---\r\n"] {
+            for close in ["---\n", "---\r\n"] {
+                let prefix = format!("{open}{metadata}{close}");
+                let source = format!("{prefix}Exact body 🦀\r\n");
+                let (identity, offset) = front_matter(&source).unwrap();
+                assert_eq!(identity.document_id, "DOC-TEST");
+                assert_eq!(offset, prefix.len());
+                assert_eq!(&source[offset..], "Exact body 🦀\r\n");
+            }
+        }
+        for close in ["---", "--- \n", " ---\n", "---\r"] {
+            assert!(front_matter(&format!("---\n{metadata}{close}")).is_err());
+        }
+    }
 
     #[test]
     fn visible_search_excludes_metadata_comments_and_link_destinations() {

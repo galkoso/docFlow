@@ -2096,3 +2096,12 @@ Checkboxes represent verified work only.
   against the final guards. Workspace Clippy/formatting pass and the exported
   OpenAPI is unchanged. Migration 023 is applied locally; the rebuilt API reports
   ready and discussion history still requires authentication with no-store.
+
+- CRLF front-matter correction: the unchanged-document source tests reproduced
+  an existing LF-only delimiter parser returning `FRONT_MATTER_REQUIRED` for a
+  valid CRLF document. Front matter now accepts exact LF/CRLF delimiter lines
+  while preserving original bytes and body offsets, including mixed newline
+  styles. Regression coverage verifies document/section anchor ranges, original
+  source preservation, and rejection of malformed delimiter lines. The document
+  engine suite passes, as do both focused front-matter cases and all 129 current
+  application cases. Complete-book anchor integration remains separate work.

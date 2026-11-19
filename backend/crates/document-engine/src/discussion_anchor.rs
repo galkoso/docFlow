@@ -215,6 +215,38 @@ mod tests {
         "---\ndocument_id: DOC-ONE\ntitle: בדיקה\nowner_team: core\nschema_version: 1\n---\n";
 
     #[test]
+    fn crlf_front_matter_keeps_exact_document_section_and_line_offsets() {
+        let prefix = PREFIX.replace('\n', "\r\n");
+        let body = "<!-- ss:section:SEC-CRLF -->\r\n# שלום 🦀\r\n\r\nExact text\r\n";
+        let source = format!("{prefix}{body}");
+        let (_, offset) = markdown::front_matter(&source).unwrap();
+        assert_eq!(offset, prefix.len());
+        let document = TextAnchor::document(&source, "DOC-ONE").unwrap();
+        assert_eq!(document.quote(), source);
+        assert!(document.matches_source(&source));
+        let section = TextAnchor::section(&source, "DOC-ONE", "SEC-CRLF").unwrap();
+        assert_eq!(section.byte_range(), prefix.len()..source.len());
+        assert_eq!(section.quote(), body);
+        assert_eq!(section.line_range(), 7..11);
+        let parsed = markdown::parse(&source).unwrap();
+        assert_eq!(parsed.source, source);
+        assert!(
+            parsed
+                .blocks
+                .iter()
+                .all(|block| source.is_char_boundary(block.source_start)
+                    && source.is_char_boundary(block.source_end))
+        );
+        let mixed = format!("{PREFIX}{body}");
+        assert_eq!(
+            TextAnchor::section(&mixed, "DOC-ONE", "SEC-CRLF")
+                .unwrap()
+                .quote(),
+            body
+        );
+    }
+
+    #[test]
     fn line_ranges_preserve_unicode_crlf_and_missing_final_newline() {
         let source = "first\r\nשָׁלוֹם 🦀\r\nlast";
         let anchor = TextAnchor::lines(source, 2, 3).unwrap();

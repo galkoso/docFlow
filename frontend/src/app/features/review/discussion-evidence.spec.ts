@@ -1,9 +1,17 @@
 import { validDiscussionComments, validDiscussionReceipt, validDiscussionThreads } from './discussion-evidence';
 import type { DiscussionIntent } from '../../core/api/discussion-api';
-import { discussionComments, discussionThreads, thread, comment } from '../../../testing/discussion-fixtures';
+import { bookDiscussionThreads, discussionComments, discussionThreads, thread, comment } from '../../../testing/discussion-fixtures';
 import { actor, other, product, proposal, files } from '../../../testing/review-fixtures';
 
 describe('Discussion evidence', () => {
+  it('accepts original book context and rejects fabricated entry identities or source descriptors', () => {
+    const v = bookDiscussionThreads(); expect(validDiscussionThreads(v, actor, proposal)).toBe(true);
+    const anchor = v.threads[0].origin.anchor; if (anchor.kind !== 'book_document') throw new Error('book fixture required');
+    anchor.entry_id = 'DOC-UNCHANGED'; expect(validDiscussionThreads(v, actor, proposal)).toBe(false);
+    anchor.entry_id = 'e'.repeat(64); anchor.source.document_id = 'DOC-OTHER'; expect(validDiscussionThreads(v, actor, proposal)).toBe(false);
+    anchor.source.document_id = 'DOC-UNCHANGED'; anchor.source.catalog_position = null; expect(validDiscussionThreads(v, actor, proposal)).toBe(false);
+    anchor.source.catalog_position = 0; anchor.source.path = '.specspace/catalog.json'; expect(validDiscussionThreads(v, actor, proposal)).toBe(false);
+  });
   it('accepts scoped reader and writer history and rejects foreign actors, proposals and duplicated threads', () => {
     expect(validDiscussionThreads(discussionThreads(), actor, proposal)).toBe(true);
     const v = discussionThreads(product);

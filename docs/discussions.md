@@ -312,5 +312,26 @@ later awaits require a fresh recheck before the mutation transaction's own locke
 authority check. Read authority does not grant comment permission. Complete-book
 and changed-file readers share the existing two-source capacity and deadline;
 CPU work keeps its permit through cancellation. Provider backoff remains explicit
-for the mutation orchestrator. These proofs are not yet accepted by discussion
-writes or exposed through document browsing/UI; that integration remains pending.
+for the mutation orchestrator.
+
+Discussion creation now accepts a snapshot `book_document` anchor containing only
+the sealed `entry_id` and bounded selection intent. The orchestrator performs the
+same durable admission, source cooldown and current-authority checks used by file
+anchors, then supplies the opaque book proof to the locked completion transaction.
+Actor, proposal, current scope, snapshot/fingerprint, frozen head, entry and exact
+selection must agree. Matching entry IDs across different snapshots do not allow
+proof reuse. A changed role/context or revoked membership prevents completion.
+
+Migration 024 binds saved book origins to the same snapshot's immutable manifest
+descriptor and checks text ranges/hashes. A forged origin rolls back the opening
+revision, audit and event; the original admission can safely retry. Existing
+merge-barrier rules remain in force, and provider failure/cooldown audits and
+exact successful replay follow the common path without additional Git writes.
+Pre-manifest snapshots reject book anchors as not-ready; general and existing
+file-anchor behavior remains supported.
+
+History returns the original book source/quote and marks outdated context without
+provider reads or relocation. The generated client and discussion interface
+validate and render book anchors as plain original-context text, separately from
+before/after diff sides. Public document browsing and the composer selection UI
+for complete-book entries remain pending.

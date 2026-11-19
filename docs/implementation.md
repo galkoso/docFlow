@@ -2121,3 +2121,22 @@ Checkboxes represent verified work only.
   663 tests with two existing performance measurements excluded. Workspace
   Clippy/formatting pass; the exported OpenAPI is unchanged. The rebuilt local
   API is ready. This stage adds no migration or public route.
+
+- Complete-book discussion creation: snapshot intents can now select a sealed
+  book entry and document/section/line selection without supplying paths, refs,
+  source or quotes. The shared orchestrator admits and audits source work,
+  respects durable provider cooldown, and completes only with the exact actor,
+  proposal, current scope, snapshot/fingerprint, head, entry and selection proof.
+  Matching entry IDs across snapshots cannot replace the selected snapshot.
+  Migration 024 binds immutable book origins to their manifest descriptors and
+  preserves the existing merge barrier, audit/event atomicity and exact replay.
+  Legacy snapshots without manifests return not-ready. History retains original
+  context and outdated blockers without provider reads. OpenAPI/generated types
+  and the discussion history UI now support plain-text book anchors. Public book
+  browsing and the composer picker remain pending, together with all other
+  unfinished full-spec requirements. The full backend run passes 670 tests with
+  two existing performance measurements excluded; final focused discussion and
+  legacy checks also pass. Workspace Clippy/formatting, all 451 frontend tests
+  and the production build pass. Migration 024 is applied and verified locally;
+  the rebuilt API is ready and discussion writes still require authentication
+  with no-store responses.

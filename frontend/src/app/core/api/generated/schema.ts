@@ -1010,6 +1010,12 @@ export interface components {
             /** @enum {string} */
             kind: "proposal";
         } | {
+            entry_id: string;
+            /** @enum {string} */
+            kind: "book_document";
+            source: components["schemas"]["Side"];
+            text: components["schemas"]["DiscussionTextAnchor"];
+        } | {
             file_id: string;
             /** @enum {string} */
             kind: "file";
@@ -2272,6 +2278,11 @@ export interface components {
         SnapshotAnchor: {
             /** @enum {string} */
             kind: "proposal";
+        } | {
+            entry_id: string;
+            /** @enum {string} */
+            kind: "book_document";
+            selection: components["schemas"]["TextSelection"];
         } | {
             file_id: string;
             /** @enum {string} */

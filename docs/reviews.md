@@ -177,9 +177,10 @@ Pre-023 snapshots retain their original evidence and manifest version 0. They
 remain readable, but a complete-book read explicitly returns no manifest;
 it never reconstructs one from the diff or a new Git read. They cannot be reused
 as a new complete-book publication. Current membership and proposal/snapshot
-scope protect stored manifest reads without provider IO. Discussion selection,
-source verification and public document browsing from this manifest are separate
-integration stages.
+scope protect stored manifest reads without provider IO. Verified document,
+section and line source proofs now support complete-book discussion creation,
+including unchanged documents; see `docs/discussions.md`. Public document browsing
+and the composer picker for these entries remain separate integration stages.
 
 An unchanged **active** snapshot can be reused in review/approved/changes-requested
 states. Reuse preserves proposal version and state, including `APPROVED`; it

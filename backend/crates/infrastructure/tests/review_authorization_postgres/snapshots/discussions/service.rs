@@ -1,4 +1,6 @@
 use super::*;
+#[path = "book.rs"]
+mod book;
 #[path = "history.rs"]
 mod history;
 #[path = "orchestration.rs"]
@@ -16,7 +18,8 @@ use specspace_application::{
 };
 use specspace_infrastructure::{
     discussions::{
-        DiscussionStoreError as Error, OpenAdmission, OpenAdmissionResult, PgDiscussions,
+        DiscussionSourceProof, DiscussionStoreError as Error, OpenAdmission, OpenAdmissionResult,
+        PgDiscussions,
     },
     review_files::PgReviewFileAuthorization,
 };
@@ -412,7 +415,10 @@ async fn anchored_open_requires_admission_and_exact_proof_and_replays_concurrent
         .await
         .unwrap();
     assert_eq!(
-        store.complete_open(&admitted, Some(&before)).await.err(),
+        store
+            .complete_open(&admitted, Some(DiscussionSourceProof::File(&before)))
+            .await
+            .err(),
         Some(Error::Stale)
     );
     let lines = r
@@ -431,7 +437,10 @@ async fn anchored_open_requires_admission_and_exact_proof_and_replays_concurrent
         .await
         .unwrap();
     assert_eq!(
-        store.complete_open(&admitted, Some(&lines)).await.err(),
+        store
+            .complete_open(&admitted, Some(DiscussionSourceProof::File(&lines)))
+            .await
+            .err(),
         Some(Error::Invalid)
     );
     let proof = r
@@ -447,8 +456,8 @@ async fn anchored_open_requires_admission_and_exact_proof_and_replays_concurrent
         .await
         .unwrap();
     let (a, b) = tokio::join!(
-        store.complete_open(&admitted, Some(&proof)),
-        store.complete_open(&admitted, Some(&proof))
+        store.complete_open(&admitted, Some(DiscussionSourceProof::File(&proof))),
+        store.complete_open(&admitted, Some(DiscussionSourceProof::File(&proof)))
     );
     let (a, b) = (a.unwrap(), b.unwrap());
     assert_eq!(a.id, b.id);
@@ -493,7 +502,10 @@ async fn final_authority_and_scope_rechecks_discard_prepared_anchor_after_revoca
         .await
         .unwrap();
     assert_eq!(
-        store.complete_open(&admitted, Some(&proof)).await.err(),
+        store
+            .complete_open(&admitted, Some(DiscussionSourceProof::File(&proof)))
+            .await
+            .err(),
         Some(Error::Forbidden)
     );
     sqlx::query("UPDATE memberships SET role='REVIEWER' WHERE user_id=$1")
@@ -507,7 +519,10 @@ async fn final_authority_and_scope_rechecks_discard_prepared_anchor_after_revoca
         .await
         .unwrap();
     assert_eq!(
-        store.complete_open(&admitted, Some(&proof)).await.err(),
+        store
+            .complete_open(&admitted, Some(DiscussionSourceProof::File(&proof)))
+            .await
+            .err(),
         Some(Error::Stale)
     );
     let counts:(i64,i64)=sqlx::query_as("SELECT (SELECT count(*) FROM discussion_attempts),(SELECT count(*) FROM discussion_threads)").fetch_one(&pool).await.unwrap();
@@ -759,7 +774,10 @@ async fn deleting_a_discussion_message_preserves_the_existing_official_change_re
         )
         .await
         .unwrap();
-    let thread = store.complete_open(&admitted, Some(&proof)).await.unwrap();
+    let thread = store
+        .complete_open(&admitted, Some(DiscussionSourceProof::File(&proof)))
+        .await
+        .unwrap();
     store
         .mutate(
             r.f.product,

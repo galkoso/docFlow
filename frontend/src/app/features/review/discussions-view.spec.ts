@@ -4,7 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { SessionState } from '../../core/auth/session-state';
 import { DiscussionsView, type DiscussionScope } from './discussions-view';
-import { discussionComments, discussionThreads, thread, comment } from '../../../testing/discussion-fixtures';
+import { bookDiscussionThreads, discussionComments, discussionThreads, thread, comment } from '../../../testing/discussion-fixtures';
 import { actor, other, product, proposal, metadata, files } from '../../../testing/review-fixtures';
 
 describe('Discussion UI', () => {
@@ -29,6 +29,15 @@ describe('Discussion UI', () => {
     expect(fixture.nativeElement.querySelector('script, img, textarea')).toBeNull();
     view.act('resolve'); view.edit(view.comments()!.comments[0]); http.expectNone(req => req.method === 'POST');
     expect([...fixture.nativeElement.querySelectorAll('button')].every((b: any) => !!b.textContent?.trim())).toBe(true);
+  });
+  it('renders sealed book anchors as original source text without treating them as a diff side', async () => {
+    const { fixture, view, http } = await create(actor); view.refresh(); const page = bookDiscussionThreads(actor);
+    http.expectOne(root).flush(page); view.select(page.threads[0]);
+    http.expectOne(req => req.url === `${root}/${thread}`).flush({ ...discussionComments(actor), thread: page.threads[0] }); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('docs/unchanged.md');
+    expect(fixture.nativeElement.textContent).toContain('מסמך בגרסת הסקירה המקורית');
+    expect(fixture.nativeElement.textContent).toContain('<img src=x>'); expect(fixture.nativeElement.querySelector('img, script')).toBeNull();
+    http.expectNone(req => req.method === 'POST');
   });
   it('keeps exact Unicode text and captures file-side selection without trusting client source metadata', async () => {
     const { view, http } = await create(); view.beginOpen(); view.mode.set('lines'); view.startLine.set(2); view.endLine.set(3);

@@ -7547,6 +7547,32 @@
           {
             "type": "object",
             "required": [
+              "entry_id",
+              "source",
+              "text",
+              "kind"
+            ],
+            "properties": {
+              "entry_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "book_document"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Side"
+              },
+              "text": {
+                "$ref": "#/components/schemas/DiscussionTextAnchor"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
               "file_id",
               "side",
               "source",
@@ -12290,6 +12316,28 @@
                 "enum": [
                   "proposal"
                 ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "entry_id",
+              "selection",
+              "kind"
+            ],
+            "properties": {
+              "entry_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "book_document"
+                ]
+              },
+              "selection": {
+                "$ref": "#/components/schemas/TextSelection"
               }
             }
           },

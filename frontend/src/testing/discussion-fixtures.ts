@@ -22,3 +22,13 @@ export const discussionComments = (viewer = actor): DiscussionComments => ({
     edited_at: null, tombstoned_at: null, reply_to_id: null, body: '<script>bad()</script> שלום 🌍',
     can_edit: viewer === product, can_tombstone: viewer === product }],
 });
+export const bookDiscussionThreads = (viewer = actor): DiscussionThreads => {
+  const page = discussionThreads(viewer);
+  page.threads[0].origin.anchor = { kind: 'book_document', entry_id: 'e'.repeat(64),
+    source: { path: 'docs/unchanged.md', blob_oid: 'a'.repeat(40), sha256: 'b'.repeat(64), bytes: 11,
+      executable: false, document_id: 'DOC-UNCHANGED', catalog_position: 0 },
+    text: { source_sha256: 'b'.repeat(64), range_sha256: 'b'.repeat(64), start_byte: 0, end_byte: 11,
+      start_line: 1, end_line: 1, quote: '<img src=x>', quote_truncated: false, selection: { kind: 'document', document_id: 'DOC-UNCHANGED' } },
+  };
+  return page;
+};

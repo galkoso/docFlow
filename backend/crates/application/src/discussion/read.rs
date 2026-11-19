@@ -38,6 +38,11 @@ pub struct DiscussionTextAnchor {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum DiscussionAnchor {
     Proposal {},
+    BookDocument {
+        entry_id: String,
+        source: Side,
+        text: Box<DiscussionTextAnchor>,
+    },
     File {
         file_id: String,
         side: AnchorSide,

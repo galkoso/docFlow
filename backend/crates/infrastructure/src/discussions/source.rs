@@ -1,11 +1,13 @@
 use super::*;
 use crate::provider_backoff::{self, ConnectionKey};
+use crate::review_files::PgReviewBookAuthorization;
 use specspace_application::{
     book::BookError,
     comparison_file::{ComparisonFileReader, FileReadError, discussion::AnchorReadError},
     comparison_reader::ComparisonReadError,
 };
 use specspace_git_adapter::GitError;
+use std::sync::Arc;
 
 struct SourceStop {
     error: DiscussionStoreError,
@@ -66,6 +68,11 @@ impl SourceStop {
                     code: "UNSUPPORTED_SELECTION",
                     delay: None,
                 },
+                NotReady => Self {
+                    error: DiscussionStoreError::NotReady,
+                    code: "SOURCE_NOT_READY",
+                    delay: None,
+                },
                 InvalidEvidence | TooLarge | InvalidImage(_) => Self {
                     error: DiscussionStoreError::InvalidSource,
                     code: "INVALID_EVIDENCE",
@@ -103,18 +110,13 @@ impl PgDiscussions {
             OpenAdmissionResult::Recorded(receipt) => return Ok(receipt),
             OpenAdmissionResult::Ready(admission) => admission,
         };
-        let ThreadOrigin::Snapshot {
-            snapshot_id,
-            anchor:
-                SnapshotAnchor::File {
-                    file_id,
-                    side,
-                    selection,
-                },
-            ..
-        } = &admission.request.origin
-        else {
-            return self.complete_open(&admission, None).await;
+        let (snapshot_id, anchor) = match &admission.request.origin {
+            ThreadOrigin::Snapshot {
+                snapshot_id,
+                anchor,
+                ..
+            } if !matches!(anchor, SnapshotAnchor::Proposal {}) => (snapshot_id, anchor),
+            _ => return self.complete_open(&admission, None).await,
         };
         let mut tx = self.transaction().await?;
         let current = scope(&mut tx, actor, proposal).await?;
@@ -135,24 +137,54 @@ impl PgDiscussions {
             };
             return self.stopped_result(&admission, stop).await;
         }
-        let proof = match reader
-            .load_discussion_anchor(
-                actor,
-                proposal,
-                *snapshot_id,
+        enum Loaded {
+            File(Box<VerifiedFileAnchor>),
+            BookDocument(Box<VerifiedBookAnchor>),
+        }
+        let loaded = match anchor {
+            SnapshotAnchor::File {
                 file_id,
-                *side,
-                selection.clone(),
-            )
-            .await
-        {
+                side,
+                selection,
+            } => reader
+                .load_discussion_anchor(
+                    actor,
+                    proposal,
+                    *snapshot_id,
+                    file_id,
+                    *side,
+                    selection.clone(),
+                )
+                .await
+                .map(Box::new)
+                .map(Loaded::File),
+            SnapshotAnchor::BookDocument {
+                entry_id,
+                selection,
+            } => reader
+                .with_book_authorization(Arc::new(PgReviewBookAuthorization::new(
+                    self.pool.clone(),
+                )))
+                .load_anchor(actor, proposal, *snapshot_id, entry_id, selection.clone())
+                .await
+                .map(Box::new)
+                .map(Loaded::BookDocument),
+            SnapshotAnchor::Proposal {} => {
+                unreachable!("general anchors completed before source IO")
+            }
+        };
+        let loaded = match loaded {
             Ok(proof) => proof,
             Err(error) => {
                 let stop = SourceStop::from_error(error);
                 return self.stopped_result(&admission, stop).await;
             }
         };
-        match self.complete_open(&admission, Some(&proof)).await {
+        let proof = match &loaded {
+            Loaded::File(proof) => DiscussionSourceProof::File(proof),
+            Loaded::BookDocument(proof) => DiscussionSourceProof::BookDocument(proof),
+        };
+        match self.complete_open(&admission, Some(proof)).await {
             Err(
                 error @ (DiscussionStoreError::Forbidden
                 | DiscussionStoreError::NotFound

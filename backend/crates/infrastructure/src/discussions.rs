@@ -3,7 +3,8 @@
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use specspace_application::{
-    comparison_file::discussion::{AnchorSide, TextSelection, VerifiedFileAnchor},
+    comparison_file::book::VerifiedBookAnchor,
+    comparison_file::discussion::{TextSelection, VerifiedFileAnchor},
     discussion::{
         DiscussionRecorded, OpenThreadRequest, SnapshotAnchor, ThreadMutation,
         ThreadMutationRequest, ThreadOrigin,
@@ -136,6 +137,7 @@ struct Snapshot {
     head_sha: String,
     target_sha: String,
     merge_base_sha: String,
+    book_manifest_version: i32,
 }
 async fn origin(
     conn: &mut PgConnection,
@@ -155,9 +157,9 @@ async fn origin(
         ThreadOrigin::Snapshot {
             snapshot_id,
             expected_fingerprint,
-            ..
+            anchor,
         } => {
-            let row=sqlx::query_as::<_,Snapshot>("SELECT id,fingerprint,repository_id,remote_id,installation_id,branch,head_sha,target_sha,merge_base_sha FROM review_snapshots WHERE organization_id=$1 AND proposal_id=$2 AND id=$3 AND state='READY' FOR SHARE")
+            let row=sqlx::query_as::<_,Snapshot>("SELECT id,fingerprint,repository_id,remote_id,installation_id,branch,head_sha,target_sha,merge_base_sha,book_manifest_version FROM review_snapshots WHERE organization_id=$1 AND proposal_id=$2 AND id=$3 AND state='READY' FOR SHARE")
                 .bind(scope.organization_id).bind(proposal).bind(snapshot_id).fetch_optional(conn).await?.ok_or(DiscussionStoreError::NotFound)?;
             if row.fingerprint != *expected_fingerprint
                 || row.repository_id != scope.repository_id
@@ -166,6 +168,11 @@ async fn origin(
                 || row.branch != scope.branch
             {
                 return Err(DiscussionStoreError::Stale);
+            }
+            if matches!(anchor, SnapshotAnchor::BookDocument { .. })
+                && row.book_manifest_version != 1
+            {
+                return Err(DiscussionStoreError::NotReady);
             }
             Ok(Some(row))
         }
@@ -271,6 +278,13 @@ pub enum OpenAdmissionResult {
     Ready(Box<OpenAdmission>),
     Recorded(DiscussionRecorded),
 }
+/// Either variant requires an opaque server-produced source proof. Browser
+/// anchor data and deserialized history cannot construct either capability.
+#[derive(Clone, Copy)]
+pub enum DiscussionSourceProof<'a> {
+    File(&'a VerifiedFileAnchor),
+    BookDocument(&'a VerifiedBookAnchor),
+}
 pub struct PgDiscussions {
     pool: PgPool,
 }
@@ -331,7 +345,7 @@ impl PgDiscussions {
     pub async fn complete_open(
         &self,
         admission: &OpenAdmission,
-        proof: Option<&VerifiedFileAnchor>,
+        proof: Option<DiscussionSourceProof<'_>>,
     ) -> Result<DiscussionRecorded, DiscussionStoreError> {
         let identity = &admission.identity;
         let mut tx = self.transaction().await?;
@@ -553,55 +567,97 @@ async fn append(
 
 fn verified_anchor(
     admission: &OpenAdmission,
-    proof: Option<&VerifiedFileAnchor>,
+    proof: Option<DiscussionSourceProof<'_>>,
 ) -> Result<Value, DiscussionStoreError> {
-    let expected = match &admission.request.origin {
-        ThreadOrigin::Snapshot {
-            anchor:
-                SnapshotAnchor::File {
-                    file_id,
-                    side,
-                    selection,
-                },
-            ..
-        } => Some((file_id, side, selection)),
-        _ => None,
+    let anchor = match &admission.request.origin {
+        ThreadOrigin::Proposal { .. } => {
+            return if proof.is_none() {
+                Ok(json!({"kind":"proposal"}))
+            } else {
+                Err(DiscussionStoreError::Invalid)
+            };
+        }
+        ThreadOrigin::Snapshot { anchor, .. } => anchor,
     };
-    let Some((file_id, side, selection)) = expected else {
+    if matches!(anchor, SnapshotAnchor::Proposal {}) {
         return if proof.is_none() {
             Ok(json!({"kind":"proposal"}))
         } else {
             Err(DiscussionStoreError::Invalid)
         };
-    };
-    let proof = proof.ok_or(DiscussionStoreError::Invalid)?;
+    }
     let scope = &admission.scope;
     let snapshot = admission
         .snapshot
         .as_ref()
         .ok_or(DiscussionStoreError::Invalid)?;
-    let ctx = proof.context();
-    if ctx.scope.actor != admission.identity.actor
-        || ctx.scope.organization != scope.organization_id
-        || ctx.scope.proposal != admission.identity.proposal
-        || ctx.scope.connection.repository != scope.repository_id
-        || ctx.scope.connection.remote_id.to_string() != scope.remote_id
-        || ctx.scope.connection.installation_id.to_string() != scope.installation_id
-        || ctx.scope.branch.as_str() != scope.branch
-        || ctx.scope.version != scope.version
-        || ctx.scope.state != scope.state
-        || Some(ctx.scope.recorded_head.as_str()) != scope.head_sha.as_deref()
-        || Some(ctx.scope.recorded_base.as_str()) != scope.base_sha.as_deref()
-        || ctx.snapshot != snapshot.id
-        || ctx.head.as_str() != snapshot.head_sha
-        || ctx.merge_base.as_str() != snapshot.merge_base_sha
-        || ctx.change.id != *file_id
-        || proof.side() != *side
+    let (ctx, selected_snapshot, head, selection, text, stored) = match (anchor, proof) {
+        (
+            SnapshotAnchor::File {
+                file_id,
+                side,
+                selection,
+            },
+            Some(DiscussionSourceProof::File(proof)),
+        ) => {
+            let ctx = proof.context();
+            if ctx.change.id != *file_id
+                || proof.side() != *side
+                || ctx.merge_base.as_str() != snapshot.merge_base_sha
+            {
+                return Err(DiscussionStoreError::Stale);
+            }
+            let stored = json!({"kind":"file","file_id":file_id,"side":side,"source":proof.source(),"text":proof.text()});
+            (
+                &ctx.scope,
+                ctx.snapshot,
+                &ctx.head,
+                selection,
+                proof.text(),
+                stored,
+            )
+        }
+        (
+            SnapshotAnchor::BookDocument {
+                entry_id,
+                selection,
+            },
+            Some(DiscussionSourceProof::BookDocument(proof)),
+        ) => {
+            let ctx = proof.context();
+            if ctx.document.id != *entry_id || ctx.fingerprint != snapshot.fingerprint {
+                return Err(DiscussionStoreError::Stale);
+            }
+            let stored = json!({"kind":"book_document","entry_id":entry_id,"source":proof.source(),"text":proof.text()});
+            (
+                &ctx.scope,
+                ctx.snapshot,
+                &ctx.head,
+                selection,
+                proof.text(),
+                stored,
+            )
+        }
+        _ => return Err(DiscussionStoreError::Invalid),
+    };
+    if ctx.actor != admission.identity.actor
+        || ctx.organization != scope.organization_id
+        || ctx.proposal != admission.identity.proposal
+        || ctx.connection.repository != scope.repository_id
+        || ctx.connection.remote_id.to_string() != scope.remote_id
+        || ctx.connection.installation_id.to_string() != scope.installation_id
+        || ctx.branch.as_str() != scope.branch
+        || ctx.version != scope.version
+        || ctx.state != scope.state
+        || Some(ctx.recorded_head.as_str()) != scope.head_sha.as_deref()
+        || Some(ctx.recorded_base.as_str()) != scope.base_sha.as_deref()
+        || selected_snapshot != snapshot.id
+        || head.as_str() != snapshot.head_sha
     {
         return Err(DiscussionStoreError::Stale);
     }
     use specspace_document_engine::discussion_anchor::Selection;
-    let matches = match (selection, proof.text().selection()) {
+    let matches = match (selection, text.selection()) {
         (TextSelection::Document {}, Selection::Document { .. }) => true,
         (
             TextSelection::Section {
@@ -616,19 +672,13 @@ fn verified_anchor(
             },
             Selection::Lines,
         ) => {
-            proof.text().line_range().start == *start_line
-                && proof.text().line_range().end.checked_sub(1) == Some(*end_line)
+            text.line_range().start == *start_line
+                && text.line_range().end.checked_sub(1) == Some(*end_line)
         }
         _ => false,
     };
     if !matches {
         return Err(DiscussionStoreError::Invalid);
     }
-    let side = match side {
-        AnchorSide::Before => "before",
-        AnchorSide::After => "after",
-    };
-    Ok(
-        json!({"kind":"file","file_id":file_id,"side":side,"source":proof.source(),"text":proof.text()}),
-    )
+    Ok(stored)
 }

@@ -344,7 +344,10 @@ async fn historical_anchor_reads_keep_old_context_and_blockers_without_provider_
         )
         .await
         .unwrap();
-    let thread = store.complete_open(&admitted, Some(&proof)).await.unwrap();
+    let thread = store
+        .complete_open(&admitted, Some(DiscussionSourceProof::File(&proof)))
+        .await
+        .unwrap();
     let reads = r.source.reads.load(Ordering::SeqCst);
     r.source.target.store(3, Ordering::SeqCst);
     let initial = store

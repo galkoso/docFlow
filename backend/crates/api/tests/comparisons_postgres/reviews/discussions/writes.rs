@@ -62,6 +62,71 @@ async fn anchored(pool: &PgPool) -> (Fixture, User, String, Value) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn book_document_discussion_http_binds_intent_and_returns_original_source_without_git_writes(
+    pool: PgPool,
+) {
+    let (f, product, _) = configured(&pool, false).await;
+    let (result, snapshot) = publish(&f, 2).await;
+    let snapshot_id = Uuid::parse_str(&snapshot).unwrap();
+    let entries = specspace_infrastructure::review_snapshots::PgReviewSnapshots::new(pool.clone())
+        .book_documents(f.actor.id, f.proposal, snapshot_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let body = json!({"request_id":Uuid::new_v4(),"origin":{"kind":"snapshot","snapshot_id":snapshot,"expected_fingerprint":result["review"]["fingerprint"],
+        "anchor":{"kind":"book_document","entry_id":entries[0].id,"selection":{"kind":"document"}}},"blocking":true,"body":"Discuss the sealed book document"});
+    let path = list(&f);
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        write(&f, &f.actor, &path, body.clone()).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+    let created = write(&f, &product, &path, body.clone()).await;
+    assert_eq!(created.0, StatusCode::CREATED, "{}", created.1);
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let replay = write(&f, &product, &path, body.clone()).await;
+    assert_eq!(replay.0, StatusCode::OK);
+    assert_eq!(replay.1["id"], created.1["id"]);
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+    let detail = get(
+        &f.app,
+        &f.actor,
+        &format!("{path}/{}", created.1["thread_id"].as_str().unwrap()),
+        true,
+    )
+    .await;
+    assert_eq!(detail.0, StatusCode::OK);
+    let anchor = &detail.1["thread"]["origin"]["anchor"];
+    assert_eq!(anchor["kind"], "book_document");
+    assert_eq!(anchor["entry_id"], entries[0].id);
+    assert_eq!(
+        anchor["source"]["sha256"],
+        entries[0].source.sha256.as_deref().unwrap()
+    );
+    assert!(
+        anchor["text"]["quote"]
+            .as_str()
+            .unwrap()
+            .contains("document_id:")
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+    let mut forged = body.clone();
+    forged["request_id"] = json!(Uuid::new_v4());
+    forged["origin"]["anchor"]["path"] = json!("docs/private.md");
+    assert_eq!(
+        write(&f, &product, &path, forged).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    let mut mismatched = body;
+    mismatched["body"] = json!("Another intent");
+    assert_eq!(
+        write(&f, &product, &path, mismatched).await.0,
+        StatusCode::CONFLICT
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn discussion_writes_thread_messages_state_and_exact_receipts_without_git_changes(
     pool: PgPool,
 ) {

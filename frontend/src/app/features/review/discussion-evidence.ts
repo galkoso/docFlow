@@ -26,7 +26,9 @@ export function validDiscussionThread(v: DiscussionThread, proposal: string, rea
   const anchor = o.anchor;
   if (!anchor) return false;
   if (anchor.kind === 'proposal') return true;
-  if (anchor.kind !== 'file' || !o.snapshot_id || !digest(anchor.file_id) || !['before', 'after'].includes(anchor.side)) return false;
+  if (!o.snapshot_id || anchor.kind === 'file' && (!digest(anchor.file_id) || !['before', 'after'].includes(anchor.side))
+    || anchor.kind === 'book_document' && !digest(anchor.entry_id)
+    || !['file', 'book_document'].includes(anchor.kind)) return false;
   const s = anchor.source, t = anchor.text;
   if (!s || typeof s.path !== 'string' || s.path.length > 240 || !/^(?:docs\/[^\u0000-\u001f\\:]+\.md|\.specspace\/catalog\.json)$/.test(s.path)
     || s.path.split('/').some(part => !part || ['.', '..', '.git'].includes(part.toLowerCase())) || !sha(s.blob_oid) || !digest(s.sha256)
@@ -35,6 +37,8 @@ export function validDiscussionThread(v: DiscussionThread, proposal: string, rea
     || !t || t.source_sha256 !== s.sha256 || !digest(t.range_sha256) || !integer(t.start_byte, s.bytes)
     || !integer(t.end_byte, s.bytes, t.start_byte) || !count(t.start_line, 1) || !count(t.end_line, t.start_line)
     || !text(t.quote, 1000) || typeof t.quote_truncated !== 'boolean' || !t.selection) return false;
+  if (anchor.kind === 'book_document' && (!s.path.startsWith('docs/') || !s.path.endsWith('.md') || !id(s.document_id)
+    || s.catalog_position == null || s.executable)) return false;
   const selection = t.selection;
   if (selection.kind === 'lines') return t.end_line - t.start_line < 500;
   return ['document', 'section'].includes(selection.kind) && id(selection.document_id) && selection.document_id === s.document_id

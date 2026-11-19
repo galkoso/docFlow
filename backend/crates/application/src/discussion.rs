@@ -35,6 +35,10 @@ pub enum ThreadOrigin {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SnapshotAnchor {
     Proposal {},
+    BookDocument {
+        entry_id: String,
+        selection: TextSelection,
+    },
     File {
         file_id: String,
         side: AnchorSide,
@@ -114,12 +118,19 @@ impl OpenThreadRequest {
                 if snapshot_id.is_nil() || !digest(expected_fingerprint) {
                     return Err("INVALID_DISCUSSION");
                 }
-                if let SnapshotAnchor::File {
-                    file_id, selection, ..
-                } = anchor
-                    && (!digest(file_id) || selection.validate().is_err())
-                {
-                    return Err("INVALID_DISCUSSION");
+                match anchor {
+                    SnapshotAnchor::File {
+                        file_id, selection, ..
+                    } if !digest(file_id) || selection.validate().is_err() => {
+                        return Err("INVALID_DISCUSSION");
+                    }
+                    SnapshotAnchor::BookDocument {
+                        entry_id,
+                        selection,
+                    } if !digest(entry_id) || selection.validate().is_err() => {
+                        return Err("INVALID_DISCUSSION");
+                    }
+                    _ => {}
                 }
             }
             _ => {}
@@ -192,5 +203,43 @@ mod tests {
         assert!(serde_json::from_value::<OpenThreadRequest>(forged_snapshot).is_err());
         let forged_resolution = json!({"request_id":Uuid::new_v4(),"expected_thread_version":1,"mutation":{"kind":"resolve","independent_requirement":false}});
         assert!(serde_json::from_value::<ThreadMutationRequest>(forged_resolution).is_err());
+    }
+
+    #[test]
+    fn book_discussion_intent_accepts_only_entry_identity_and_bounded_selection() {
+        let valid = json!({"request_id":Uuid::new_v4(),"origin":{"kind":"snapshot","snapshot_id":Uuid::new_v4(),"expected_fingerprint":"a".repeat(64),
+            "anchor":{"kind":"book_document","entry_id":"b".repeat(64),"selection":{"kind":"section","section_id":"SEC-ONE"}}},"blocking":false,"body":"Exact book context"});
+        assert!(
+            serde_json::from_value::<OpenThreadRequest>(valid.clone())
+                .unwrap()
+                .validate()
+                .is_ok()
+        );
+        for field in ["path", "source", "head_sha", "side", "quote"] {
+            let mut forged = valid.clone();
+            forged["origin"]["anchor"][field] = json!("untrusted");
+            assert!(serde_json::from_value::<OpenThreadRequest>(forged).is_err());
+        }
+        for selection in [
+            json!({"kind":"lines","start_line":1,"end_line":501}),
+            json!({"kind":"section","section_id":"../private"}),
+        ] {
+            let mut invalid = valid.clone();
+            invalid["origin"]["anchor"]["selection"] = selection;
+            assert!(
+                serde_json::from_value::<OpenThreadRequest>(invalid)
+                    .unwrap()
+                    .validate()
+                    .is_err()
+            );
+        }
+        let mut invalid = valid;
+        invalid["origin"]["anchor"]["entry_id"] = json!("DOC-ONE");
+        assert!(
+            serde_json::from_value::<OpenThreadRequest>(invalid)
+                .unwrap()
+                .validate()
+                .is_err()
+        );
     }
 }

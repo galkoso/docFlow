@@ -185,6 +185,25 @@ async fn migration_preserves_legacy_snapshots_without_fabricating_complete_book_
             .await,
         Err(FileReadError::NotReady)
     ));
+    let legacy_book_request = specspace_application::discussion::OpenThreadRequest {
+        request_id: Uuid::new_v4(),
+        origin: specspace_application::discussion::ThreadOrigin::Snapshot {
+            snapshot_id: original.snapshot_id,
+            expected_fingerprint: original.fingerprint.clone(),
+            anchor: specspace_application::discussion::SnapshotAnchor::BookDocument {
+                entry_id: entry.id.clone(),
+                selection: TextSelection::Document {},
+            },
+        },
+        blocking: false,
+        body: "Legacy snapshot cannot supply complete-book proof".into(),
+    };
+    assert!(matches!(
+        specspace_infrastructure::discussions::PgDiscussions::new(pool.clone())
+            .admit_open(f.owner, f.proposal, legacy_book_request)
+            .await,
+        Err(specspace_infrastructure::discussions::DiscussionStoreError::NotReady)
+    ));
     assert!(
         store
             .book_documents(f.owner, f.proposal, original.snapshot_id)

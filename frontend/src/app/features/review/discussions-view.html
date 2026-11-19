@@ -29,8 +29,12 @@
       <details><summary>ההקשר המקורי של הדיון</summary>
         <p>ענף: <bdi>{{ page.thread.origin.branch }}</bdi></p>
         @if (page.thread.origin.snapshot_id) {<p>גרסת הסקירה: <bdi>{{ page.thread.origin.snapshot_id }}</bdi></p>}
-        @if (page.thread.origin.anchor.kind === 'file') {
-          <p><bdi>{{ page.thread.origin.anchor.source.path }}</bdi> · {{ page.thread.origin.anchor.side === 'before' ? 'לפני' : 'אחרי' }}</p>
+        @if (page.thread.origin.anchor.kind !== 'proposal') {
+          <p><bdi>{{ page.thread.origin.anchor.source.path }}</bdi> ·
+            @if (page.thread.origin.anchor.kind === 'file') {
+              {{ page.thread.origin.anchor.side === 'before' ? 'לפני' : 'אחרי' }}
+            }
+            @else {מסמך בגרסת הסקירה המקורית}</p>
           <p>שורות {{ page.thread.origin.anchor.text.start_line }}–{{ page.thread.origin.anchor.text.end_line }} בהקשר המקורי</p>
           @if (page.thread.origin.anchor.text.selection.kind === 'section') {<p>סעיף: <bdi>{{ page.thread.origin.anchor.text.selection.section_id }}</bdi></p>}
           <pre dir="auto">{{ page.thread.origin.anchor.text.quote }}</pre>

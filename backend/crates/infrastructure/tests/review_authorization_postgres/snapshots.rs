@@ -80,6 +80,9 @@ impl GitProvider for Source {
         path: &RepositoryPath,
     ) -> Result<String, GitError> {
         self.reads.fetch_add(1, Ordering::SeqCst);
+        if let Some(error) = self.failure.lock().unwrap().clone() {
+            return Err(error);
+        }
         Ok(String::from_utf8(self.trees[commit.as_str()][path.as_str()].clone()).unwrap())
     }
     async fn read_bytes(

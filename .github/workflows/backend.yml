@@ -1,5 +1,10 @@
 name: Backend
-on: [push, pull_request]
+on:
+  push:
+    branches: [production]
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   domain:
     runs-on: ubuntu-latest

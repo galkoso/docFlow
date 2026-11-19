@@ -17,6 +17,11 @@ the behavior it covers; unverified acceptance criteria remain open in the checkl
 
 ## Local checks
 
+Run checks locally during development. GitHub Actions runs only on pushes to
+`production`; pushes to `main` and pull requests do not run CI. When GitHub
+validation is needed, open a pull request from `main` into `production` and merge
+it to run both workflows once. New production pushes cancel superseded runs.
+
 Frontend: `cd frontend && npm ci && npm run build && npm test -- --watch=false`.
 Run `npm start` from `frontend` for the development server.
 

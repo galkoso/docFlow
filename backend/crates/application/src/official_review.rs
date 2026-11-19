@@ -66,3 +66,39 @@ pub struct OfficialReviewRecorded {
     pub recorded_at: String,
     pub replayed: bool,
 }
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct OfficialReviewEntry {
+    pub id: Uuid,
+    pub reviewer_id: Uuid,
+    pub reviewer_name: String,
+    pub domain: ReviewArea,
+    pub decision: ReviewDecision,
+    pub explanation: String,
+    pub recorded_at: String,
+    pub effective: bool,
+    pub reviewer_eligible: bool,
+    /// Database context and current eligibility only; provider refs are not read.
+    pub valid_for_stored_context: bool,
+}
+#[derive(Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct OfficialReviewHistory {
+    pub proposal_id: Uuid,
+    pub snapshot_id: Uuid,
+    pub fingerprint: String,
+    pub head_sha: String,
+    pub target_sha: String,
+    pub policy_version: i64,
+    pub configuration_version: i64,
+    pub current_for_metadata: bool,
+    /// Current caller assignments; each POST independently rechecks eligibility.
+    pub domains: Vec<ReviewArea>,
+    pub approve_all_available: bool,
+    /// No server section-visit receipt exists yet; always warn before approve-all.
+    pub unviewed_content_warning: bool,
+    pub read_at: String,
+    pub entries: Vec<OfficialReviewEntry>,
+    pub next_after: Option<Uuid>,
+}

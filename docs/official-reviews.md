@@ -1,9 +1,16 @@
 # Official snapshot decisions
 
-Migration 018 and `PgOfficialReviews` provide the persistence/service foundation
-for official `APPROVE_ALL`, `REQUEST_CHANGES` and `COMMENT` actions. This stage is
-not yet exposed through HTTP or the review page. History reads, section visits/
-coverage, reviewer controls and required-check publication remain to be connected.
+Migration 018 and `PgOfficialReviews` provide official `APPROVE_ALL`,
+`REQUEST_CHANGES` and `COMMENT` actions. Current organization members read history
+through `GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/decisions`.
+An optional `after` UUID seeks an immutable revision cursor; pages contain at
+most twenty entries. Foreign/unknown cursors fail rather than changing scope.
+
+The same URL accepts POST with the session, `X-Expected-Actor`, allowed Origin,
+CSRF header and `OfficialReviewRequest`. New decisions return 201; exact receipt
+replay returns 200. All responses use no-store. GET performs no provider IO and
+separates an effective decision from current reviewer eligibility and validity
+for the stored database context. It does not claim live Git or merge readiness.
 
 Each request names a sealed snapshot, expected fingerprint, qualified review
 domain, explanation and idempotency UUID. The server checks current organization
@@ -32,6 +39,23 @@ Exact replay checks current reviewer access and the original intent, then return
 the stored receipt without provider IO, another event or a new decision, including
 after proposal closure. A different actor/body/scope cannot reuse the request ID.
 New persisted actions are limited to thirty per reviewer and two hundred per
-organization in ten minutes; replay does not consume that quota. Provider-request
-admission/backoff limits must also be wired before exposing the service through
-an HTTP mutation endpoint.
+organization in ten minutes; replay does not consume that quota. Migration 019
+also charges authorized provider-read attempts, including failures/timeouts, at
+those limits. Failed request bodies remain bound to their original request ID.
+Eight read operations can run concurrently per API service instance, and no
+database connection remains held during provider reads. Significant source
+failures append a content-free audit record.
+
+Rate limits persist a cooldown scoped to organization, repository and captured
+remote/installation IDs. Other requests/reviewers cannot bypass it by changing
+their request IDs. The longest observed cooldown wins; 429 responses preserve
+remaining Retry-After seconds. Receipt replay bypasses provider IO, quota and
+cooldown after current reviewer access is checked. Provider failures do not close
+the proposal or delete its saved snapshot.
+
+Reviewer controls are added in the following implementation stage.
+
+Section visits/coverage, broader threaded discussions and product questions,
+current policy-evidence assembly, required-check publication/reconciliation and
+native repository enforcement remain pending, alongside all remaining full-spec
+work. A recorded approve-all action is not final approval or merge authorization.

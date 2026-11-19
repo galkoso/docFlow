@@ -1892,3 +1892,19 @@ Checkboxes represent verified work only.
   HTTP/history APIs, provider-request admission/backoff, reviewer UI, section
   coverage, current-evidence/check publication and the full remaining scope are
   still pending.
+
+- Official review endpoints and provider admission (migration 019): shared members
+  can read immutable revision-paged decision history without provider calls;
+  qualified assigned reviewers can submit scoped decisions with actor/CSRF checks
+  and exact receipt replay. History distinguishes the effective decision, current
+  reviewer eligibility and validity for stored metadata. Durable provider-read
+  admission charges failed attempts and binds their request bodies; an eight-slot
+  service bound keeps provider reads from holding database connections. Repository
+  cooldowns preserve Retry-After across requests/reviewers, and source failures
+  receive content-free audit records. Nine new database/HTTP cases cover history,
+  scope, authorization, replay, failed-read quota, capacity and shared backoff.
+  All 586 backend tests pass with two existing performance measurements excluded;
+  workspace Clippy passes. OpenAPI and the generated client are updated.
+  Migration 019 is applied locally. Required-check publication/current-evidence
+  assembly, section coverage, discussion/product blockers, merge, bundles and all
+  remaining full-spec requirements remain open.

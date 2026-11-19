@@ -45,9 +45,11 @@ struct Provider {
     files: BTreeMap<String, String>,
     images: BTreeMap<String, Vec<u8>>,
     reads: AtomicUsize,
+    ref_reads: AtomicUsize,
     backoff: AtomicUsize,
     reused_media: AtomicBool,
     before_media: AtomicBool,
+    base_updated: AtomicBool,
     hook: Mutex<Option<(PgPool, Uuid)>>,
 }
 impl Provider {
@@ -79,6 +81,7 @@ impl Provider {
 #[async_trait]
 impl GitProvider for Provider {
     async fn main_head(&self) -> Result<CommitSha, GitError> {
+        self.ref_reads.fetch_add(1, Ordering::SeqCst);
         if self
             .backoff
             .compare_exchange(1, 0, Ordering::SeqCst, Ordering::SeqCst)
@@ -91,6 +94,7 @@ impl GitProvider for Provider {
         Ok(sha(MAIN))
     }
     async fn branch_head(&self, _: &BranchName) -> Result<CommitSha, GitError> {
+        self.ref_reads.fetch_add(1, Ordering::SeqCst);
         Ok(sha(HEAD))
     }
     async fn create_branch(&self, _: &BranchName, _: &CommitSha) -> Result<CommitSha, GitError> {
@@ -194,10 +198,16 @@ impl GitProvider for Provider {
         panic!("no mutation evidence required")
     }
     async fn merge_base(&self, _: &CommitSha, _: &CommitSha) -> Result<CommitSha, GitError> {
-        Ok(sha(OLD))
+        Ok(sha(if self.base_updated.load(Ordering::SeqCst) {
+            MAIN
+        } else {
+            OLD
+        }))
     }
     async fn is_ancestor(&self, a: &CommitSha, b: &CommitSha) -> Result<bool, GitError> {
-        Ok(a == b || a.as_str() == OLD && [HEAD, MAIN].contains(&b.as_str()))
+        Ok(a == b
+            || a.as_str() == OLD && [HEAD, MAIN].contains(&b.as_str())
+            || self.base_updated.load(Ordering::SeqCst) && a.as_str() == MAIN && b.as_str() == HEAD)
     }
 }
 struct Factory {
@@ -369,9 +379,11 @@ async fn fixture_review_options(
         files,
         images,
         reads: AtomicUsize::new(0),
+        ref_reads: AtomicUsize::new(0),
         backoff: AtomicUsize::new(0),
         reused_media: AtomicBool::new(false),
         before_media: AtomicBool::new(false),
+        base_updated: AtomicBool::new(false),
         hook: Mutex::new(None),
     });
     let mut state = AppState::new(pool.clone());

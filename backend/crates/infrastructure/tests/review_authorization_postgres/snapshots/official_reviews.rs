@@ -44,6 +44,192 @@ fn request(fingerprint: &str, decision: ReviewDecision) -> OfficialReviewRequest
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn failed_provider_reads_are_charged_but_recorded_replay_needs_no_io(pool: PgPool) {
+    let (f, source, snapshot, fp, factory) = ready(&pool, true).await;
+    let store = PgOfficialReviews::new(pool.clone());
+    let first = request(&fp, ReviewDecision::Comment);
+    store
+        .submit(f.product, f.proposal, snapshot, first.clone(), &factory)
+        .await
+        .unwrap();
+    *source.failure.lock().unwrap() = Some(GitError::ProviderUnavailable);
+    for _ in 1..30 {
+        assert_eq!(
+            store
+                .submit(
+                    f.product,
+                    f.proposal,
+                    snapshot,
+                    request(&fp, ReviewDecision::Comment),
+                    &factory
+                )
+                .await
+                .err(),
+            Some(OfficialReviewError::ProviderUnavailable)
+        );
+    }
+    let reads = source.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        store
+            .submit(
+                f.product,
+                f.proposal,
+                snapshot,
+                request(&fp, ReviewDecision::Comment),
+                &factory
+            )
+            .await
+            .err(),
+        Some(OfficialReviewError::Quota)
+    );
+    assert!(
+        store
+            .submit(f.product, f.proposal, snapshot, first, &factory)
+            .await
+            .unwrap()
+            .replayed
+    );
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
+    let charged: i64 = sqlx::query_scalar("SELECT count(*) FROM official_review_reads")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(charged, 30);
+    let failures:i64=sqlx::query_scalar("SELECT count(*) FROM audit_events WHERE action='OFFICIAL_REVIEW_SOURCE_FAILED' AND result='PROVIDER_UNAVAILABLE'").fetch_one(&pool).await.unwrap();
+    assert_eq!(failures, 29);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn provider_backoff_applies_to_other_reviewers_and_failed_request_bodies_stay_bound(
+    pool: PgPool,
+) {
+    let (f, source, snapshot, fp, factory) = ready(&pool, true).await;
+    let store = PgOfficialReviews::new(pool.clone());
+    *source.failure.lock().unwrap() = Some(GitError::RateLimited {
+        retry_after_seconds: Some(17),
+    });
+    let req = request(&fp, ReviewDecision::Comment);
+    assert_eq!(
+        store
+            .submit(f.product, f.proposal, snapshot, req.clone(), &factory)
+            .await
+            .err(),
+        Some(OfficialReviewError::ProviderRateLimited(17))
+    );
+    let reads = source.reads.load(Ordering::SeqCst);
+    let mut other = request(&fp, ReviewDecision::Comment);
+    other.domain = ReviewArea::Development;
+    assert!(matches!(
+        store
+            .submit(f.development, f.proposal, snapshot, other, &factory)
+            .await,
+        Err(OfficialReviewError::ProviderRateLimited(_))
+    ));
+    assert_eq!(reads, source.reads.load(Ordering::SeqCst));
+    let mut changed = req;
+    changed.explanation = "Another intent".into();
+    assert_eq!(
+        store
+            .submit(f.product, f.proposal, snapshot, changed, &factory)
+            .await
+            .err(),
+        Some(OfficialReviewError::IdempotencyMismatch)
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn history_is_shared_paged_and_separates_effective_eligibility_from_live_approval(
+    pool: PgPool,
+) {
+    let (f, source, snapshot, fp, factory) = ready(&pool, true).await;
+    let store = PgOfficialReviews::new(pool.clone());
+    store
+        .submit(
+            f.product,
+            f.proposal,
+            snapshot,
+            request(&fp, ReviewDecision::ApproveAll),
+            &factory,
+        )
+        .await
+        .unwrap();
+    for _ in 0..22 {
+        store
+            .submit(
+                f.product,
+                f.proposal,
+                snapshot,
+                request(&fp, ReviewDecision::Comment),
+                &factory,
+            )
+            .await
+            .unwrap();
+    }
+    let reader = user(&pool, f.org, "READER", vec![]).await;
+    let reads = source.reads.load(Ordering::SeqCst);
+    let first = store
+        .history(reader, f.proposal, snapshot, None)
+        .await
+        .unwrap();
+    assert_eq!(first.entries.len(), 20);
+    assert!(
+        first.domains.is_empty() && !first.approve_all_available && first.unviewed_content_warning
+    );
+    let last = store
+        .history(reader, f.proposal, snapshot, first.next_after)
+        .await
+        .unwrap();
+    assert_eq!(last.entries.len(), 3);
+    assert!(last.next_after.is_none());
+    assert!(
+        last.entries.last().unwrap().effective
+            && last.entries.last().unwrap().valid_for_stored_context
+    );
+    let foreign = fixture(&pool).await;
+    assert!(matches!(
+        store
+            .history(foreign.owner, f.proposal, snapshot, None)
+            .await,
+        Err(OfficialReviewError::NotFound)
+    ));
+    assert!(matches!(
+        store
+            .history(reader, f.proposal, snapshot, Some(Uuid::new_v4()))
+            .await,
+        Err(OfficialReviewError::Invalid)
+    ));
+    sqlx::query(
+        "UPDATE memberships SET review_domains='{}' WHERE organization_id=$1 AND user_id=$2",
+    )
+    .bind(f.org)
+    .bind(f.product)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let revoked = store
+        .history(reader, f.proposal, snapshot, first.next_after)
+        .await
+        .unwrap();
+    let approval = revoked.entries.last().unwrap();
+    assert!(
+        approval.effective && !approval.reviewer_eligible && !approval.valid_for_stored_context
+    );
+    sqlx::query("UPDATE proposals SET state='CLOSED' WHERE id=$1")
+        .bind(f.proposal)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        !store
+            .history(reader, f.proposal, snapshot, None)
+            .await
+            .unwrap()
+            .current_for_metadata
+    );
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn decision_quota_limits_new_actions_without_blocking_an_exact_replay(pool: PgPool) {
     let (f, _, snapshot, fp, factory) = ready(&pool, true).await;
     let store = PgOfficialReviews::new(pool.clone());
@@ -88,6 +274,56 @@ async fn decision_quota_limits_new_actions_without_blocking_an_exact_replay(pool
 }
 async fn counts(pool: &PgPool) -> (i64, i64, i64, i64) {
     sqlx::query_as("SELECT (SELECT count(*) FROM official_reviews),(SELECT count(*) FROM official_review_effective),(SELECT count(*) FROM audit_events WHERE action='OFFICIAL_REVIEW_RECORDED'),(SELECT count(*) FROM outbox WHERE event_type='REVIEW_DECISION_RECORDED')").fetch_one(pool).await.unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn provider_capacity_is_bounded_without_holding_database_connections_during_reads(
+    pool: PgPool,
+) {
+    let (f, source, snapshot, fp, factory) = ready(&pool, true).await;
+    let store = Arc::new(PgOfficialReviews::new(pool.clone()));
+    let factory = Arc::new(factory);
+    source.blocked.store(true, Ordering::SeqCst);
+    let before = source.reads.load(Ordering::SeqCst);
+    let mut tasks = Vec::new();
+    for _ in 0..8 {
+        let store = store.clone();
+        let factory = factory.clone();
+        let req = request(&fp, ReviewDecision::Comment);
+        let proposal = f.proposal;
+        let reviewer = f.product;
+        tasks.push(tokio::spawn(async move {
+            store
+                .submit(reviewer, proposal, snapshot, req, factory.as_ref())
+                .await
+        }));
+    }
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while source.reads.load(Ordering::SeqCst) < before + 8 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        store
+            .submit(
+                f.product,
+                f.proposal,
+                snapshot,
+                request(&fp, ReviewDecision::Comment),
+                factory.as_ref()
+            )
+            .await
+            .err(),
+        Some(OfficialReviewError::Capacity)
+    );
+    source.blocked.store(false, Ordering::SeqCst);
+    source.release.notify_waiters();
+    for task in tasks {
+        task.await.unwrap().unwrap();
+    }
+    assert_eq!(counts(&pool).await, (8, 0, 8, 8));
 }
 #[sqlx::test(migrations = "../../migrations")]
 async fn official_approval_comments_and_change_requests_preserve_history_without_publishing(

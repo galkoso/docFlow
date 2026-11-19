@@ -504,6 +504,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalOfficialReviewHistory"];
+        put?: never;
+        post: operations["recordProposalOfficialReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/files": {
         parameters: {
             query?: never;
@@ -1253,6 +1269,74 @@ export interface components {
             review_domains: string[];
             role: string;
         };
+        OfficialReviewEntry: {
+            decision: components["schemas"]["ReviewDecision"];
+            domain: components["schemas"]["ReviewArea"];
+            effective: boolean;
+            explanation: string;
+            /** Format: uuid */
+            id: string;
+            recorded_at: string;
+            reviewer_eligible: boolean;
+            /** Format: uuid */
+            reviewer_id: string;
+            reviewer_name: string;
+            /** @description Database context and current eligibility only; provider refs are not read. */
+            valid_for_stored_context: boolean;
+        };
+        OfficialReviewHistory: {
+            approve_all_available: boolean;
+            /** Format: int64 */
+            configuration_version: number;
+            current_for_metadata: boolean;
+            /** @description Current caller assignments; each POST independently rechecks eligibility. */
+            domains: components["schemas"]["ReviewArea"][];
+            entries: components["schemas"]["OfficialReviewEntry"][];
+            fingerprint: string;
+            head_sha: string;
+            /** Format: uuid */
+            next_after?: string | null;
+            /** Format: int64 */
+            policy_version: number;
+            /** Format: uuid */
+            proposal_id: string;
+            read_at: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            target_sha: string;
+            /** @description No server section-visit receipt exists yet; always warn before approve-all. */
+            unviewed_content_warning: boolean;
+        };
+        OfficialReviewRecorded: {
+            /** Format: int64 */
+            configuration_version: number;
+            decision: components["schemas"]["ReviewDecision"];
+            domain: components["schemas"]["ReviewArea"];
+            head_sha: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            policy_version: number;
+            /** Format: uuid */
+            proposal_id: string;
+            recorded_at: string;
+            replayed: boolean;
+            /** Format: uuid */
+            request_id: string;
+            /** Format: uuid */
+            reviewer_id: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            target_sha: string;
+        };
+        OfficialReviewRequest: {
+            decision: components["schemas"]["ReviewDecision"];
+            domain: components["schemas"]["ReviewArea"];
+            expected_fingerprint: string;
+            explanation: string;
+            /** Format: uuid */
+            request_id: string;
+        };
         OrderedListResume: {
             /**
              * Format: int64
@@ -1583,6 +1667,8 @@ export interface components {
             request_id: string;
             settings: components["schemas"]["ReviewSettings"];
         };
+        /** @enum {string} */
+        ReviewDecision: "APPROVE_ALL" | "REQUEST_CHANGES" | "COMMENT";
         /** @enum {string} */
         ReviewFindingSeverity: "warning" | "blocker";
         /**
@@ -4571,6 +4657,175 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalOfficialReviewHistory: {
+        parameters: {
+            query?: {
+                after?: string;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfficialReviewHistory"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    recordProposalOfficialReview: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfficialReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Original decision receipt replayed; current approval validity is separate */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfficialReviewRecorded"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfficialReviewRecorded"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

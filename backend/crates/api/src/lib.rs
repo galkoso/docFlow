@@ -4,6 +4,7 @@ pub mod contract;
 pub mod creation_context;
 pub mod drafts;
 pub mod editor;
+pub mod official_reviews;
 pub mod proposal_content;
 pub mod proposal_reads;
 pub mod proposals;
@@ -78,6 +79,7 @@ pub struct AppState {
     pub review_submissions: Arc<PgReviewSubmissions>,
     pub review_snapshots: Arc<PgReviewSnapshots>,
     pub pr_sync: Arc<PgPrSync>,
+    pub official_reviews: Arc<specspace_infrastructure::official_reviews::PgOfficialReviews>,
     pr_source: Arc<dyn PrProviderFactory>,
     bound_source: Arc<dyn BoundProviderFactory>,
     review_preparer: Arc<ReviewPreparer>,
@@ -145,6 +147,11 @@ impl AppState {
             review_submissions: Arc::new(PgReviewSubmissions::new(database.clone())),
             review_snapshots: Arc::new(PgReviewSnapshots::new(database.clone())),
             pr_sync: Arc::new(PgPrSync::new(database.clone())),
+            official_reviews: Arc::new(
+                specspace_infrastructure::official_reviews::PgOfficialReviews::new(
+                    database.clone(),
+                ),
+            ),
             pr_source: source.clone(),
             bound_source: source.clone(),
             saves: Arc::new(PgSaves::new(database.clone())),
@@ -333,6 +340,7 @@ pub fn router(state: AppState) -> Router {
         .merge(saves::routes())
         .merge(review_configuration::routes())
         .merge(reviews::routes())
+        .merge(official_reviews::routes())
         .merge(comparisons::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))

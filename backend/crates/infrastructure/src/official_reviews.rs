@@ -8,8 +8,11 @@ use specspace_application::{
 };
 use specspace_domain::BranchName;
 use sqlx::{FromRow, PgConnection, PgPool, Postgres, Transaction};
+use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
+mod admission;
+mod history;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum OfficialReviewError {
@@ -22,6 +25,8 @@ pub enum OfficialReviewError {
     IdempotencyMismatch,
     Quota,
     ProviderUnavailable,
+    ProviderRateLimited(u32),
+    Capacity,
     Unavailable,
 }
 impl From<sqlx::Error> for OfficialReviewError {
@@ -186,10 +191,14 @@ async fn replay(
 }
 pub struct PgOfficialReviews {
     pool: PgPool,
+    slots: Arc<tokio::sync::Semaphore>,
 }
 impl PgOfficialReviews {
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            slots: Arc::new(tokio::sync::Semaphore::new(8)),
+        }
     }
     async fn transaction(&self) -> Result<Transaction<'_, Postgres>, OfficialReviewError> {
         let mut tx = self.pool.begin().await?;
@@ -248,6 +257,11 @@ impl PgOfficialReviews {
             return Ok(old);
         }
         current(&before, &request)?;
+        let _permit = self
+            .slots
+            .try_acquire()
+            .map_err(|_| OfficialReviewError::Capacity)?;
+        admission::admit(&mut tx, &before, actor, proposal, snapshot, &request, &hash).await?;
         tx.commit().await?;
         let number = |v: &str| {
             v.parse::<u64>()
@@ -262,20 +276,28 @@ impl PgOfficialReviews {
         };
         let branch =
             BranchName::parse(&before.branch).map_err(|_| OfficialReviewError::Unavailable)?;
-        tokio::time::timeout(Duration::from_secs(15), async {
+        let observed = tokio::time::timeout(Duration::from_secs(15), async {
             let provider = factory
                 .provider_bound(&binding)
                 .await
-                .map_err(|_| OfficialReviewError::ProviderUnavailable)?;
+                .map_err(|e| match e {
+                    specspace_application::comparison_reader::ComparisonReadError::Provider(
+                        error,
+                    )
+                    | specspace_application::comparison_reader::ComparisonReadError::Source(
+                        specspace_application::book::BookError::Provider(error),
+                    ) => admission::provider_error(error),
+                    _ => OfficialReviewError::ProviderUnavailable,
+                })?;
             for _ in 0..2 {
                 let head = provider
                     .branch_head(&branch)
                     .await
-                    .map_err(|_| OfficialReviewError::ProviderUnavailable)?;
+                    .map_err(admission::provider_error)?;
                 let target = provider
                     .main_head()
                     .await
-                    .map_err(|_| OfficialReviewError::ProviderUnavailable)?;
+                    .map_err(admission::provider_error)?;
                 if head.as_str() != before.head_sha || target.as_str() != before.target_sha {
                     return Err(OfficialReviewError::Stale);
                 }
@@ -283,7 +305,23 @@ impl PgOfficialReviews {
             Ok(())
         })
         .await
-        .map_err(|_| OfficialReviewError::ProviderUnavailable)??;
+        .unwrap_or(Err(OfficialReviewError::ProviderUnavailable));
+        if let Err(error) = observed {
+            if let OfficialReviewError::ProviderRateLimited(seconds) = error {
+                admission::backoff(&self.pool, &before, seconds).await?;
+            }
+            admission::failure(
+                &self.pool,
+                &before,
+                actor,
+                proposal,
+                snapshot,
+                request.request_id,
+                &error,
+            )
+            .await?;
+            return Err(error);
+        }
         let mut tx = self.transaction().await?;
         let after = scope(&mut tx, actor, proposal, snapshot, &request).await?;
         if let Some(old) = replay(

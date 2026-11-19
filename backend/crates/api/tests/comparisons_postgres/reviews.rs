@@ -1,4 +1,6 @@
 use super::*;
+#[path = "reviews/official.rs"]
+mod official;
 #[path = "reviews/pr_recovery.rs"]
 mod pr_recovery;
 use specspace_application::{
@@ -121,7 +123,7 @@ async fn post_raw(
     if status == StatusCode::ACCEPTED {
         assert_eq!(response.headers()["Retry-After"], "2");
     }
-    if status == StatusCode::TOO_MANY_REQUESTS {
+    if status == StatusCode::TOO_MANY_REQUESTS && !uri.ends_with("/decisions") {
         assert_eq!(
             response.headers()["Retry-After"],
             if uri.ends_with("/recover") {

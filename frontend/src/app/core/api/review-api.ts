@@ -10,6 +10,7 @@ export type ReviewSnapshot = components['schemas']['ReviewSnapshot'];
 export type ReviewHistory = components['schemas']['ReviewSnapshotHistory'];
 export type ReviewFiles = components['schemas']['ReviewSnapshotFiles'];
 export type ReviewMedia = components['schemas']['ReviewSnapshotMedia'];
+export type ReviewUnits = components['schemas']['ReviewSnapshotUnits'];
 export type ReviewDocuments = components['schemas']['ReviewSnapshotDocuments'];
 export type ReviewBookDocument = components['schemas']['ReviewBookDocument'];
 export type ReviewPrStatus = components['schemas']['ReviewPrStatus'];
@@ -44,6 +45,11 @@ export class ReviewApi {
   }
   documents(actor: string, proposal: string, snapshot: string, offset = 0) {
     return this.http.get<ReviewDocuments>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/documents`, {
+      headers: this.actor(actor), params: { offset, limit: 20 },
+    });
+  }
+  units(actor: string, proposal: string, snapshot: string, offset = 0) {
+    return this.http.get<ReviewUnits>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/units`, {
       headers: this.actor(actor), params: { offset, limit: 20 },
     });
   }

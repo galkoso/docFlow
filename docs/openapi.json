@@ -5600,6 +5600,122 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units": {
+      "get": {
+        "tags": [
+          "crate::reviews"
+        ],
+        "operationId": "proposalReviewSnapshotUnits",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSnapshotUnits"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/specification": {
       "get": {
         "tags": [
@@ -9103,6 +9219,17 @@
           }
         }
       },
+      "FileRequirement": {
+        "type": "string",
+        "enum": [
+          "non_document",
+          "non_section",
+          "layout",
+          "unstructured",
+          "section_limit",
+          "manifest_limit"
+        ]
+      },
       "Finding": {
         "type": "object",
         "required": [
@@ -10842,6 +10969,90 @@
           }
         }
       },
+      "RequiredReviewUnit": {
+        "type": "object",
+        "required": [
+          "id",
+          "file_id",
+          "requirement"
+        ],
+        "properties": {
+          "after": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnitSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnitSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "requirement": {
+            "$ref": "#/components/schemas/Requirement"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Requirement": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "document_id",
+              "section_id",
+              "kind"
+            ],
+            "properties": {
+              "document_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "section"
+                ]
+              },
+              "section_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "file"
+                ]
+              },
+              "reason": {
+                "$ref": "#/components/schemas/FileRequirement"
+              }
+            }
+          }
+        ]
+      },
       "ReviewArea": {
         "type": "string",
         "enum": [
@@ -11907,6 +12118,66 @@
           "UNDECIDED"
         ]
       },
+      "ReviewSnapshotUnits": {
+        "type": "object",
+        "description": "Mandatory source metadata only; reading a page does not record a visit or approval.",
+        "required": [
+          "actor_id",
+          "proposal_id",
+          "snapshot_id",
+          "fingerprint",
+          "head_sha",
+          "available",
+          "offset",
+          "total",
+          "units"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "False for legacy snapshots without a sealed requirement manifest."
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequiredReviewUnit"
+            }
+          }
+        }
+      },
       "ReviewSnapshotValidation": {
         "type": "object",
         "required": [
@@ -12630,6 +12901,38 @@
         },
         "additionalProperties": false
       },
+      "SourceRange": {
+        "type": "object",
+        "required": [
+          "start_byte",
+          "end_byte",
+          "start_line",
+          "end_line",
+          "sha256"
+        ],
+        "properties": {
+          "end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_line": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "start_line": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
       "Specification": {
         "type": "object",
         "required": [
@@ -13063,6 +13366,28 @@
           "rendered_content",
           "section_position"
         ]
+      },
+      "UnitSource": {
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "properties": {
+          "range": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SourceRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/Side"
+          }
+        },
+        "additionalProperties": false
       },
       "UnitStatus": {
         "type": "string",

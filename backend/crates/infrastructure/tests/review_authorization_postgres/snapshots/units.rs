@@ -128,6 +128,15 @@ async fn unit_migration_preserves_legacy_evidence_and_requires_new_complete_publ
     let (after,version,count,ids):(Value,i32,i32,Value)=sqlx::query_as("SELECT to_jsonb(h)-ARRAY['review_units_version','unit_count','unit_ids'],review_units_version,unit_count,unit_ids FROM review_snapshots h WHERE id=$1").bind(old.snapshot_id).fetch_one(&pool).await.unwrap();
     assert_eq!(before, after);
     assert_eq!((version, count, ids), (0, 0, json!([])));
+    let legacy = store
+        .units(f.owner, f.proposal, old.snapshot_id, 0, 100)
+        .await
+        .unwrap();
+    assert!(!legacy.available);
+    assert!(legacy.units.is_empty());
+    assert_eq!((legacy.total, legacy.next_offset), (0, None));
+    assert_eq!(legacy.fingerprint, old.fingerprint);
+
     assert!(
         sqlx::query("UPDATE review_snapshots SET review_units_version=1 WHERE id=$1")
             .bind(old.snapshot_id)
@@ -146,5 +155,101 @@ async fn unit_migration_preserves_legacy_evidence_and_requires_new_complete_publ
             .await
             .unwrap()
             > 0
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn requirement_pages_preserve_exact_order_context_and_current_membership(pool: PgPool) {
+    let (f, source, preparer) = setup_media(&pool, true).await;
+    let (lease, verified) = prepared(&pool, &f, &preparer, 2).await;
+    let store = PgReviewSnapshots::new(pool.clone());
+    let saved = store.publish(&lease, &verified, &preparer).await.unwrap();
+    let viewer = user(&pool, f.org, "READER", vec![]).await;
+    let reads = source.reads.load(Ordering::SeqCst);
+    let expected = verified.candidate().plan().required_units();
+    assert!(expected.len() > 1);
+    let first = store
+        .units(viewer, f.proposal, saved.snapshot_id, 0, 1)
+        .await
+        .unwrap();
+    assert!(first.available);
+    assert_eq!(first.actor_id, viewer);
+    assert_eq!(first.proposal_id, f.proposal);
+    assert_eq!(first.snapshot_id, saved.snapshot_id);
+    assert_eq!(first.fingerprint, saved.fingerprint);
+    assert_eq!(first.head_sha, sha(1).as_str());
+    assert_eq!(
+        (first.offset, first.total, first.next_offset),
+        (0, expected.len() as i32, Some(1))
+    );
+    assert_eq!(first.units, expected[..1]);
+    sqlx::query("UPDATE proposals SET head_sha=$2,version=version+1 WHERE id=$1")
+        .bind(f.proposal)
+        .bind(sha(3).as_str())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let rest = store
+        .units(viewer, f.proposal, saved.snapshot_id, 1, 100)
+        .await
+        .unwrap();
+    assert_eq!(rest.units, expected[1..]);
+    assert_eq!(rest.head_sha, first.head_sha);
+    assert_eq!(rest.fingerprint, first.fingerprint);
+    assert_eq!(rest.next_offset, None);
+    assert!(
+        !serde_json::to_string(&rest)
+            .unwrap()
+            .contains("Saved text-only proposal")
+    );
+    let end = store
+        .units(viewer, f.proposal, saved.snapshot_id, 40000, 100)
+        .await
+        .unwrap();
+    assert!(end.units.is_empty());
+    assert_eq!(end.next_offset, None);
+    for (offset, limit) in [(-1, 1), (40001, 1), (0, 0), (0, 101)] {
+        assert!(matches!(
+            store
+                .units(viewer, f.proposal, saved.snapshot_id, offset, limit)
+                .await,
+            Err(SnapshotError::Submission(SubmissionError::InvalidQuery))
+        ));
+    }
+    for (proposal, snapshot) in [
+        (Uuid::new_v4(), saved.snapshot_id),
+        (f.proposal, Uuid::new_v4()),
+    ] {
+        assert!(matches!(
+            store.units(viewer, proposal, snapshot, 0, 1).await,
+            Err(SnapshotError::Submission(SubmissionError::NotFound))
+        ));
+    }
+    let (foreign, _, _) = setup_media(&pool, false).await;
+    let outsider = foreign.owner;
+    assert!(
+        store
+            .units(outsider, f.proposal, saved.snapshot_id, 0, 1)
+            .await
+            .is_err()
+    );
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1")
+        .bind(viewer)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        store
+            .units(viewer, f.proposal, saved.snapshot_id, 0, 1)
+            .await
+            .is_err()
+    );
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM official_reviews")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
     );
 }

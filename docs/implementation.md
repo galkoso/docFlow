@@ -2203,3 +2203,18 @@ Checkboxes represent verified work only.
   Workspace Clippy and formatting pass, and the exported OpenAPI remains unchanged.
   Migration 025 is applied locally; the rebuilt API passes readiness and retains
   authentication and no-store responses on review reads.
+
+- Paged mandatory requirement API: current members can now read a sealed
+  snapshot's exact ordered review units through an actor-bound endpoint without
+  Git IO. Pages retain snapshot/fingerprint/head identity after proposal changes,
+  bound query sizes and offsets, and distinguish unavailable legacy evidence
+  from a complete manifest. Source bodies stay outside the response. OpenAPI and
+  the generated Angular client expose the contract, including the section/file
+  requirement variants and original source ranges. Database and HTTP cases cover
+  exact paging, scope, actor mismatch, revocation, legacy behavior and read-only
+  semantics. All 461 frontend tests and the production build pass; workspace
+  Clippy and formatting pass. The rebuilt local API is ready and the new route
+  requires authentication with no-store responses. No migration is added.
+  The full backend run passes 686 tests with the same two performance
+  measurements excluded. Visit receipts, section decisions and the coverage UI/check assembly
+  remain unfinished; metadata reads do not count as review actions.

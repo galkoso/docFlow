@@ -323,6 +323,114 @@ async fn review_document_pages_are_actor_bound_scoped_and_provider_free(pool: Pg
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn review_requirement_pages_are_scoped_strict_actor_bound_and_read_only(pool: PgPool) {
+    let (f, _, _) = configured(&pool, true).await;
+    let (result, snapshot) = publish(&f, 2).await;
+    let path = format!("{}/{snapshot}/units", history_path(&f));
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let expected: Vec<Value> = sqlx::query_scalar(
+        "SELECT unit FROM review_snapshot_units WHERE snapshot_id=$1 ORDER BY ordinal",
+    )
+    .bind(Uuid::parse_str(&snapshot).unwrap())
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert!(expected.len() > 1);
+    let first = get(&f.app, &f.actor, &format!("{path}?offset=0&limit=1"), true).await;
+    assert_eq!(first.0, StatusCode::OK, "{}", first.1);
+    assert_eq!(first.1["actor_id"], f.actor.id.to_string());
+    assert_eq!(first.1["proposal_id"], f.proposal.to_string());
+    assert_eq!(first.1["snapshot_id"], snapshot);
+    assert_eq!(first.1["fingerprint"], result["review"]["fingerprint"]);
+    assert_eq!(first.1["head_sha"], HEAD);
+    assert_eq!(first.1["available"], true);
+    assert_eq!(first.1["total"], expected.len());
+    assert_eq!(first.1["next_offset"], 1);
+    assert_eq!(first.1["units"], json!(&expected[..1]));
+    let rest = get(
+        &f.app,
+        &f.actor,
+        &format!("{path}?offset=1&limit=100"),
+        true,
+    )
+    .await;
+    assert_eq!(rest.1["units"], json!(&expected[1..]));
+    assert!(rest.1["next_offset"].is_null());
+    assert!(!rest.1.to_string().contains("PRIVATE SOURCE SENTINEL"));
+    for query in [
+        "offset=-1",
+        "offset=40001",
+        "limit=0",
+        "limit=101",
+        "unknown=true",
+        "offset=0&offset=1",
+        "limit=abc",
+    ] {
+        assert_eq!(
+            get(&f.app, &f.actor, &format!("{path}?{query}"), true)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    assert_eq!(
+        get(&f.app, &f.actor, &path, false).await.0,
+        StatusCode::CONFLICT
+    );
+    let wrong = Request::builder()
+        .uri(&path)
+        .header("Cookie", format!("specspace-session={}", f.actor.token))
+        .header("X-Expected-Actor", f.owner.id.to_string())
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(
+        f.app.clone().oneshot(wrong).await.unwrap().status(),
+        StatusCode::CONFLICT
+    );
+    let anonymous = f
+        .app
+        .clone()
+        .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(anonymous.headers()["cache-control"], "no-store");
+    assert_eq!(
+        get(
+            &f.app,
+            &f.actor,
+            &path.replace(&snapshot, &Uuid::new_v4().to_string()),
+            true
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    let foreign = fixture(&pool, true).await;
+    assert_eq!(
+        get(&f.app, &foreign.owner, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1")
+        .bind(f.actor.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&f.app, &f.actor, &path, true).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM official_reviews")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn review_http_queue_worker_shared_evidence_and_actor_private_progress(pool: PgPool) {
     let (f, product, _) = configured(&pool, true).await;
     let empty = get(&f.app, &f.actor, &history_path(&f), true).await;

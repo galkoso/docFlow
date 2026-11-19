@@ -119,6 +119,14 @@ an outbox failure rolls them back with the snapshot. Existing snapshots retain
 their original evidence as requirement version 0. They cannot be upgraded in place
 or reused as a complete requirement publication; resubmission creates new sealed
 evidence. This manifest does not assert visits, approvals or merge readiness.
+The actor-bound `GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units`
+returns the sealed ordered requirements in pages of up to 100 (default 50).
+Offsets are bounded to 0–40,000, query fields are strict, and every read checks
+current membership. Pages echo actor/proposal/snapshot/fingerprint/head identity,
+remain pinned if the proposal advances, and contain descriptors and ranges only.
+Legacy snapshots return `available: false` with no requirements. These reads need
+no provider IO and do not record a visit or an approval. The typed Angular client
+requests pages of 20; the review coverage UI remains to be connected.
 Reviewer visit receipts, section decisions, coverage reads/UI and policy-check
 assembly remain separate integration stages. Approve-all still warns about
 unviewed content until real visit evidence is connected.

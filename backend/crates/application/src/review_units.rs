@@ -12,6 +12,7 @@ use specspace_document_engine::review_sections::{self, SectionError, Sections, S
 use std::collections::{HashMap, HashSet};
 
 pub const MAX_REQUIRED_UNITS: usize = 40_000;
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FileRequirement {
@@ -22,6 +23,7 @@ pub enum FileRequirement {
     SectionLimit,
     ManifestLimit,
 }
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Requirement {
@@ -33,12 +35,14 @@ pub enum Requirement {
         reason: FileRequirement,
     },
 }
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UnitSource {
     pub source: Side,
     pub range: Option<SourceRange>,
 }
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RequiredReviewUnit {

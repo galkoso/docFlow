@@ -696,6 +696,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalReviewSnapshotUnits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/specification": {
         parameters: {
             query?: never;
@@ -1402,6 +1418,8 @@ export interface components {
             start_stack: components["schemas"]["RenderEvent"][];
             unit: components["schemas"]["UnitSummary"];
         };
+        /** @enum {string} */
+        FileRequirement: "non_document" | "non_section" | "layout" | "unstructured" | "section_limit" | "manifest_limit";
         Finding: {
             code: string;
             path: string;
@@ -1854,6 +1872,23 @@ export interface components {
             /** Format: uuid */
             repository_id: string;
         };
+        RequiredReviewUnit: {
+            after?: components["schemas"]["UnitSource"] | null;
+            before?: components["schemas"]["UnitSource"] | null;
+            file_id: string;
+            id: string;
+            requirement: components["schemas"]["Requirement"];
+        };
+        Requirement: {
+            document_id: string;
+            /** @enum {string} */
+            kind: "section";
+            section_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "file";
+            reason: components["schemas"]["FileRequirement"];
+        };
         /** @enum {string} */
         ReviewArea: "PRODUCT" | "DEVELOPMENT" | "DESIGN";
         /**
@@ -2161,6 +2196,26 @@ export interface components {
         };
         /** @enum {string} */
         ReviewSnapshotUiImpact: "YES" | "NO" | "UNDECIDED";
+        /** @description Mandatory source metadata only; reading a page does not record a visit or approval. */
+        ReviewSnapshotUnits: {
+            /** Format: uuid */
+            actor_id: string;
+            /** @description False for legacy snapshots without a sealed requirement manifest. */
+            available: boolean;
+            fingerprint: string;
+            head_sha: string;
+            /** Format: int32 */
+            next_offset?: number | null;
+            /** Format: int32 */
+            offset: number;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: int32 */
+            total: number;
+            units: components["schemas"]["RequiredReviewUnit"][];
+        };
         ReviewSnapshotValidation: {
             blockers_total: number;
             complete: boolean;
@@ -2352,6 +2407,13 @@ export interface components {
             expected_proposal_version: number;
             markdown: string;
         };
+        SourceRange: {
+            end_byte: number;
+            end_line: number;
+            sha256: string;
+            start_byte: number;
+            start_line: number;
+        };
         Specification: {
             branch: string;
             documents: components["schemas"]["DocumentSummary"][];
@@ -2464,6 +2526,10 @@ export interface components {
         UnitKind: "metadata" | "heading" | "paragraph" | "list" | "quote" | "code" | "table" | "protected" | "trailing";
         /** @enum {string} */
         UnitMatch: "structural" | "heading_id" | "exact_source" | "rendered_content" | "section_position";
+        UnitSource: {
+            range?: components["schemas"]["SourceRange"] | null;
+            source: components["schemas"]["Side"];
+        };
         /** @enum {string} */
         UnitStatus: "unchanged" | "modified" | "added" | "deleted";
         UnitSummary: {
@@ -6058,6 +6124,73 @@ export interface operations {
                 };
             };
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalReviewSnapshotUnits: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewSnapshotUnits"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

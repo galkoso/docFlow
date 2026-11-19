@@ -12,7 +12,7 @@ use specspace_application::{
     review_snapshot::{
         ReviewBookDocument, ReviewMediaReceipt, ReviewSnapshot, ReviewSnapshotDocuments,
         ReviewSnapshotHistory, ReviewSnapshotHistoryEntry, ReviewSnapshotMedia,
-        ReviewSnapshotMetadata,
+        ReviewSnapshotMetadata, ReviewSnapshotUnits,
     },
     review_submission::ReviewPublication,
 };
@@ -493,6 +493,54 @@ impl PgReviewSnapshots {
             total,
             next_offset: (end < total).then_some(end),
             documents,
+        })
+    }
+    /// Reads immutable requirements with current membership, without provider IO
+    /// or changes to human visit/approval evidence.
+    pub async fn units(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        offset: i32,
+        limit: i32,
+    ) -> Result<ReviewSnapshotUnits, SnapshotError> {
+        if !(0..=40000).contains(&offset) || !(1..=100).contains(&limit) {
+            return Err(SubmissionError::InvalidQuery.into());
+        }
+        let mut tx = self.transaction().await?;
+        let org = read_access(&mut tx, actor, proposal).await?;
+        let (fingerprint, head_sha, version, total): (String, String, i32, i32) = sqlx::query_as("SELECT fingerprint,head_sha,review_units_version,unit_count FROM review_snapshots WHERE id=$1 AND organization_id=$2 AND proposal_id=$3 AND state='READY'")
+            .bind(snapshot).bind(org).bind(proposal).fetch_optional(&mut *tx).await?.ok_or(SubmissionError::NotFound)?;
+        let available = match (version, total) {
+            (0, 0) => false,
+            (1, 1..=40000) => true,
+            _ => return Err(SnapshotError::InvalidEvidence),
+        };
+        let values: Vec<Value> = sqlx::query_scalar("SELECT unit FROM review_snapshot_units WHERE snapshot_id=$1 AND organization_id=$2 AND proposal_id=$3 AND ordinal>=$4 ORDER BY ordinal LIMIT $5")
+            .bind(snapshot).bind(org).bind(proposal).bind(offset).bind(limit).fetch_all(&mut *tx).await?;
+        let units: Vec<specspace_application::review_units::RequiredReviewUnit> = values
+            .into_iter()
+            .map(serde_json::from_value)
+            .collect::<Result<_, _>>()
+            .map_err(|_| SnapshotError::InvalidEvidence)?;
+        let expected = (total - offset).clamp(0, limit) as usize;
+        if units.len() != expected {
+            return Err(SnapshotError::InvalidEvidence);
+        }
+        let end = offset + units.len() as i32;
+        tx.commit().await?;
+        Ok(ReviewSnapshotUnits {
+            actor_id: actor,
+            proposal_id: proposal,
+            snapshot_id: snapshot,
+            fingerprint,
+            head_sha,
+            available,
+            offset,
+            total,
+            next_offset: (end < total).then_some(end),
+            units,
         })
     }
     pub async fn files(

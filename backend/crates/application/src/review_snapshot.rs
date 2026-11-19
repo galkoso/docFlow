@@ -33,6 +33,22 @@ pub struct ReviewSnapshotDocuments {
     pub next_offset: Option<i32>,
     pub documents: Vec<ReviewBookDocument>,
 }
+/// Mandatory source metadata only; reading a page does not record a visit or approval.
+#[derive(Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ReviewSnapshotUnits {
+    pub actor_id: Uuid,
+    pub proposal_id: Uuid,
+    pub snapshot_id: Uuid,
+    pub fingerprint: String,
+    pub head_sha: String,
+    /// False for legacy snapshots without a sealed requirement manifest.
+    pub available: bool,
+    pub offset: i32,
+    pub total: i32,
+    pub next_offset: Option<i32>,
+    pub units: Vec<crate::review_units::RequiredReviewUnit>,
+}
 impl ReviewBookDocument {
     /// Pure metadata identity; this calculation does not verify source or grant
     /// authority. The publication plan and source reader use the same encoding.

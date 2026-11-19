@@ -18,7 +18,7 @@ use specspace_application::{
     review_pr_status::ReviewPrStatus,
     review_snapshot::{
         ReviewSnapshot, ReviewSnapshotDocuments, ReviewSnapshotFiles, ReviewSnapshotHistory,
-        ReviewSnapshotMedia,
+        ReviewSnapshotMedia, ReviewSnapshotUnits,
     },
     review_submission::{
         ReviewSubmissionAccepted, ReviewSubmissionRequest, ValidatedReviewSubmission,
@@ -50,6 +50,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/documents",
             get(documents),
+        )
+        .route(
+            "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units",
+            get(units),
         )
         .route(
             "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/media",
@@ -290,6 +294,36 @@ pub(crate) async fn documents(
     match state
         .review_snapshots
         .documents(
+            actor,
+            proposal,
+            snapshot,
+            query.offset.unwrap_or(0),
+            query.limit.unwrap_or(50),
+        )
+        .await
+    {
+        Ok(page) => Json(page).into_response(),
+        Err(error) => snapshot_failure(error),
+    }
+}
+#[utoipa::path(get,path="/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units",operation_id="proposalReviewSnapshotUnits",security(("sessionCookie"=[])),
+    params(("proposal"=Uuid,Path),("snapshot"=Uuid,Path),("X-Expected-Actor"=Uuid,Header),PageQuery),responses((status=200,body=ReviewSnapshotUnits),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=503,body=ErrorBody)))]
+pub(crate) async fn units(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<(Uuid, Uuid)>, axum::extract::rejection::PathRejection>,
+    query: Result<Query<PageQuery>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let actor = match actor(&state, &headers, false).await {
+        Ok(actor) => actor,
+        Err(error) => return error.into_response(),
+    };
+    let (Ok(Path((proposal, snapshot))), Ok(Query(query))) = (path, query) else {
+        return proposals::invalid_query();
+    };
+    match state
+        .review_snapshots
+        .units(
             actor,
             proposal,
             snapshot,

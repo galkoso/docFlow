@@ -15,6 +15,7 @@ pub enum SectionError {
     AmbiguousSections,
     SectionLimit,
 }
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceRange {

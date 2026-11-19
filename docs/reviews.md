@@ -143,7 +143,7 @@ opaque proof retains actor/proposal/snapshot/fingerprint, exact source and windo
 bounds; it can be rechecked after later awaits. It shares the file reader's
 verified cache, source capacity and deadline. Binary requirements need separate
 display verification. This internal proof is not a visit receipt or an approval;
-HTTP delivery and browser acknowledgement remain to be wired.
+Browser delivery and acknowledgement controls remain to be wired.
 PostgreSQL unit authorization resolves only the selected ready snapshot's sealed
 manifest under current organization access and the exact repository/installation
 binding. It preserves the snapshot's immutable head/base/fingerprint if proposal
@@ -163,9 +163,22 @@ source bodies. Only an explicit actor/domain/snapshot-bound acknowledgement crea
 a visit, atomically with audit and event records. An exact recorded retry remains
 replayable after delivery expiry, subject to current authority; nonce reuse for
 another intent is rejected. Neither a delivery nor one window acknowledgement
-asserts whole-unit coverage or approval. HTTP endpoints, coverage assembly and
-review UI acknowledgement controls remain to be connected.
-HTTP visit receipt endpoints, section decisions, coverage reads/UI and policy-check
+asserts whole-unit coverage or approval. Coverage assembly and review UI
+acknowledgement controls remain to be connected.
+
+The guarded HTTP boundary exposes
+`GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units/{unit}/source`
+with strict required `expected_fingerprint`, `domain`, `side` and `offset` query
+fields. It checks the session and captured actor, returns a bounded verified
+window/delivery with no-store headers, and never acknowledges it automatically.
+`POST /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/visits` requires
+Origin, CSRF and actor binding plus a strict 4 KiB intent containing the delivery,
+domain, fingerprint and immutable request nonce. New receipts return 201; exact
+replays return 200. Unacknowledged expiry returns 410, scope/nonce conflicts return
+409, and quota/provider cooldown responses include Retry-After. Provider failures
+never return partial source or invented receipts. OpenAPI and the typed Angular
+client describe source reads and explicit acknowledgements as separate calls.
+Section decisions, coverage reads/UI and policy-check
 assembly remain separate integration stages. Approve-all still warns about
 unviewed content until real visit evidence is connected.
 

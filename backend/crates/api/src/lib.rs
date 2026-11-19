@@ -10,6 +10,7 @@ pub mod proposal_content;
 pub mod proposal_reads;
 pub mod proposals;
 pub mod review_configuration;
+mod review_visits;
 pub mod reviews;
 pub mod saves;
 pub mod specification;
@@ -77,6 +78,7 @@ pub struct AppState {
     pub comparison_jobs: Arc<PgComparisons>,
     pub comparison_files: Arc<ComparisonFileReader>,
     pub review_files: Arc<ComparisonFileReader>,
+    pub review_visits: Arc<specspace_infrastructure::review_visits::PgReviewVisits>,
     pub review_submissions: Arc<PgReviewSubmissions>,
     pub review_snapshots: Arc<PgReviewSnapshots>,
     pub pr_sync: Arc<PgPrSync>,
@@ -138,12 +140,14 @@ impl AppState {
                 database.clone(),
             ),
         )));
+        let review_visits = source_visits(database.clone(), review_files.clone());
         let review_preparer =
             review_preparer(database.clone(), comparisons.clone(), source.clone());
         Self {
             comparison_jobs,
             comparison_files,
             review_files,
+            review_visits,
             comparisons,
             review_preparer,
             review_submissions: Arc::new(PgReviewSubmissions::new(database.clone())),
@@ -201,6 +205,7 @@ impl AppState {
                 self.database.clone(),
             ),
         )));
+        self.review_visits = source_visits(self.database.clone(), self.review_files.clone());
         self.comparisons = Arc::new(
             ComparisonReader::new(
                 Arc::new(PgComparisonAuthorization::new(self.database.clone())),
@@ -297,6 +302,26 @@ impl AppState {
     }
 }
 
+fn source_visits(
+    database: PgPool,
+    files: Arc<ComparisonFileReader>,
+) -> Arc<specspace_infrastructure::review_visits::PgReviewVisits> {
+    Arc::new(
+        specspace_infrastructure::review_visits::PgReviewVisits::new(
+            database.clone(),
+            Arc::new(
+                specspace_application::comparison_file::review_unit::ReviewUnitReader::new(
+                    files,
+                    Arc::new(
+                        specspace_infrastructure::review_files::PgReviewUnitAuthorization::new(
+                            database,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+}
 fn review_preparer(
     database: PgPool,
     comparisons: Arc<ComparisonReader>,
@@ -346,6 +371,7 @@ pub fn router(state: AppState) -> Router {
         .merge(review_configuration::routes())
         .merge(reviews::routes())
         .merge(official_reviews::routes())
+        .merge(review_visits::routes())
         .merge(discussions::routes())
         .merge(comparisons::routes())
         .route("/api/v1/health/live", get(live))

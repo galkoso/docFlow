@@ -712,6 +712,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units/{unit}/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalReviewSourceWindow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["acknowledgeProposalReviewSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/specification": {
         parameters: {
             query?: never;
@@ -2223,6 +2255,37 @@ export interface components {
             findings_total: number;
             findings_truncated: boolean;
         };
+        ReviewSourceRequest: {
+            domain: components["schemas"]["ReviewArea"];
+            expected_fingerprint: string;
+            offset: number;
+            side: components["schemas"]["AnchorSide"];
+            unit_id: string;
+        };
+        ReviewSourceWindow: {
+            /** Format: uuid */
+            actor_id: string;
+            /** Format: uuid */
+            delivery_id: string;
+            domain: components["schemas"]["ReviewArea"];
+            end_byte: number;
+            expires_at: string;
+            fingerprint: string;
+            head_sha: string;
+            merge_base_sha: string;
+            next_offset?: number | null;
+            offset: number;
+            /** Format: uuid */
+            proposal_id: string;
+            side: components["schemas"]["AnchorSide"];
+            /** Format: uuid */
+            snapshot_id: string;
+            source: components["schemas"]["UnitSource"];
+            start_byte: number;
+            text: string;
+            unit_id: string;
+            window_sha256: string;
+        };
         ReviewSubmissionAccepted: {
             /** Format: uuid */
             job_id: string;
@@ -2240,6 +2303,36 @@ export interface components {
             /** Format: int64 */
             expected_proposal_version: number;
             expected_target_sha: string;
+        };
+        ReviewVisitRecorded: {
+            /** Format: uuid */
+            actor_id: string;
+            /** Format: uuid */
+            delivery_id: string;
+            domain: components["schemas"]["ReviewArea"];
+            end_byte: number;
+            fingerprint: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            proposal_id: string;
+            recorded_at: string;
+            replayed: boolean;
+            /** Format: uuid */
+            request_id: string;
+            side: components["schemas"]["AnchorSide"];
+            /** Format: uuid */
+            snapshot_id: string;
+            start_byte: number;
+            unit_id: string;
+        };
+        ReviewVisitRequest: {
+            /** Format: uuid */
+            delivery_id: string;
+            domain: components["schemas"]["ReviewArea"];
+            expected_fingerprint: string;
+            /** Format: uuid */
+            request_id: string;
         };
         ReviewerCandidate: {
             display_name: string;
@@ -6191,6 +6284,213 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalReviewSourceWindow: {
+        parameters: {
+            query: {
+                expected_fingerprint: string;
+                domain: components["schemas"]["ReviewArea"];
+                side: components["schemas"]["AnchorSide"];
+                offset: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+                unit: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified bounded source delivery; no visit or approval is recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewSourceWindow"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    acknowledgeProposalReviewSource: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewVisitRequest"];
+            };
+        };
+        responses: {
+            /** @description Exact original receipt replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewVisitRecorded"];
+                };
+            };
+            /** @description Explicit acknowledgement of exactly one delivered source window; no approval or whole-unit coverage implied */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewVisitRecorded"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

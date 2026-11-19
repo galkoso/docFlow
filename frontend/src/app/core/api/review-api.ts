@@ -2,6 +2,10 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { components } from './generated/schema';
 
+export type ReviewSourceRequest = components['schemas']['ReviewSourceRequest'];
+export type ReviewSourceWindow = components['schemas']['ReviewSourceWindow'];
+export type ReviewVisitRequest = components['schemas']['ReviewVisitRequest'];
+export type ReviewVisitRecorded = components['schemas']['ReviewVisitRecorded'];
 export type ReviewRequest = components['schemas']['ReviewSubmissionRequest'];
 export type ReviewAccepted = components['schemas']['ReviewSubmissionAccepted'];
 export type ReviewPublication = components['schemas']['ReviewPublication'];
@@ -52,6 +56,14 @@ export class ReviewApi {
     return this.http.get<ReviewUnits>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/units`, {
       headers: this.actor(actor), params: { offset, limit: 20 },
     });
+  }
+  source(actor: string, proposal: string, snapshot: string, request: Readonly<ReviewSourceRequest>) {
+    return this.http.get<ReviewSourceWindow>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/units/${encodeURIComponent(request.unit_id)}/source`, {
+      headers: this.actor(actor), params: { expected_fingerprint: request.expected_fingerprint, domain: request.domain, side: request.side, offset: request.offset },
+    });
+  }
+  acknowledge(actor: string, proposal: string, snapshot: string, body: Readonly<ReviewVisitRequest>) {
+    return this.http.post<ReviewVisitRecorded>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/visits`, body, { headers: this.actor(actor) });
   }
   prStatus(actor: string, proposal: string, snapshot: string) {
     return this.http.get<ReviewPrStatus>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/pr-sync`, { headers: this.actor(actor) });

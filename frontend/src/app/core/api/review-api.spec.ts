@@ -33,4 +33,21 @@ describe('Review API request scope', () => {
     for (const request of pages) { expect(request.request.headers.get('X-Expected-Actor')).toBe(actor); expect(request.request.params.get('limit')).toBe('50'); request.flush({}); }
     http.verify();
   });
+  it('keeps source delivery reads separate from a frozen explicit acknowledgement intent', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ReviewApi), http = TestBed.inject(HttpTestingController);
+    const source = Object.freeze({ unit_id: 'unit/other', expected_fingerprint: 'a'.repeat(64), domain: 'PRODUCT' as const, side: 'before' as const, offset: 65536 });
+    api.source(actor, 'proposal/other', 'snapshot/other', source).subscribe();
+    const read = http.expectOne(req => req.url === '/api/v1/proposals/proposal%2Fother/review/snapshots/snapshot%2Fother/units/unit%2Fother/source');
+    expect(read.request.method).toBe('GET'); expect(read.request.headers.get('X-Expected-Actor')).toBe(actor);
+    expect(read.request.params.get('expected_fingerprint')).toBe(source.expected_fingerprint);
+    expect(read.request.params.get('domain')).toBe('PRODUCT'); expect(read.request.params.get('side')).toBe('before');
+    expect(read.request.params.get('offset')).toBe('65536'); read.flush({}); http.expectNone(req => req.method === 'POST');
+    const intent = Object.freeze({ request_id: other, delivery_id: snapshot, expected_fingerprint: source.expected_fingerprint, domain: 'PRODUCT' as const });
+    api.acknowledge(actor, 'proposal/other', 'snapshot/other', intent).subscribe();
+    const ack = http.expectOne('/api/v1/proposals/proposal%2Fother/review/snapshots/snapshot%2Fother/visits');
+    expect(ack.request.method).toBe('POST'); expect(ack.request.headers.get('X-Expected-Actor')).toBe(actor);
+    expect(ack.request.body).toBe(intent); expect(ack.request.params.keys()).toEqual([]); ack.flush({}); http.verify();
+  });
+
 });

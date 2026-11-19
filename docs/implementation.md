@@ -2275,3 +2275,17 @@ Checkboxes represent verified work only.
   excluded. Workspace Clippy, formatting and builds pass; the exported OpenAPI is
   unchanged. Migration 026 is applied locally, all three evidence tables exist,
   and the rebuilt API is ready with authenticated no-store review responses.
+
+- Guarded source-delivery and acknowledgement HTTP API: qualified reviewers can
+  request exact sealed source windows through a strict actor-bound GET, then
+  explicitly acknowledge a delivery with a CSRF-protected bounded POST. Source
+  reads record no visit automatically. New acknowledgements return 201, exact
+  retries return the original 200 receipt, and expired unacknowledged deliveries
+  return 410. Nonce/context conflicts, scope loss, quota/backoff and source
+  verification failures have bounded no-store responses. Source factory
+  configuration preserves shared capacity/cache and immutable bindings. OpenAPI,
+  generated types and the Angular client expose the two separate operations.
+  Eight HTTP cases cover lifecycle, authentication/CSRF, strict fields and body
+  limits, expiry, replay, changed roles/heads, provider errors and mid-read access
+  loss. Review UI controls, whole-unit coverage and section approvals remain
+  unfinished; the approve-all warning remains conservative.

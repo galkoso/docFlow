@@ -5,6 +5,8 @@ mod discussions;
 mod official;
 #[path = "reviews/pr_recovery.rs"]
 mod pr_recovery;
+#[path = "reviews/visits.rs"]
+mod visits;
 use specspace_application::{
     proposal::UiImpact,
     review_configuration::{

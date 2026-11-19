@@ -5716,6 +5716,344 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units/{unit}/source": {
+      "get": {
+        "tags": [
+          "crate::review_visits"
+        ],
+        "operationId": "proposalReviewSourceWindow",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "unit",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "expected_fingerprint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ReviewArea"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AnchorSide"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified bounded source delivery; no visit or approval is recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSourceWindow"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/visits": {
+      "post": {
+        "tags": [
+          "crate::review_visits"
+        ],
+        "operationId": "acknowledgeProposalReviewSource",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewVisitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Exact original receipt replayed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewVisitRecorded"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Explicit acknowledgement of exactly one delivered source window; no approval or whole-unit coverage implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewVisitRecorded"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/specification": {
       "get": {
         "tags": [
@@ -12211,6 +12549,124 @@
         },
         "additionalProperties": false
       },
+      "ReviewSourceRequest": {
+        "type": "object",
+        "required": [
+          "expected_fingerprint",
+          "domain",
+          "unit_id",
+          "side",
+          "offset"
+        ],
+        "properties": {
+          "domain": {
+            "$ref": "#/components/schemas/ReviewArea"
+          },
+          "expected_fingerprint": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "side": {
+            "$ref": "#/components/schemas/AnchorSide"
+          },
+          "unit_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSourceWindow": {
+        "type": "object",
+        "required": [
+          "actor_id",
+          "proposal_id",
+          "snapshot_id",
+          "delivery_id",
+          "fingerprint",
+          "domain",
+          "unit_id",
+          "side",
+          "source",
+          "head_sha",
+          "merge_base_sha",
+          "start_byte",
+          "end_byte",
+          "offset",
+          "text",
+          "window_sha256",
+          "expires_at"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ReviewArea"
+          },
+          "end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "merge_base_sha": {
+            "type": "string"
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "side": {
+            "$ref": "#/components/schemas/AnchorSide"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/UnitSource"
+          },
+          "start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string"
+          },
+          "unit_id": {
+            "type": "string"
+          },
+          "window_sha256": {
+            "type": "string"
+          }
+        }
+      },
       "ReviewSubmissionAccepted": {
         "type": "object",
         "required": [
@@ -12260,6 +12716,103 @@
           },
           "expected_target_sha": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewVisitRecorded": {
+        "type": "object",
+        "required": [
+          "id",
+          "request_id",
+          "delivery_id",
+          "actor_id",
+          "proposal_id",
+          "snapshot_id",
+          "fingerprint",
+          "domain",
+          "unit_id",
+          "side",
+          "start_byte",
+          "end_byte",
+          "recorded_at",
+          "replayed"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ReviewArea"
+          },
+          "end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "side": {
+            "$ref": "#/components/schemas/AnchorSide"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unit_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewVisitRequest": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "delivery_id",
+          "expected_fingerprint",
+          "domain"
+        ],
+        "properties": {
+          "delivery_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ReviewArea"
+          },
+          "expected_fingerprint": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false

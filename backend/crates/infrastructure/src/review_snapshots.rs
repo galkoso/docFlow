@@ -10,8 +10,9 @@ use specspace_application::{
     comparison::Change,
     review_preparation::{ReviewPreparationError, ReviewPreparer, VerifiedReview},
     review_snapshot::{
-        ReviewBookDocument, ReviewMediaReceipt, ReviewSnapshot, ReviewSnapshotHistory,
-        ReviewSnapshotHistoryEntry, ReviewSnapshotMedia, ReviewSnapshotMetadata,
+        ReviewBookDocument, ReviewMediaReceipt, ReviewSnapshot, ReviewSnapshotDocuments,
+        ReviewSnapshotHistory, ReviewSnapshotHistoryEntry, ReviewSnapshotMedia,
+        ReviewSnapshotMetadata,
     },
     review_submission::ReviewPublication,
 };
@@ -433,6 +434,43 @@ impl PgReviewSnapshots {
         };
         tx.commit().await?;
         Ok(documents)
+    }
+    pub async fn documents(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        offset: i32,
+        limit: i32,
+    ) -> Result<ReviewSnapshotDocuments, SnapshotError> {
+        if !(0..=1000).contains(&offset) || !(1..=100).contains(&limit) {
+            return Err(SubmissionError::InvalidQuery.into());
+        }
+        let mut tx = self.transaction().await?;
+        let org = read_access(&mut tx, actor, proposal).await?;
+        let (fingerprint, head_sha, version, exists, total, values): (String, String, i32, bool, i32, Value) = sqlx::query_as("SELECT h.fingerprint,h.head_sha,h.book_manifest_version,b.snapshot_id IS NOT NULL,coalesce(jsonb_array_length(b.documents),0),(SELECT coalesce(jsonb_agg(d.value ORDER BY d.ordinality),'[]'::jsonb) FROM (SELECT value,ordinality FROM jsonb_array_elements(b.documents) WITH ORDINALITY WHERE ordinality>$4 AND ordinality<=$4+$5) d) FROM review_snapshots h LEFT JOIN review_snapshot_books b ON b.snapshot_id=h.id AND b.organization_id=h.organization_id AND b.proposal_id=h.proposal_id WHERE h.id=$1 AND h.organization_id=$2 AND h.proposal_id=$3 AND h.state='READY'")
+            .bind(snapshot).bind(org).bind(proposal).bind(offset).bind(limit).fetch_optional(&mut *tx).await?.ok_or(SubmissionError::NotFound)?;
+        let available = match (version, exists) {
+            (0, false) => false,
+            (1, true) => true,
+            _ => return Err(SnapshotError::InvalidEvidence),
+        };
+        let documents: Vec<ReviewBookDocument> =
+            serde_json::from_value(values).map_err(|_| SnapshotError::InvalidEvidence)?;
+        let end = offset + documents.len() as i32;
+        tx.commit().await?;
+        Ok(ReviewSnapshotDocuments {
+            actor_id: actor,
+            proposal_id: proposal,
+            snapshot_id: snapshot,
+            fingerprint,
+            head_sha,
+            available,
+            offset,
+            total,
+            next_offset: (end < total).then_some(end),
+            documents,
+        })
     }
     pub async fn files(
         &self,

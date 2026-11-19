@@ -2140,3 +2140,16 @@ Checkboxes represent verified work only.
   and the production build pass. Migration 024 is applied and verified locally;
   the rebuilt API is ready and discussion writes still require authentication
   with no-store responses.
+
+- Paged complete-book browsing API: current members can read the sealed head-book
+  descriptors, including unchanged documents, in catalog order through an
+  actor-bound snapshot endpoint. Pages echo proposal/snapshot/fingerprint/head,
+  enforce bounds and strict query fields, and distinguish legacy unavailability
+  from an available empty book. Data remains pinned after proposal refs advance;
+  reads need no provider IO and revoked sessions/scopes cannot read another page.
+  OpenAPI and the generated typed client include the new contract. Database and
+  HTTP coverage verify order, pagination, unchanged entries, scope, revocation,
+  bounds and legacy behavior. Composer integration is the next stage; the full
+  remaining specification stays active. The full backend run passes all 672
+  tests with two existing performance measurements excluded; workspace Clippy
+  and formatting pass. This endpoint adds no migration.

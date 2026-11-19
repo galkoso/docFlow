@@ -520,6 +520,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalReviewSnapshotDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/files": {
         parameters: {
             query?: never;
@@ -1853,6 +1869,14 @@ export interface components {
             /** Format: int32 */
             media_validation_version: number;
         };
+        /**
+         * @description Complete head-book identity, including documents absent from the diff.
+         *     Deserializing this read model does not construct a source proof.
+         */
+        ReviewBookDocument: {
+            id: string;
+            source: components["schemas"]["Side"];
+        };
         ReviewConfiguration: {
             branch: string;
             can_edit: boolean;
@@ -2014,6 +2038,25 @@ export interface components {
             team_id: string;
             ui_impact: components["schemas"]["ReviewSnapshotUiImpact"];
             ui_impact_reason?: string | null;
+        };
+        ReviewSnapshotDocuments: {
+            /** Format: uuid */
+            actor_id: string;
+            /** @description False for legacy snapshots without a sealed complete-book manifest. */
+            available: boolean;
+            documents: components["schemas"]["ReviewBookDocument"][];
+            fingerprint: string;
+            head_sha: string;
+            /** Format: int32 */
+            next_offset?: number | null;
+            /** Format: int32 */
+            offset: number;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: int32 */
+            total: number;
         };
         ReviewSnapshotFiles: {
             files: components["schemas"]["Change"][];
@@ -5127,6 +5170,73 @@ export interface operations {
                 };
             };
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalReviewSnapshotDocuments: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewSnapshotDocuments"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

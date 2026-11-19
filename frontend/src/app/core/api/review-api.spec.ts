@@ -19,6 +19,10 @@ describe('Review API request scope', () => {
     api.history(actor, proposal, other).subscribe(); const history = http.expectOne(req => req.url.endsWith('/review/snapshots'));
     expect(history.request.params.get('after')).toBe(other); expect(history.request.params.get('limit')).toBe('20'); history.flush({});
     api.snapshot(actor, proposal, 'snap/other').subscribe(); http.expectOne(`/api/v1/proposals/${proposal}/review/snapshots/snap%2Fother`).flush({});
+    api.documents(actor, 'p/other', 'snap/other', 20).subscribe();
+    const documents = http.expectOne(req => req.url === '/api/v1/proposals/p%2Fother/review/snapshots/snap%2Fother/documents');
+    expect(documents.request.method).toBe('GET'); expect(documents.request.headers.get('X-Expected-Actor')).toBe(actor);
+    expect(documents.request.params.get('offset')).toBe('20'); expect(documents.request.params.get('limit')).toBe('20'); documents.flush({});
     api.files(actor, proposal, snapshot, 50).subscribe(); api.media(actor, proposal, snapshot, 100).subscribe();
     const pages = http.match(req => req.url.endsWith('/files') || req.url.endsWith('/media'));
     expect(pages.map(request => request.request.params.get('offset'))).toEqual(['50', '100']);

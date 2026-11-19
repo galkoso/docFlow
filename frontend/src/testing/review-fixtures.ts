@@ -1,6 +1,15 @@
 import type { ReviewConfiguration } from '../app/core/api/review-configuration-api';
 import type { ReviewAccepted, ReviewDetail, ReviewFiles, ReviewHistory, ReviewJob, ReviewMedia,
-  ReviewPublication, ReviewSnapshot, ReviewPrStatus, OfficialHistory } from '../app/core/api/review-api';
+  ReviewPublication, ReviewSnapshot, ReviewPrStatus, OfficialHistory, ReviewDocuments } from '../app/core/api/review-api';
+
+export const reviewDocuments = (viewer = actor, offset = 0, total = 2): ReviewDocuments => ({ actor_id: viewer, proposal_id: proposal,
+  snapshot_id: snapshot, fingerprint: metadata().fingerprint, head_sha: head, available: true, offset, total,
+  next_offset: offset + Math.min(20, Math.max(0, total - offset)) < total ? offset + 20 : null,
+  documents: Array.from({ length: Math.min(20, Math.max(0, total - offset)) }, (_, n) => ({ id: (offset + n + 128).toString(16).padStart(64, '0'),
+    source: { path: `docs/book-${offset + n}.md`, document_id: `DOC-BOOK-${offset + n}`, catalog_position: offset + n,
+      blob_oid: head, bytes: 100, executable: false, sha256: '3'.repeat(64) },
+  })),
+});
 
 export const officialHistory = (viewer = actor): OfficialHistory => ({ proposal_id: proposal, snapshot_id: snapshot, fingerprint: metadata().fingerprint,
   head_sha: head, target_sha: target, policy_version: 1, configuration_version: 2, current_for_metadata: true,

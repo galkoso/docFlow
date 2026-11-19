@@ -179,8 +179,17 @@ it never reconstructs one from the diff or a new Git read. They cannot be reused
 as a new complete-book publication. Current membership and proposal/snapshot
 scope protect stored manifest reads without provider IO. Verified document,
 section and line source proofs now support complete-book discussion creation,
-including unchanged documents; see `docs/discussions.md`. Public document browsing
-and the composer picker for these entries remain separate integration stages.
+including unchanged documents; see `docs/discussions.md`. Paged document browsing
+is described below; the composer picker follows as a separate integration stage.
+
+`GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/documents` now
+returns sealed head-book descriptors in catalog order, in pages of 1–100
+documents. It requires a current session and captured actor, rejects unknown or
+invalid paging queries, and returns no-store responses. The response echoes
+actor, proposal, snapshot, fingerprint and frozen head; changing current proposal
+refs does not change these pages. Reads do not contact Git. Legacy snapshots
+return `available: false` with no entries, distinct from an available empty book.
+The generated client requests bounded pages for the upcoming composer picker.
 
 An unchanged **active** snapshot can be reused in review/approved/changes-requested
 states. Reuse preserves proposal version and state, including `APPROVED`; it

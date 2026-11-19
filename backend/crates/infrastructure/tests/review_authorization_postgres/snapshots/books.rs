@@ -8,6 +8,91 @@ use specspace_infrastructure::review_files::{
 };
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn complete_document_pages_keep_catalog_order_immutable_context_and_current_access(
+    pool: PgPool,
+) {
+    let (f, source, preparer) = setup_book_options(&pool, false, None, false, None, true).await;
+    let (lease, verified) = prepared(&pool, &f, &preparer, 2).await;
+    let store = PgReviewSnapshots::new(pool.clone());
+    let saved = store.publish(&lease, &verified, &preparer).await.unwrap();
+    let viewer = user(&pool, f.org, "READER", vec![]).await;
+    let reads = source.reads.load(Ordering::SeqCst);
+    let first = store
+        .documents(viewer, f.proposal, saved.snapshot_id, 0, 1)
+        .await
+        .unwrap();
+    assert!(first.available);
+    assert_eq!(first.actor_id, viewer);
+    assert_eq!(first.proposal_id, f.proposal);
+    assert_eq!(first.snapshot_id, saved.snapshot_id);
+    assert_eq!(first.fingerprint, saved.fingerprint);
+    assert_eq!(first.head_sha, sha(1).as_str());
+    assert_eq!(
+        (first.offset, first.total, first.next_offset),
+        (0, 2, Some(1))
+    );
+    assert_eq!(
+        first.documents[0].source.document_id.as_deref(),
+        Some("DOC-B")
+    );
+    sqlx::query("UPDATE proposals SET head_sha=$2,version=version+1 WHERE id=$1")
+        .bind(f.proposal)
+        .bind(sha(3).as_str())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let second = store
+        .documents(viewer, f.proposal, saved.snapshot_id, 1, 1)
+        .await
+        .unwrap();
+    assert_eq!(second.head_sha, first.head_sha);
+    assert_eq!(second.fingerprint, first.fingerprint);
+    assert_eq!(
+        second.documents[0].source.document_id.as_deref(),
+        Some("DOC-A")
+    );
+    assert_eq!(second.next_offset, None);
+    let end = store
+        .documents(viewer, f.proposal, saved.snapshot_id, 1000, 100)
+        .await
+        .unwrap();
+    assert!(end.documents.is_empty());
+    assert_eq!(end.next_offset, None);
+    for (offset, limit) in [(-1, 1), (1001, 1), (0, 0), (0, 101)] {
+        assert!(
+            store
+                .documents(viewer, f.proposal, saved.snapshot_id, offset, limit)
+                .await
+                .is_err()
+        );
+    }
+    assert!(
+        store
+            .documents(viewer, Uuid::new_v4(), saved.snapshot_id, 0, 1)
+            .await
+            .is_err()
+    );
+    assert!(
+        store
+            .documents(viewer, f.proposal, Uuid::new_v4(), 0, 1)
+            .await
+            .is_err()
+    );
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1")
+        .bind(viewer)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        store
+            .documents(viewer, f.proposal, saved.snapshot_id, 0, 1)
+            .await
+            .is_err()
+    );
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn unchanged_document_source_proofs_are_scoped_to_the_sealed_book_not_the_diff(pool: PgPool) {
     let (f, source, preparer) = setup_book_options(&pool, false, None, false, None, true).await;
     let (lease, verified) = prepared(&pool, &f, &preparer, 2).await;
@@ -177,6 +262,14 @@ async fn migration_preserves_legacy_snapshots_without_fabricating_complete_book_
         .bind(original.snapshot_id).fetch_one(&pool).await.unwrap();
     assert_eq!(before, after);
     assert_eq!(version, 0);
+    let unavailable = store
+        .documents(f.owner, f.proposal, original.snapshot_id, 0, 20)
+        .await
+        .unwrap();
+    assert!(!unavailable.available);
+    assert_eq!(unavailable.total, 0);
+    assert!(unavailable.documents.is_empty());
+    assert_eq!(unavailable.next_offset, None);
     let authorization = PgReviewBookAuthorization::new(pool.clone());
     let entry = &verified.candidate().plan().book_documents()[0];
     assert!(matches!(

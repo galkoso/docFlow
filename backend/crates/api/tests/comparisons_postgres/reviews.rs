@@ -271,6 +271,58 @@ async fn publish(f: &Fixture, version: i64) -> (Value, String) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn review_document_pages_are_actor_bound_scoped_and_provider_free(pool: PgPool) {
+    let (f, _, _) = configured(&pool, false).await;
+    let (result, snapshot) = publish(&f, 2).await;
+    let path = format!("{}/{snapshot}/documents", history_path(&f));
+    let reads = f.provider.reads.load(Ordering::SeqCst);
+    let response = get(&f.app, &f.actor, &format!("{path}?offset=0&limit=1"), true).await;
+    assert_eq!(response.0, StatusCode::OK, "{}", response.1);
+    assert_eq!(response.1["actor_id"], f.actor.id.to_string());
+    assert_eq!(response.1["proposal_id"], f.proposal.to_string());
+    assert_eq!(response.1["snapshot_id"], snapshot);
+    assert_eq!(response.1["fingerprint"], result["review"]["fingerprint"]);
+    assert_eq!(response.1["head_sha"], HEAD);
+    assert_eq!(response.1["available"], true);
+    assert_eq!(response.1["total"], 3);
+    assert_eq!(response.1["next_offset"], 1);
+    assert_eq!(response.1["documents"][0]["source"]["document_id"], "DOC-0");
+    let second = get(&f.app, &f.actor, &format!("{path}?offset=1&limit=1"), true).await;
+    assert_eq!(second.1["documents"][0]["source"]["document_id"], "DOC-1");
+    assert!(response.1.get("body").is_none());
+    assert!(response.1["documents"][0].get("markdown").is_none());
+    for query in [
+        "offset=-1",
+        "offset=1001",
+        "limit=101",
+        "limit=0",
+        "unknown=true",
+    ] {
+        assert_eq!(
+            get(&f.app, &f.actor, &format!("{path}?{query}"), true)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    let foreign = path.replace(&snapshot, &Uuid::new_v4().to_string());
+    assert_eq!(
+        get(&f.app, &f.actor, &foreign, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1")
+        .bind(f.actor.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&f.app, &f.actor, &path, true).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(f.provider.reads.load(Ordering::SeqCst), reads);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn review_http_queue_worker_shared_evidence_and_actor_private_progress(pool: PgPool) {
     let (f, product, _) = configured(&pool, true).await;
     let empty = get(&f.app, &f.actor, &history_path(&f), true).await;

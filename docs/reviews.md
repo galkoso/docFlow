@@ -159,6 +159,28 @@ manifests. Deferred constraints reject unsealed, incomplete or orphan publicatio
 transactions. Published headers, children and submission receipts are immutable,
 including against deletion, late insertion and truncation.
 
+New publications also seal the complete head-book document manifest in catalog
+order, including documents unchanged by the proposal. Each entry retains only
+its source descriptor and a deterministic identity bound to repository, head and
+that descriptor. Plan fingerprint version 2 includes the complete manifest;
+changed-file counts and the diff still represent only actual changes.
+
+Migration 023 stores this manifest in the same fenced publication transaction.
+Its guards enforce unique document IDs, paths and entry identities, contiguous
+catalog positions, supported paths, exact descriptor fields, hashes, sizes and
+the 1,000-document/20-MiB limits. Sealing also checks each changed after-document
+against the book manifest. A missing manifest prevents publication, and sealed
+manifests cannot be extended, updated, deleted or truncated. An outbox failure
+rolls the manifest back with all other publication evidence.
+
+Pre-023 snapshots retain their original evidence and manifest version 0. They
+remain readable, but a complete-book read explicitly returns no manifest;
+it never reconstructs one from the diff or a new Git read. They cannot be reused
+as a new complete-book publication. Current membership and proposal/snapshot
+scope protect stored manifest reads without provider IO. Discussion selection,
+source verification and public document browsing from this manifest are separate
+integration stages.
+
 An unchanged **active** snapshot can be reused in review/approved/changes-requested
 states. Reuse preserves proposal version and state, including `APPROVED`; it
 keeps the original immutable evidence digest. Otherwise a new snapshot becomes

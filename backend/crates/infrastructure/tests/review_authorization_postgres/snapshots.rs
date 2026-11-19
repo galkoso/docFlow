@@ -24,6 +24,8 @@ use std::{
     },
     time::Duration,
 };
+#[path = "snapshots/books.rs"]
+mod books;
 #[path = "snapshots/discussions.rs"]
 mod discussions;
 #[path = "snapshots/files.rs"]
@@ -162,6 +164,16 @@ async fn setup_body_options(
     reuse_media: bool,
     before_body: Option<&str>,
 ) -> (Fixture, Arc<Source>, ReviewPreparer) {
+    setup_book_options(pool, include_media, body, reuse_media, before_body, false).await
+}
+async fn setup_book_options(
+    pool: &PgPool,
+    include_media: bool,
+    body: Option<&str>,
+    reuse_media: bool,
+    before_body: Option<&str>,
+    unchanged_document: bool,
+) -> (Fixture, Arc<Source>, ReviewPreparer) {
     let f = fixture(pool).await;
     sqlx::query("UPDATE proposals SET base_sha=$2,target_sha=$3 WHERE id=$1")
         .bind(f.proposal)
@@ -170,13 +182,19 @@ async fn setup_body_options(
         .execute(pool)
         .await
         .unwrap();
-    let catalog =
-        br#"{"schema_version":1,"documents":[{"document_id":"DOC-A","path":"docs/a.md"}]}"#
-            .to_vec();
+    let catalog = if unchanged_document {
+        br#"{"schema_version":1,"documents":[{"document_id":"DOC-B","path":"docs/b.md"},{"document_id":"DOC-A","path":"docs/a.md"}]}"#.to_vec()
+    } else {
+        br#"{"schema_version":1,"documents":[{"document_id":"DOC-A","path":"docs/a.md"}]}"#.to_vec()
+    };
     let tree = |body: &str| {
-        BTreeMap::from([
+        let mut tree = BTreeMap::from([
         (".specspace/catalog.json".to_owned(),catalog.clone()),
-        ("docs/a.md".to_owned(),format!("---\ndocument_id: DOC-A\ntitle: Synthetic\nowner_team: fixture\nschema_version: 1\n---\n<!-- ss:section:SEC-A -->\n# Synthetic\n\n{body}\n").into_bytes())])
+        ("docs/a.md".to_owned(),format!("---\ndocument_id: DOC-A\ntitle: Synthetic\nowner_team: fixture\nschema_version: 1\n---\n<!-- ss:section:SEC-A -->\n# Synthetic\n\n{body}\n").into_bytes())]);
+        if unchanged_document {
+            tree.insert("docs/b.md".into(), b"---\ndocument_id: DOC-B\ntitle: Unchanged\nowner_team: fixture\nschema_version: 1\n---\n<!-- ss:section:SEC-B -->\n# Unchanged\n\nUnchanged original body\n".to_vec());
+        }
+        tree
     };
     let image=include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),"/../../../fixtures/repository/assets/5e3d382db4dd83d59aa5742793ad6b7903409e865c83bcbc54835049f043bc15.png")).to_vec();
     let path = format!("assets/{:x}.png", Sha256::digest(&image));
@@ -539,6 +557,13 @@ async fn outbox_failure_rolls_back_every_publication_write_and_safe_retry_succee
         (snapshots, results, version, state.as_str()),
         (0, 0, 2, "DRAFT")
     );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM review_snapshot_books")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
     sqlx::query("DROP TRIGGER fail_review_event ON outbox")
         .execute(&pool)
         .await
@@ -698,6 +723,7 @@ async fn database_refuses_incomplete_headers_missing_files_and_activation_withou
             sqlx::query("INSERT INTO review_snapshot_files SELECT organization_id,proposal_id,$2,ordinal,file_id,change FROM review_snapshot_files WHERE snapshot_id=$1").bind(published.snapshot_id).bind(id).execute(&mut *tx).await.unwrap();
         }
         if fault == 4 {
+            sqlx::query("INSERT INTO review_snapshot_books SELECT organization_id,proposal_id,$2,documents FROM review_snapshot_books WHERE snapshot_id=$1").bind(published.snapshot_id).bind(id).execute(&mut *tx).await.unwrap();
             sqlx::query("INSERT INTO review_snapshot_media SELECT organization_id,proposal_id,$2,ordinal,path,receipt FROM review_snapshot_media WHERE snapshot_id=$1").bind(published.snapshot_id).bind(id).execute(&mut *tx).await.unwrap();
             sqlx::query("UPDATE review_snapshots SET state='READY' WHERE id=$1")
                 .bind(id)

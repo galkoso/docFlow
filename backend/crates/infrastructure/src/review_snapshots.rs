@@ -10,8 +10,8 @@ use specspace_application::{
     comparison::Change,
     review_preparation::{ReviewPreparationError, ReviewPreparer, VerifiedReview},
     review_snapshot::{
-        ReviewMediaReceipt, ReviewSnapshot, ReviewSnapshotHistory, ReviewSnapshotHistoryEntry,
-        ReviewSnapshotMedia, ReviewSnapshotMetadata,
+        ReviewBookDocument, ReviewMediaReceipt, ReviewSnapshot, ReviewSnapshotHistory,
+        ReviewSnapshotHistoryEntry, ReviewSnapshotMedia, ReviewSnapshotMetadata,
     },
     review_submission::ReviewPublication,
 };
@@ -193,6 +193,8 @@ impl PgReviewSnapshots {
             .map(serde_json::to_value)
             .collect::<Result<_, _>>()
             .map_err(|_| SnapshotError::InvalidEvidence)?;
+        let book_documents = serde_json::to_value(plan.book_documents())
+            .map_err(|_| SnapshotError::InvalidEvidence)?;
         let media: Vec<_> = verified
             .media()
             .iter()
@@ -223,7 +225,7 @@ impl PgReviewSnapshots {
             state.as_str(),
             "IN_REVIEW" | "APPROVED" | "CHANGES_REQUESTED"
         ) {
-            sqlx::query_scalar("SELECT id FROM review_snapshots WHERE id=$1 AND organization_id=$2 AND proposal_id=$3 AND state='READY' AND fingerprint=$4")
+            sqlx::query_scalar("SELECT id FROM review_snapshots WHERE id=$1 AND organization_id=$2 AND proposal_id=$3 AND state='READY' AND fingerprint=$4 AND book_manifest_version=1")
                 .bind(active).bind(lease.organization()).bind(lease.proposal()).bind(verified.fingerprint()).fetch_optional(&mut *tx).await?
         } else {
             None
@@ -240,6 +242,9 @@ impl PgReviewSnapshots {
                 .bind(&summary.branch).bind(read.connection.remote_id.to_string()).bind(read.connection.installation_id.to_string())
                 .bind(number).bind(title).bind(delivery).bind(metadata).bind(files.len() as i32).bind(json!(ids))
                 .bind(media.len() as i32).bind(json!(plan.required_media())).execute(&mut *tx).await?;
+            sqlx::query("INSERT INTO review_snapshot_books(organization_id,proposal_id,snapshot_id,documents) VALUES($1,$2,$3,$4)")
+                .bind(lease.organization()).bind(lease.proposal()).bind(snapshot).bind(book_documents)
+                .execute(&mut *tx).await?;
             for (chunk, values) in files.chunks(500).enumerate() {
                 let mut query = QueryBuilder::<Postgres>::new(
                     "INSERT INTO review_snapshot_files(organization_id,proposal_id,snapshot_id,ordinal,file_id,change) ",
@@ -406,6 +411,28 @@ impl PgReviewSnapshots {
             next_offset: (end < total).then_some(end),
             receipts,
         })
+    }
+    /// Legacy snapshots have no complete-book proof. Never fabricate it from
+    /// their changed-file list or from a fresh repository read.
+    pub async fn book_documents(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+    ) -> Result<Option<Vec<ReviewBookDocument>>, SnapshotError> {
+        let mut tx = self.transaction().await?;
+        let org = read_access(&mut tx, actor, proposal).await?;
+        let (version, documents): (i32, Option<Value>) = sqlx::query_as("SELECT h.book_manifest_version,b.documents FROM review_snapshots h LEFT JOIN review_snapshot_books b ON b.snapshot_id=h.id AND b.organization_id=h.organization_id AND b.proposal_id=h.proposal_id WHERE h.id=$1 AND h.proposal_id=$2 AND h.organization_id=$3 AND h.state='READY'")
+            .bind(snapshot).bind(proposal).bind(org).fetch_optional(&mut *tx).await?.ok_or(SubmissionError::NotFound)?;
+        let documents = match (version, documents) {
+            (0, None) => None,
+            (1, Some(value)) => {
+                Some(serde_json::from_value(value).map_err(|_| SnapshotError::InvalidEvidence)?)
+            }
+            _ => return Err(SnapshotError::InvalidEvidence),
+        };
+        tx.commit().await?;
+        Ok(documents)
     }
     pub async fn files(
         &self,

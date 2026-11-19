@@ -2079,3 +2079,20 @@ Checkboxes represent verified work only.
   unchanged-document case verifies that the diff still contains only actual
   changes. All 120 application tests pass. Durable publication and discussion
   reads from this evidence are subsequent stages; the full goal remains active.
+
+- Durable complete-book evidence: migration 023 and the fenced publisher now
+  atomically seal the complete head-book manifest, including unchanged documents.
+  Database guards enforce descriptor shape, unique identities/paths, catalog
+  order, supported paths, hashes and size quotas; missing manifests and changed
+  document mismatches cannot seal. Published manifests resist extension, mutation,
+  deletion and truncation. Scoped current-member reads require no provider IO.
+  Migration coverage preserves existing snapshot evidence as version 0 without
+  fabricating a manifest; resubmission publishes complete evidence instead of
+  reusing a legacy snapshot. Outbox-failure coverage also verifies manifest
+  rollback. Public browsing and verified discussion anchors from this complete
+  manifest remain to be connected, along with all other unfinished full-spec
+  requirements. The full backend run passes 650 tests with two existing
+  performance measurements excluded; the three focused book cases also pass
+  against the final guards. Workspace Clippy/formatting pass and the exported
+  OpenAPI is unchanged. Migration 023 is applied locally; the rebuilt API reports
+  ready and discussion history still requires authentication with no-store.

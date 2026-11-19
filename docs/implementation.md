@@ -2176,3 +2176,14 @@ Checkboxes represent verified work only.
   new engine cases cover complete partitioning, alignment with existing anchors,
   code-fence markers, identity errors and limits. This index supplies neither
   read authority nor visit/approval evidence; the full goal remains active.
+
+- Mandatory review requirement preparation: plans now identify changed stable
+  sections with exact before/after source evidence and retain front matter,
+  unsectioned content, file metadata, layout, catalog and media requirements.
+  Missing section sides remain distinct from existing files. Unstructured or
+  excessive sections and exhausted manifest budgets explicitly require whole-file
+  review rather than losing changes; every changed file has a requirement.
+  Plan fingerprint version 3 binds this complete set while preserving canonical
+  actor/order/state-only stability. Six new application cases cover raw source,
+  add/delete, metadata/layout, non-documents and limits; all 136 application cases
+  pass. Persistence and visit/approval integration follow as separate stages.

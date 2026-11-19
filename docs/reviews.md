@@ -96,6 +96,22 @@ review/merge gates; decoding an image does not satisfy those gates.
 
 ## Durable submission journal
 
+Prepared review plans now include mandatory source requirements. A stable section
+requirement retains exact before/after source descriptors and original byte/line
+ranges; sections with unchanged raw source do not become new requirements.
+Front matter, unsectioned text, paths/modes/catalog positions, section ordering,
+catalog files and media changes remain explicit review work. Added/deleted
+sections distinguish absent section sides from existing file sides.
+
+Unstructured or excessive sections use an explicit whole-file requirement,
+retaining all original evidence. A bounded global manifest reserves at least one
+requirement for every changed file; exceeding the section budget replaces that
+file's section set with complete whole-file review work instead of dropping it.
+Plan fingerprint version 3 includes the exact requirement set. Matching unit IDs
+do not transfer visits or approvals across snapshot/policy contexts. These data
+are preparation evidence, not a visit receipt or an approval; durable coverage
+and reviewer actions are separate integration stages.
+
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks
 current edit authority, then replays an identical actor-bound idempotency key or

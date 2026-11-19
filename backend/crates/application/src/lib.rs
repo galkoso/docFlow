@@ -19,6 +19,7 @@ pub mod review_pr_status;
 pub mod review_preparation;
 pub mod review_snapshot;
 pub mod review_submission;
+pub mod review_units;
 
 pub mod pr_recovery;
 pub mod pr_sync;

@@ -6,6 +6,7 @@ use crate::{
     comparison::{Change, Kind},
     comparison_reader::LoadedComparison,
     review_snapshot::ReviewBookDocument,
+    review_units::{self, RequiredReviewUnit},
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -103,6 +104,7 @@ pub struct PreparedReview {
     summary: ReviewSummary,
     files: Vec<Change>,
     book_documents: Vec<ReviewBookDocument>,
+    required_units: Vec<RequiredReviewUnit>,
     assignments: Vec<AssignedReviewer>,
     media: Vec<RequiredMedia>,
     validation: SaveValidation,
@@ -119,6 +121,9 @@ impl PreparedReview {
     }
     pub fn book_documents(&self) -> &[ReviewBookDocument] {
         &self.book_documents
+    }
+    pub fn required_units(&self) -> &[RequiredReviewUnit] {
+        &self.required_units
     }
     pub fn assignments(&self) -> &[AssignedReviewer] {
         &self.assignments
@@ -266,6 +271,7 @@ impl PreparedReview {
                 bytes: side.bytes,
             });
         }
+        let required_units = review_units::prepare(loaded).map_err(ReviewError::Invalid)?;
         let impact = match context.ui_impact {
             UiImpact::Yes => "YES",
             UiImpact::No => "NO",
@@ -275,7 +281,7 @@ impl PreparedReview {
         serde_json::to_writer(
             &mut writer,
             &(
-                "specspace-review-plan-v2",
+                "specspace-review-plan-v3",
                 loaded.organization(),
                 loaded.repository(),
                 loaded.binding().remote_id,
@@ -302,6 +308,7 @@ impl PreparedReview {
                 &loaded.inventory().changes,
                 &media,
                 &book_documents,
+                &required_units,
             ),
         )
         .map_err(|_| ReviewError::Invalid("REVIEW_FINGERPRINT_FAILED"))?;
@@ -340,6 +347,7 @@ impl PreparedReview {
             summary,
             files: loaded.inventory().changes.clone(),
             book_documents,
+            required_units,
             assignments,
             media,
             validation,

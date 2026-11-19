@@ -80,9 +80,44 @@ async fn complete_manifest_binds_saved_git_pair_and_configuration_without_publis
     assert_eq!(plan.assignments().len(), 2);
     assert!(plan.required_media().is_empty());
     assert!(plan.validation().ready());
+    assert!(!plan.required_units().is_empty());
     let json = serde_json::to_string(summary).unwrap();
     assert!(!json.contains("proposal edit"));
     assert!(!json.contains("approved"));
+}
+#[tokio::test]
+async fn bounded_review_requirements_cover_every_changed_file_without_dropping_large_sections() {
+    let mut body = String::new();
+    for n in 0..10 {
+        body.push_str(&format!(
+            "<!-- ss:section:SEC-{n} -->\n# Heading\n\nChanged text\n"
+        ));
+    }
+    let f = fixture_body(&body);
+    let source = loaded(&f).await;
+    let units = crate::review_units::prepare_with_limit(&source, 1).unwrap();
+    assert_eq!(units.len(), 1);
+    assert_eq!(units[0].file_id, source.inventory().changes[0].id);
+    assert!(matches!(
+        units[0].requirement,
+        crate::review_units::Requirement::File {
+            reason: crate::review_units::FileRequirement::ManifestLimit
+        }
+    ));
+    assert_eq!(
+        units[0]
+            .after
+            .as_ref()
+            .unwrap()
+            .range
+            .as_ref()
+            .unwrap()
+            .end_byte,
+        source.after().source("docs/a.md").unwrap().len()
+    );
+    assert!(crate::review_units::prepare_with_limit(&source, 0).is_err());
+    let plan = PreparedReview::prepare(context(&f), &source).unwrap();
+    assert!(plan.required_units().len() > 1);
 }
 #[tokio::test]
 async fn complete_book_manifest_retains_unchanged_documents_in_catalog_order_without_inventing_changes()

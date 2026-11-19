@@ -144,6 +144,12 @@ bounds; it can be rechecked after later awaits. It shares the file reader's
 verified cache, source capacity and deadline. Binary requirements need separate
 display verification. This internal proof is not a visit receipt or an approval;
 HTTP delivery, durable receipts and reviewer acknowledgement remain to be wired.
+PostgreSQL unit authorization resolves only the selected ready snapshot's sealed
+manifest under current organization access and the exact repository/installation
+binding. It preserves the snapshot's immutable head/base/fingerprint if proposal
+metadata advances, while a proof captured under an earlier current scope fails
+recheck. Legacy requirement version 0 returns unavailable authority; metadata
+alone cannot be promoted to a source proof. This read path adds no migration.
 Reviewer visit receipts, section decisions, coverage reads/UI and policy-check
 assembly remain separate integration stages. Approve-all still warns about
 unviewed content until real visit evidence is connected.

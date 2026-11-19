@@ -136,6 +136,23 @@ async fn unit_migration_preserves_legacy_evidence_and_requires_new_complete_publ
     assert!(legacy.units.is_empty());
     assert_eq!((legacy.total, legacy.next_offset), (0, None));
     assert_eq!(legacy.fingerprint, old.fingerprint);
+    {
+        use specspace_application::comparison_file::{
+            FileReadError, review_unit::ReviewUnitAuthorization,
+        };
+        use specspace_infrastructure::review_files::PgReviewUnitAuthorization;
+        assert!(matches!(
+            PgReviewUnitAuthorization::new(pool.clone())
+                .resolve_unit(
+                    f.owner,
+                    f.proposal,
+                    old.snapshot_id,
+                    &verified.candidate().plan().required_units()[0].id
+                )
+                .await,
+            Err(FileReadError::NotReady)
+        ));
+    }
 
     assert!(
         sqlx::query("UPDATE review_snapshots SET review_units_version=1 WHERE id=$1")
@@ -251,5 +268,116 @@ async fn requirement_pages_preserve_exact_order_context_and_current_membership(p
             .await
             .unwrap(),
         0
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn required_unit_authority_reads_sealed_ranges_with_current_repository_binding(pool: PgPool) {
+    use specspace_application::comparison_file::{
+        ComparisonFileReader, FileReadError,
+        discussion::AnchorSide,
+        review_unit::{ReviewUnitAuthorization, ReviewUnitReader, UnitWindowRequest},
+    };
+    use specspace_infrastructure::review_files::{
+        PgReviewFileAuthorization, PgReviewUnitAuthorization,
+    };
+    let (f, source, preparer) = setup_media(&pool, false).await;
+    let (lease, verified) = prepared(&pool, &f, &preparer, 2).await;
+    let saved = PgReviewSnapshots::new(pool.clone())
+        .publish(&lease, &verified, &preparer)
+        .await
+        .unwrap();
+    let viewer = user(&pool, f.org, "READER", vec![]).await;
+    let auth = Arc::new(PgReviewUnitAuthorization::new(pool.clone()));
+    let unit = &verified.candidate().plan().required_units()[0];
+    let context = auth
+        .resolve_unit(viewer, f.proposal, saved.snapshot_id, &unit.id)
+        .await
+        .unwrap();
+    assert_eq!(context.unit, *unit);
+    assert_eq!(context.fingerprint, saved.fingerprint);
+    assert_eq!(context.scope.actor, viewer);
+    assert_eq!(context.head, sha(1));
+    assert_eq!(context.merge_base, sha(0));
+    let files = Arc::new(
+        ComparisonFileReader::new(
+            Arc::new(PgReviewFileAuthorization::new(pool.clone())),
+            Arc::new(Factory {
+                source: source.clone(),
+                repository: f.repository,
+            }),
+            Duration::from_secs(60),
+        )
+        .unwrap(),
+    );
+    let reader = ReviewUnitReader::new(files, auth.clone());
+    let proof = reader
+        .load(
+            viewer,
+            f.proposal,
+            saved.snapshot_id,
+            UnitWindowRequest {
+                unit: &unit.id,
+                side: AnchorSide::After,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    assert!(proof.text().contains("Saved text-only proposal"));
+    assert_eq!(proof.source(), unit.after.as_ref().unwrap());
+    sqlx::query("UPDATE proposals SET head_sha=$2,version=version+1 WHERE id=$1")
+        .bind(f.proposal)
+        .bind(sha(3).as_str())
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(reader.recheck(viewer, &proof).await.is_err());
+    let next = auth
+        .resolve_unit(viewer, f.proposal, saved.snapshot_id, &unit.id)
+        .await
+        .unwrap();
+    assert_eq!(next.head, context.head);
+    assert_eq!(next.fingerprint, context.fingerprint);
+    assert!(matches!(
+        auth.resolve_unit(viewer, f.proposal, saved.snapshot_id, &"f".repeat(64))
+            .await,
+        Err(FileReadError::NotFound)
+    ));
+    assert!(
+        auth.resolve_unit(viewer, Uuid::new_v4(), saved.snapshot_id, &unit.id)
+            .await
+            .is_err()
+    );
+    assert!(
+        auth.resolve_unit(viewer, f.proposal, Uuid::new_v4(), &unit.id)
+            .await
+            .is_err()
+    );
+    let (foreign, _, _) = setup_media(&pool, false).await;
+    assert!(
+        auth.resolve_unit(foreign.owner, f.proposal, saved.snapshot_id, &unit.id)
+            .await
+            .is_err()
+    );
+    sqlx::query("UPDATE repositories SET remote_id='999999' WHERE id=$1")
+        .bind(f.repository)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        auth.resolve_unit(viewer, f.proposal, saved.snapshot_id, &unit.id)
+            .await
+            .is_err()
+    );
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1")
+        .bind(viewer)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        auth.resolve_unit(viewer, f.proposal, saved.snapshot_id, &unit.id)
+            .await
+            .is_err()
     );
 }

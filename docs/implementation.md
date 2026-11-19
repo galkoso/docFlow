@@ -2245,3 +2245,15 @@ Checkboxes represent verified work only.
   standalone application builds support the source-range schemas. Delivery,
   durable visit receipts and actual reviewer acknowledgement remain unfinished.
   All 142 application tests pass, along with workspace Clippy and formatting.
+
+- Sealed-unit database authority: individual required items now resolve under
+  current membership and the snapshot's exact repository/installation binding.
+  The source reader can consume this authority with the existing shared file
+  reader. Database coverage verifies actual text proof creation, stale proof
+  rejection after proposal changes, immutable snapshot context, missing/foreign
+  resources, repository rebinding, revoked access and legacy unavailability.
+  This integration adds no migration and does not create visit/approval records;
+  HTTP delivery and durable reviewer acknowledgement remain unfinished.
+  The full backend run passes 693 tests with the same two performance measurements
+  excluded; workspace Clippy and formatting pass. No API/runtime wiring or schema
+  contract changes are part of these internal reader/authority stages.

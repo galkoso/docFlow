@@ -3,8 +3,10 @@
 //! sealed shared snapshot, never a browser locator or private comparison job.
 mod book;
 mod media;
+mod units;
 pub use book::PgReviewBookAuthorization;
 pub use media::PgReviewMediaAuthorization;
+pub use units::PgReviewUnitAuthorization;
 
 use crate::comparison_authorization;
 use async_trait::async_trait;

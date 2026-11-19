@@ -2167,3 +2167,12 @@ Checkboxes represent verified work only.
   access loss and parent guards. Browser discovery still reports no connection,
   so physical keyboard/RTL/320px review remains pending. The full remaining
   specification stays active.
+
+- Exact review-section indexing: a bounded source index now partitions original
+  Markdown into preamble and uniquely marked sections without dropping protected,
+  non-rendered or trailing content. Raw hashes and UTF-8 byte/line ranges retain
+  CRLF and Unicode source exactly. Ambiguous identities and excessive section
+  counts remain explicit errors for the caller's whole-file review path. Three
+  new engine cases cover complete partitioning, alignment with existing anchors,
+  code-fence markers, identity errors and limits. This index supplies neither
+  read authority nor visit/approval evidence; the full goal remains active.

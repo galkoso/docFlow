@@ -8,4 +8,5 @@ pub mod index;
 pub mod markdown;
 pub mod media;
 pub mod render;
+pub mod review_sections;
 pub mod save_validation;

@@ -36,6 +36,10 @@ For local PostgreSQL, run `docker compose up -d --wait`. Copy `.env.example` to
 `cargo test --workspace --all-features --locked` to include PostgreSQL integration
 tests. Integration tests create and remove isolated databases; use a dedicated
 development database role with database-creation privileges, as provided by Compose.
+Run PostgreSQL test invocations sequentially against a server. SQLx 0.8 names test
+databases from each test's path, so overlapping focused and full runs can recreate
+or drop the same database. Tests within one invocation still run concurrently;
+parallel independent runs need separate PostgreSQL instances.
 The default test command runs unit checks without requiring PostgreSQL.
 
 ## Identity configuration

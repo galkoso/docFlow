@@ -5772,6 +5772,221 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/threads": {
+      "get": {
+        "tags": [
+          "crate::discussions"
+        ],
+        "operationId": "proposalDiscussionThreads",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscussionThreads"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/threads/{thread}": {
+      "get": {
+        "tags": [
+          "crate::discussions"
+        ],
+        "operationId": "proposalDiscussionComments",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "expected_thread_version",
+            "in": "query",
+            "description": "Required with after; rejects paging across a changed thread",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscussionComments"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/repositories": {
       "get": {
         "tags": [
@@ -6445,6 +6660,13 @@
   },
   "components": {
     "schemas": {
+      "AnchorSide": {
+        "type": "string",
+        "enum": [
+          "before",
+          "after"
+        ]
+      },
       "ApiError": {
         "type": "object",
         "required": [
@@ -6976,6 +7198,503 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "DiscussionActor": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "DiscussionAnchor": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "proposal"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "file_id",
+              "side",
+              "source",
+              "text",
+              "kind"
+            ],
+            "properties": {
+              "file_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "file"
+                ]
+              },
+              "side": {
+                "$ref": "#/components/schemas/AnchorSide"
+              },
+              "source": {
+                "$ref": "#/components/schemas/Side"
+              },
+              "text": {
+                "$ref": "#/components/schemas/DiscussionTextAnchor"
+              }
+            }
+          }
+        ]
+      },
+      "DiscussionComment": {
+        "type": "object",
+        "required": [
+          "id",
+          "author",
+          "version",
+          "created_at",
+          "can_edit",
+          "can_tombstone"
+        ],
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/DiscussionActor"
+          },
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "can_edit": {
+            "type": "boolean"
+          },
+          "can_tombstone": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "edited_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reply_to_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "tombstoned_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DiscussionComments": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "actor_id",
+          "thread",
+          "comments",
+          "read_at"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscussionComment"
+            }
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "read_at": {
+            "type": "string"
+          },
+          "thread": {
+            "$ref": "#/components/schemas/DiscussionThread"
+          }
+        }
+      },
+      "DiscussionOrigin": {
+        "type": "object",
+        "required": [
+          "repository_id",
+          "branch",
+          "head_sha",
+          "target_sha",
+          "proposal_version",
+          "anchor"
+        ],
+        "properties": {
+          "anchor": {
+            "$ref": "#/components/schemas/DiscussionAnchor"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "merge_base_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshot_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "target_sha": {
+            "type": "string"
+          }
+        }
+      },
+      "DiscussionPermissions": {
+        "type": "object",
+        "required": [
+          "can_comment",
+          "can_resolve",
+          "can_reopen",
+          "can_toggle_blocking"
+        ],
+        "properties": {
+          "can_comment": {
+            "type": "boolean"
+          },
+          "can_reopen": {
+            "type": "boolean"
+          },
+          "can_resolve": {
+            "type": "boolean"
+          },
+          "can_toggle_blocking": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DiscussionResolution": {
+        "type": "object",
+        "required": [
+          "actor",
+          "recorded_at"
+        ],
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/DiscussionActor"
+          },
+          "recorded_at": {
+            "type": "string"
+          }
+        }
+      },
+      "DiscussionTextAnchor": {
+        "type": "object",
+        "required": [
+          "selection",
+          "source_sha256",
+          "range_sha256",
+          "start_byte",
+          "end_byte",
+          "start_line",
+          "end_line",
+          "quote",
+          "quote_truncated"
+        ],
+        "properties": {
+          "end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_line": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "quote": {
+            "type": "string"
+          },
+          "quote_truncated": {
+            "type": "boolean"
+          },
+          "range_sha256": {
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/DiscussionTextSelection"
+          },
+          "source_sha256": {
+            "type": "string"
+          },
+          "start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "start_line": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscussionTextSelection": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "document_id",
+              "kind"
+            ],
+            "properties": {
+              "document_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "document"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "document_id",
+              "section_id",
+              "kind"
+            ],
+            "properties": {
+              "document_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "section"
+                ]
+              },
+              "section_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "lines"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "DiscussionThread": {
+        "type": "object",
+        "required": [
+          "id",
+          "proposal_id",
+          "creator",
+          "created_at",
+          "origin",
+          "version",
+          "blocking",
+          "resolved",
+          "independent_requirement",
+          "last_activity_at",
+          "comment_count",
+          "outdated_context",
+          "repository_binding_changed",
+          "permissions"
+        ],
+        "properties": {
+          "blocking": {
+            "type": "boolean"
+          },
+          "comment_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "creator": {
+            "$ref": "#/components/schemas/DiscussionActor"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "independent_requirement": {
+            "type": "boolean"
+          },
+          "last_activity_at": {
+            "type": "string"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/DiscussionOrigin"
+          },
+          "outdated_context": {
+            "type": "boolean",
+            "description": "Compared to recorded database refs, never a live provider observation."
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/DiscussionPermissions"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "repository_binding_changed": {
+            "type": "boolean"
+          },
+          "resolution": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DiscussionResolution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DiscussionThreads": {
+        "type": "object",
+        "required": [
+          "proposal_id",
+          "actor_id",
+          "proposal_version",
+          "can_comment",
+          "unresolved_blockers",
+          "read_at",
+          "threads"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "can_comment": {
+            "type": "boolean"
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "read_at": {
+            "type": "string"
+          },
+          "recorded_head_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded_target_sha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscussionThread"
+            }
+          },
+          "unresolved_blockers": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Includes outdated threads and tombstoned messages."
           }
         }
       },

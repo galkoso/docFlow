@@ -2010,3 +2010,18 @@ Checkboxes represent verified work only.
   current access, stale origins and provider-free reads. Read HTTP routes,
   mutation orchestration/source backoff, reviewer UI and full-spec integration
   are tracked as separate stages.
+
+- Discussion read HTTP: authenticated proposal-scoped thread and comment routes
+  require the captured actor, reject unknown/invalid queries and foreign cursors,
+  preserve no-store headers and return explicit stale-paging errors. Two HTTP
+  cases verify Reader access without write capabilities, tombstone privacy,
+  revocation, actor binding and scope without provider reads. OpenAPI and the
+  generated TypeScript client are updated. The sequential full backend run passes
+  all 636 tests, with two existing performance measurements excluded; workspace
+  Clippy/formatting and the frontend production build pass. Migration 021 is
+  applied locally; the restarted API is ready and both live read routes require
+  authentication. Overlapping focused/full local SQLx runs reproduced deterministic
+  fixture database collisions; README now documents sequential PostgreSQL test
+  invocations. No mutation timeout or concurrency rule was weakened. Mutation
+  HTTP/source backoff, reviewer UI, unchanged-document anchors, provider/check
+  integration and all unfinished specification scope remain pending.

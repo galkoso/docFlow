@@ -2,8 +2,8 @@
 
 Implementation of specification REV-03–06 is in progress. The source-selection
 engine, pure authorization rules, append-only database schema and authenticated
-mutation services are available. APIs, reviewer UI and required-check integration
-are not yet connected.
+mutation services and member-scoped read APIs are available. Mutation HTTP
+orchestration, reviewer UI and required-check integration are not yet connected.
 
 ## Source anchors
 
@@ -159,7 +159,49 @@ Audit failure rolls back thread/revision/event creation while retaining the
 earlier admission. Reusing that admission after recovery yields one durable
 receipt. Database proposal locks serialize competing expected-version updates.
 
-HTTP orchestration, source backoff/error presentation, scoped paginated reads,
-outdated-context display, UI, unchanged-document resolution and check/provider
-synchronization still need integration. These services do not enforce merge
-readiness on their own.
+Mutation HTTP orchestration, source backoff/error presentation, UI,
+unchanged-document resolution and check/provider synchronization still need
+integration. These services do not enforce merge readiness on their own.
+
+## Current discussion reads
+
+`PgDiscussions::threads` and `comments` use repeatable-read transactions with
+current membership/user/repository locks. Readers can read; write capabilities
+come from current role, message ownership and independent-blocker policy. They
+are hints: every mutation checks policy again. Changed target configuration
+preserves history while disabling unavailable actions. Revoked membership or a
+disabled account never receives a body.
+
+Thread pages contain 20 roots, newest creation first, with a proposal-scoped UUID
+cursor. Unresolved blocker counts include every thread in the proposal, including
+older pages, historical snapshots and tombstoned messages. Current comment pages
+contain 20 messages in their original creation order. Edits do not reorder them;
+tombstones retain identity/authorship/time and return no body. Prior text remains
+in the immutable ledger and is not exposed by these current-message endpoints.
+Resolution identity/time comes from the last resolution transition, never a later
+reply's author/time.
+
+Comment pagination requires the expected thread version with its cursor. Any
+intervening reply/edit/state change rejects continued paging as stale; clients
+must refresh rather than combine bodies from different versions. Cursors from
+another thread or proposal are rejected.
+
+`outdated_context` compares original head/target and snapshot-recorded base with
+current recorded database refs, plus repository/branch binding changes. A
+metadata-only edit does not change source context. Reads make no provider call
+and do not claim live Git freshness. Original refs, source-side metadata, quote
+and ranges remain intact when context changes; no source URL or new source
+capability is minted. Outdated context never resolves a thread or clears a
+blocking requirement. Three indexes in migration 021 support per-thread latest
+revision, original-message order and resolution-transition lookups, including
+the write guard's serialized version check.
+
+The read HTTP routes are:
+
+- `GET /api/v1/proposals/{proposal}/threads?after={thread}`
+- `GET /api/v1/proposals/{proposal}/threads/{thread}?after={comment}&expected_thread_version={version}`
+
+Both require the current session and `X-Expected-Actor`, reject unknown query
+parameters, and return `Cache-Control: no-store`. Invalid cursors/queries return
+400; lost scope returns 404; changed paging context returns 409. OpenAPI and the
+generated client describe the response data, capabilities and cursor contract.

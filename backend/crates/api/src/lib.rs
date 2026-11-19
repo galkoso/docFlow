@@ -2,6 +2,7 @@ pub mod auth;
 pub mod comparisons;
 pub mod contract;
 pub mod creation_context;
+pub mod discussions;
 pub mod drafts;
 pub mod editor;
 pub mod official_reviews;
@@ -80,6 +81,7 @@ pub struct AppState {
     pub review_snapshots: Arc<PgReviewSnapshots>,
     pub pr_sync: Arc<PgPrSync>,
     pub official_reviews: Arc<specspace_infrastructure::official_reviews::PgOfficialReviews>,
+    pub discussions: Arc<specspace_infrastructure::discussions::PgDiscussions>,
     pr_source: Arc<dyn PrProviderFactory>,
     bound_source: Arc<dyn BoundProviderFactory>,
     review_preparer: Arc<ReviewPreparer>,
@@ -152,6 +154,9 @@ impl AppState {
                     database.clone(),
                 ),
             ),
+            discussions: Arc::new(specspace_infrastructure::discussions::PgDiscussions::new(
+                database.clone(),
+            )),
             pr_source: source.clone(),
             bound_source: source.clone(),
             saves: Arc::new(PgSaves::new(database.clone())),
@@ -341,6 +346,7 @@ pub fn router(state: AppState) -> Router {
         .merge(review_configuration::routes())
         .merge(reviews::routes())
         .merge(official_reviews::routes())
+        .merge(discussions::routes())
         .merge(comparisons::routes())
         .route("/api/v1/health/live", get(live))
         .route("/api/v1/health/ready", get(ready))

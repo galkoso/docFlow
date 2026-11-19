@@ -712,6 +712,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalDiscussionThreads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}/threads/{thread}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalDiscussionComments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/repositories": {
         parameters: {
             query?: never;
@@ -812,6 +844,8 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        AnchorSide: "before" | "after";
         ApiError: {
             code: string;
             details?: unknown;
@@ -950,6 +984,138 @@ export interface components {
             snapshot_id: string;
             state: string;
             summary?: components["schemas"]["ComparisonSummary"] | null;
+        };
+        DiscussionActor: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        DiscussionAnchor: {
+            /** @enum {string} */
+            kind: "proposal";
+        } | {
+            file_id: string;
+            /** @enum {string} */
+            kind: "file";
+            side: components["schemas"]["AnchorSide"];
+            source: components["schemas"]["Side"];
+            text: components["schemas"]["DiscussionTextAnchor"];
+        };
+        DiscussionComment: {
+            author: components["schemas"]["DiscussionActor"];
+            body?: string | null;
+            can_edit: boolean;
+            can_tombstone: boolean;
+            created_at: string;
+            edited_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            reply_to_id?: string | null;
+            tombstoned_at?: string | null;
+            /** Format: int64 */
+            version: number;
+        };
+        DiscussionComments: {
+            /** Format: uuid */
+            actor_id: string;
+            comments: components["schemas"]["DiscussionComment"][];
+            /** Format: uuid */
+            next_after?: string | null;
+            /** Format: uuid */
+            proposal_id: string;
+            read_at: string;
+            thread: components["schemas"]["DiscussionThread"];
+        };
+        DiscussionOrigin: {
+            anchor: components["schemas"]["DiscussionAnchor"];
+            branch: string;
+            fingerprint?: string | null;
+            head_sha: string;
+            merge_base_sha?: string | null;
+            /** Format: int64 */
+            proposal_version: number;
+            /** Format: uuid */
+            repository_id: string;
+            /** Format: uuid */
+            snapshot_id?: string | null;
+            target_sha: string;
+        };
+        DiscussionPermissions: {
+            can_comment: boolean;
+            can_reopen: boolean;
+            can_resolve: boolean;
+            can_toggle_blocking: boolean;
+        };
+        DiscussionResolution: {
+            actor: components["schemas"]["DiscussionActor"];
+            recorded_at: string;
+        };
+        DiscussionTextAnchor: {
+            end_byte: number;
+            end_line: number;
+            quote: string;
+            quote_truncated: boolean;
+            range_sha256: string;
+            selection: components["schemas"]["DiscussionTextSelection"];
+            source_sha256: string;
+            start_byte: number;
+            start_line: number;
+        };
+        DiscussionTextSelection: {
+            document_id: string;
+            /** @enum {string} */
+            kind: "document";
+        } | {
+            document_id: string;
+            /** @enum {string} */
+            kind: "section";
+            section_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "lines";
+        };
+        DiscussionThread: {
+            blocking: boolean;
+            /** Format: int64 */
+            comment_count: number;
+            created_at: string;
+            creator: components["schemas"]["DiscussionActor"];
+            /** Format: uuid */
+            id: string;
+            independent_requirement: boolean;
+            last_activity_at: string;
+            origin: components["schemas"]["DiscussionOrigin"];
+            /** @description Compared to recorded database refs, never a live provider observation. */
+            outdated_context: boolean;
+            permissions: components["schemas"]["DiscussionPermissions"];
+            /** Format: uuid */
+            proposal_id: string;
+            repository_binding_changed: boolean;
+            resolution?: components["schemas"]["DiscussionResolution"] | null;
+            resolved: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        DiscussionThreads: {
+            /** Format: uuid */
+            actor_id: string;
+            can_comment: boolean;
+            /** Format: uuid */
+            next_after?: string | null;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: int64 */
+            proposal_version: number;
+            read_at: string;
+            recorded_head_sha?: string | null;
+            recorded_target_sha?: string | null;
+            threads: components["schemas"]["DiscussionThread"][];
+            /**
+             * Format: int64
+             * @description Includes outdated threads and tombstoned messages.
+             */
+            unresolved_blockers: number;
         };
         DocumentBlock: {
             block_id: string;
@@ -5840,6 +6006,139 @@ export interface operations {
                 };
             };
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalDiscussionThreads: {
+        parameters: {
+            query?: {
+                after?: string;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscussionThreads"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalDiscussionComments: {
+        parameters: {
+            query?: {
+                after?: string;
+                /** @description Required with after; rejects paging across a changed thread */
+                expected_thread_version?: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                thread: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscussionComments"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

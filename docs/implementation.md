@@ -2153,3 +2153,17 @@ Checkboxes represent verified work only.
   remaining specification stays active. The full backend run passes all 672
   tests with two existing performance measurements excluded; workspace Clippy
   and formatting pass. This endpoint adds no migration.
+
+- Complete-book discussion picker: the shared review discussion panel now loads
+  bounded document pages on demand, including unchanged documents. Readers get
+  pinned reading links; writers can capture a document and select its complete
+  source, stable section or original lines. Entry/snapshot context stays fixed
+  across document paging and refresh, and only identity/selection intent is
+  posted. Scope mismatches, detached entries and invalid paging/source metadata
+  are rejected. Frozen exact retries and route/reload/logout/unload guards protect
+  book drafts; actor/context changes and scope loss cancel reads and clear private
+  state. All 461 frontend tests in 52 files and the production build pass, including
+  request scope, evidence checks, reader behavior, capture/retry, legacy fallback,
+  access loss and parent guards. Browser discovery still reports no connection,
+  so physical keyboard/RTL/320px review remains pending. The full remaining
+  specification stays active.

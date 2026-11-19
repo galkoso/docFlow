@@ -4,7 +4,11 @@ article, form { background: #f8fafc; }
 button, select, input, textarea { font: inherit; max-width: 100%; }
 button { padding: .5rem .75rem; min-height: 2.75rem; cursor: pointer; white-space: normal; }
 button:disabled { cursor: default; }
-button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
+summary { cursor: pointer; padding-block: .75rem; }
+.book-documents { padding-inline-start: 1.25rem; }
+.book-documents li { margin-block: .8rem; }
+.book-documents a { margin-inline-end: .75rem; }
 label { display: block; margin-block-start: .7rem; }
 textarea, select { width: 100%; box-sizing: border-box; padding: .5rem; }
 textarea { resize: vertical; }

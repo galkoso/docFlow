@@ -11,7 +11,7 @@ import { DiscussionsView } from './discussions-view';
 import { discussionThreads } from '../../../testing/discussion-fixtures';
 import { reviewSnapshotExit } from './review-snapshot-exit';
 import { actor, proposal, snapshot, other, configuration, detail, history, metadata, files, media,
-  ticket, publication, job, prStatus, officialHistory, product } from '../../../testing/review-fixtures';
+  ticket, publication, job, prStatus, officialHistory, product, reviewDocuments } from '../../../testing/review-fixtures';
 
 @Component({ template: '<p>Elsewhere</p>' })
 class Away {}
@@ -89,7 +89,9 @@ describe('Review snapshots page', () => {
   it('protects discussion drafts on navigation, logout, reload and unload while retaining them through metadata refresh', async () => {
     const { harness, page, http, router, load, settle, guard } = await create(`?snapshot=${snapshot}`, product); load(); await settle();
     const discussions = harness.routeDebugElement!.query(By.directive(DiscussionsView)).componentInstance as DiscussionsView;
-    discussions.beginOpen(); discussions.body.set('Unsent discussion'); harness.detectChanges();
+    discussions.loadBook(); const book = reviewDocuments(product);
+    http.expectOne(req => req.url === `${snapshots}/${snapshot}/documents`).flush(book);
+    discussions.beginBook(book.documents[0]); discussions.body.set('Unsent discussion'); harness.detectChanges();
     page.decisionRecorded(); http.expectOne(req => req.url === snapshots).flush(history()); await settle();
     expect(discussions.body()).toBe('Unsent discussion');
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);

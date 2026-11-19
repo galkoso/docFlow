@@ -5,10 +5,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { SessionState } from '../../core/auth/session-state';
 import { DiscussionsView, type DiscussionScope } from './discussions-view';
 import { bookDiscussionThreads, discussionComments, discussionThreads, thread, comment } from '../../../testing/discussion-fixtures';
-import { actor, other, product, proposal, metadata, files } from '../../../testing/review-fixtures';
+import { actor, other, product, proposal, metadata, files, reviewDocuments, snapshot } from '../../../testing/review-fixtures';
 
 describe('Discussion UI', () => {
   const root = `/api/v1/proposals/${proposal}/threads`;
+  const documents = `/api/v1/proposals/${proposal}/review/snapshots/${snapshot}/documents`;
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); TestBed.inject(HttpTestingController).verify({ ignoreCancelled: true }); });
   async function create(viewer = product) {
     const profile = signal<{ user_id: string } | null>({ user_id: viewer }), logoutEpoch = signal(0);
@@ -29,6 +30,65 @@ describe('Discussion UI', () => {
     expect(fixture.nativeElement.querySelector('script, img, textarea')).toBeNull();
     view.act('resolve'); view.edit(view.comments()!.comments[0]); http.expectNone(req => req.method === 'POST');
     expect([...fixture.nativeElement.querySelectorAll('button')].every((b: any) => !!b.textContent?.trim())).toBe(true);
+  });
+  it('lets readers browse sealed documents and pinned reading links without opening a composer', async () => {
+    const { fixture, view, http } = await create(actor); view.loadBook(); const req = http.expectOne(r => r.url === documents);
+    expect(req.request.method).toBe('GET'); expect(req.request.headers.get('X-Expected-Actor')).toBe(actor);
+    expect(req.request.params.get('offset')).toBe('0'); expect(req.request.params.get('limit')).toBe('20');
+    req.flush(reviewDocuments(actor)); fixture.detectChanges(); view.beginBook(view.book()!.documents[0]); expect(view.draft()).toBeNull();
+    const link = fixture.nativeElement.querySelector('a') as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toContain(`commit=${metadata().metadata.summary.head_sha}&doc=DOC-BOOK-0`);
+    expect(link.target).toBe('_blank'); expect(link.rel).toContain('noopener'); http.expectNone(r => r.method === 'POST');
+  });
+  it('captures a selected book entry while paging and refresh preserve the original draft and frozen retry', async () => {
+    const { view, http } = await create(); view.loadBook(); http.expectOne(r => r.url === documents).flush(reviewDocuments(product, 0, 21));
+    const entry = view.book()!.documents[0]; view.beginBook({ ...entry }); expect(view.draft()).toBeNull();
+    view.beginBook(entry); view.body.set('Exact unchanged chapter note'); expect(view.mode()).toBe('book_document');
+    const d = view.draft(); if (d?.kind !== 'open') throw new Error('open draft required');
+    expect(Object.isFrozen(d.book?.source)).toBe(true);
+    view.loadBook(20); http.expectOne(r => r.url === documents).flush(reviewDocuments(product, 20, 21));
+    expect(view.body()).toBe('Exact unchanged chapter note'); expect(view.canSend()).toBe(true); view.send();
+    const post = http.expectOne(root), body = post.request.body;
+    expect(body.origin).toEqual({ kind: 'snapshot', snapshot_id: snapshot, expected_fingerprint: metadata().fingerprint,
+      anchor: { kind: 'book_document', entry_id: entry.id, selection: { kind: 'document' } } });
+    post.error(new ProgressEvent('error')); view.loadBook(); http.expectOne(r => r.url === documents).flush(reviewDocuments(product));
+    http.expectNone(r => r.method === 'POST'); view.retry(); const retry = http.expectOne(root); expect(retry.request.body).toBe(body);
+    retry.error(new ProgressEvent('error'));
+  });
+  it('submits bounded book sections and lines using the selected entry only', async () => {
+    const { view, http } = await create(); view.loadBook(); http.expectOne(r => r.url === documents).flush(reviewDocuments(product));
+    view.beginBook(view.book()!.documents[0]); view.body.set('Selected source'); view.mode.set('book_section');
+    view.sectionId.set('../private'); expect(view.canSend()).toBe(false); view.sectionId.set('SEC-BOOK'); view.send();
+    const section = http.expectOne(root); expect(section.request.body.origin.anchor.selection).toEqual({ kind: 'section', section_id: 'SEC-BOOK' });
+    section.flush({ error: { code: 'INVALID_DISCUSSION' } }, { status: 400, statusText: 'Invalid' });
+    view.mode.set('book_lines'); view.endLine.set(501); expect(view.canSend()).toBe(false);
+    view.endLine.set(500); view.send(); const lines = http.expectOne(root);
+    expect(lines.request.body.origin.anchor.selection).toEqual({ kind: 'lines', start_line: 1, end_line: 500 });
+    expect(lines.request.body.origin.anchor).not.toHaveProperty('source'); lines.error(new ProgressEvent('error'));
+  });
+  it('keeps legacy manifests unavailable while allowing general discussions', async () => {
+    const { fixture, view, http } = await create(); view.loadBook();
+    http.expectOne(r => r.url === documents).flush({ ...reviewDocuments(product, 0, 0), available: false }); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('לא נשמרה רשימת מסמכים מלאה');
+    view.beginBook(reviewDocuments(product).documents[0]); expect(view.draft()).toBeNull(); view.beginOpen();
+    view.body.set('General note'); expect(view.canSend()).toBe(true); http.expectNone(r => r.method === 'POST');
+  });
+  it('rejects foreign book metadata, cancels old pages and purges book drafts on scoped denial', async () => {
+    const { view, http } = await create(); view.loadBook(20); const old = http.expectOne(r => r.url === documents);
+    view.loadBook(); expect(old.cancelled).toBe(true); http.expectOne(r => r.url === documents).flush(reviewDocuments(actor));
+    expect(view.book()).toBeNull(); view.loadBook(); http.expectOne(r => r.url === documents).flush(reviewDocuments(product));
+    view.beginBook(view.book()!.documents[0]); view.body.set('Private note'); const denied = vi.fn(); view.accessDenied.subscribe(denied);
+    view.loadBook(); http.expectOne(r => r.url === documents).flush({}, { status: 404, statusText: 'Not Found' });
+    expect(denied).toHaveBeenCalledOnce(); expect(view.book()).toBeNull(); expect(view.body()).toBe(''); expect(view.draft()).toBeNull();
+  });
+  it('cancels document reads and erases captured entries when the account or selected snapshot changes', async () => {
+    const { view, http, fixture, scope, profile } = await create(); view.loadBook(); const read = http.expectOne(r => r.url === documents);
+    fixture.componentRef.setInput('scope', { ...scope, snapshot: null }); fixture.detectChanges(); expect(read.cancelled).toBe(true);
+    expect(view.book()).toBeNull(); http.expectOne(root).flush(discussionThreads(product));
+    fixture.componentRef.setInput('scope', scope); fixture.detectChanges(); http.expectOne(root).flush(discussionThreads(product));
+    view.loadBook(); http.expectOne(r => r.url === documents).flush(reviewDocuments(product));
+    view.beginBook(view.book()!.documents[0]); view.body.set('Private chapter'); profile.set({ user_id: other });
+    expect(view.book()).toBeNull(); fixture.detectChanges(); expect(view.draft()).toBeNull(); expect(view.body()).toBe('');
   });
   it('renders sealed book anchors as original source text without treating them as a diff side', async () => {
     const { fixture, view, http } = await create(actor); view.refresh(); const page = bookDiscussionThreads(actor);

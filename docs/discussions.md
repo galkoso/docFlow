@@ -333,5 +333,21 @@ file-anchor behavior remains supported.
 History returns the original book source/quote and marks outdated context without
 provider reads or relocation. The generated client and discussion interface
 validate and render book anchors as plain original-context text, separately from
-before/after diff sides. Public document browsing and the composer selection UI
-for complete-book entries remain pending.
+before/after diff sides.
+
+The discussion interface now loads the selected snapshot's complete document
+list on demand, including unchanged documents. Readers can page through it and
+open the pinned proposal book/document in a separate tab. Legacy snapshots show
+that their complete list is unavailable and keep general discussions available.
+Current writers can choose an entry and open a document, stable-section or
+original-line discussion. The composer captures an immutable copy of that entry;
+paging or refreshing the list preserves its selection and text. Detached entries
+and responses with mismatched actor, proposal, snapshot, fingerprint, head,
+catalog position or paging data are rejected.
+
+Book drafts use the same frozen request/retry, role checks and route/reload/logout/
+unload protection as other discussion drafts. Account/context changes and scoped
+access loss cancel document reads and purge captured private context. Pinned book
+links and labelled native controls preserve access to the original content while
+writing. Physical keyboard, RTL and 320px browser review remains pending because
+browser discovery reports no available connection.

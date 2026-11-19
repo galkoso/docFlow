@@ -180,7 +180,7 @@ as a new complete-book publication. Current membership and proposal/snapshot
 scope protect stored manifest reads without provider IO. Verified document,
 section and line source proofs now support complete-book discussion creation,
 including unchanged documents; see `docs/discussions.md`. Paged document browsing
-is described below; the composer picker follows as a separate integration stage.
+and composer selection use this sealed evidence, as described below.
 
 `GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/documents` now
 returns sealed head-book descriptors in catalog order, in pages of 1–100
@@ -189,7 +189,12 @@ invalid paging queries, and returns no-store responses. The response echoes
 actor, proposal, snapshot, fingerprint and frozen head; changing current proposal
 refs does not change these pages. Reads do not contact Git. Legacy snapshots
 return `available: false` with no entries, distinct from an available empty book.
-The generated client requests bounded pages for the upcoming composer picker.
+The generated client requests bounded pages for the composer picker. The shared
+review discussion panel loads this list on demand and offers pinned document
+reading links for all members. Writers can select unchanged documents and keep
+the exact entry/snapshot while composing; document paging does not retarget the
+draft. Actor/context loss clears private list/draft state, while route, reload,
+logout and unload guards protect unsent or uncertain work.
 
 An unchanged **active** snapshot can be reused in review/approved/changes-requested
 states. Reuse preserves proposal version and state, including `APPROVED`; it

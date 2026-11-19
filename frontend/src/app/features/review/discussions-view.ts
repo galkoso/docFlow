@@ -6,18 +6,19 @@ import {
   DiscussionApi, type DiscussionAction, type DiscussionComment, type DiscussionComments, type DiscussionIntent,
   type DiscussionThread, type DiscussionThreads, type OpenDiscussion,
 } from '../../core/api/discussion-api';
-import type { ReviewSnapshot } from '../../core/api/review-api';
+import { ReviewApi, type ReviewBookDocument, type ReviewDocuments, type ReviewSnapshot } from '../../core/api/review-api';
 import type { ComparisonChange } from '../../core/api/comparison-api';
 import { SessionState } from '../../core/auth/session-state';
 import { integer } from '../comparison/comparison-evidence';
 import { validDiscussionComments, validDiscussionReceipt, validDiscussionThreads } from './discussion-evidence';
+import { validReviewDocuments } from './review-documents-evidence';
 
 export interface DiscussionScope { actor: string; proposal: string; snapshot: ReviewSnapshot | null; file: ComparisonChange | null; }
-type Draft = { kind: 'open'; scope: DiscussionScope; version: number }
+type Draft = { kind: 'open'; scope: DiscussionScope; version: number; book: ReviewBookDocument | null }
   | { kind: 'reply'; thread: string; version: number; replyTo: string | null }
   | { kind: 'edit'; thread: string; version: number; comment: string; commentVersion: number };
 type Attempt = { scope: DiscussionScope; epoch: number; intent: DiscussionIntent };
-type Mode = 'proposal' | 'snapshot' | 'document' | 'section' | 'lines';
+type Mode = 'proposal' | 'snapshot' | 'document' | 'section' | 'lines' | 'book_document' | 'book_section' | 'book_lines';
 function frozen<T>(value: T): T {
   if (value && typeof value === 'object') { Object.values(value).forEach(frozen); Object.freeze(value); }
   return value;
@@ -30,15 +31,22 @@ export class DiscussionsView implements OnDestroy {
   readonly scope = input.required<DiscussionScope>();
   readonly accessDenied = output<void>();
   private readonly api = inject(DiscussionApi);
+  private readonly reviews = inject(ReviewApi);
   private readonly session = inject(SessionState);
   private owner: DiscussionScope | null = null;
   private epoch = -1;
   private listGeneration = 0;
   private detailGeneration = 0;
   private writeGeneration = 0;
+  private bookGeneration = 0;
   private listRead?: Subscription;
   private detailRead?: Subscription;
   private write?: Subscription;
+  private bookRead?: Subscription;
+  private readonly bookData = signal<ReviewDocuments | null>(null);
+  readonly bookLoading = signal(false);
+  readonly bookError = signal('');
+  readonly book = computed(() => this.owns(this.owner, this.epoch) ? this.bookData() : null);
   private timer?: ReturnType<typeof setInterval>;
   private readonly now = signal(Date.now());
   private readonly retryUntil = signal(0);
@@ -88,6 +96,33 @@ export class DiscussionsView implements OnDestroy {
     return [401, 404].includes(e?.status ?? 0) || e?.error?.error?.code === 'SESSION_IDENTITY_CHANGED';
   }
   private rejectAccess(): void { this.clear(); this.accessDenied.emit(); }
+  loadBook(offset = 0): void {
+    const scope = this.owner, epoch = this.epoch, snapshot = scope?.snapshot;
+    if (!snapshot || !this.owns(scope, epoch) || this.sending() || !integer(offset, 1000)) return;
+    this.bookRead?.unsubscribe(); const generation = ++this.bookGeneration;
+    this.bookData.set(null); this.bookLoading.set(true); this.bookError.set('');
+    this.bookRead = this.reviews.documents(scope!.actor, scope!.proposal, snapshot.snapshot_id, offset).pipe(timeout(20000)).subscribe({
+      next: value => {
+        if (generation !== this.bookGeneration || !this.owns(scope, epoch)) return;
+        this.bookLoading.set(false);
+        if (!validReviewDocuments(value, scope!.actor, scope!.proposal, snapshot, offset)) { this.bookError.set('רשימת המסמכים אינה תואמת לגרסת הסקירה שנבחרה.'); return; }
+        this.bookData.set(value);
+      },
+      error: e => {
+        if (generation !== this.bookGeneration || !this.owns(scope, epoch)) return;
+        this.bookLoading.set(false); if (this.denied(e)) { this.rejectAccess(); return; }
+        this.bookError.set('לא ניתן לטעון את מסמכי הספר כרגע.');
+      },
+    });
+  }
+  bookHref(entry: ReviewBookDocument): string | null {
+    const scope = this.scope(), snapshot = scope.snapshot;
+    return snapshot ? `/changes/${encodeURIComponent(scope.proposal)}/book?commit=${encodeURIComponent(snapshot.metadata.summary.head_sha)}&doc=${encodeURIComponent(entry.source.document_id!)}` : null;
+  }
+  beginBook(entry: ReviewBookDocument): void {
+    if (!this.book()?.available || !this.book()!.documents.includes(entry)) return;
+    this.openDraft(entry);
+  }
   refresh(): void { if (!this.sending()) { this.loadList(); if (this.selected()) this.loadComments(this.selected()!); } }
   page(after?: string): void { if (this.discard()) { this.selected.set(null); this.detail.set(null); this.loadList(after); } }
   private loadList(after?: string): void {
@@ -136,9 +171,13 @@ export class DiscussionsView implements OnDestroy {
     const page = this.comments(); if (page && this.discard()) this.loadComments(page.thread.id, page.thread.version, after);
   }
   beginOpen(): void {
+    this.openDraft();
+  }
+  private openDraft(book?: ReviewBookDocument): void {
     const v = this.view(); if (!v?.can_comment || !this.discard()) return;
-    this.draft.set({ kind: 'open', scope: this.scope(), version: v.proposal_version });
-    this.mode.set(this.scope().snapshot ? 'snapshot' : 'proposal'); this.blocking.set(false);
+    this.draft.set({ kind: 'open', scope: this.scope(), version: v.proposal_version,
+      book: book ? frozen({ ...book, source: { ...book.source } }) : null });
+    this.mode.set(book ? 'book_document' : this.scope().snapshot ? 'snapshot' : 'proposal'); this.blocking.set(false);
     this.side.set(this.scope().file?.after ? 'after' : 'before'); this.sectionId.set(''); this.startLine.set(1); this.endLine.set(1);
   }
   reply(comment?: DiscussionComment): void {
@@ -166,18 +205,20 @@ export class DiscussionsView implements OnDestroy {
     if (!snapshot) return null;
     const common = { kind: 'snapshot' as const, snapshot_id: snapshot.snapshot_id, expected_fingerprint: snapshot.fingerprint };
     if (this.mode() === 'snapshot') return { ...common, anchor: { kind: 'proposal' } };
-    const file = d.scope.file, side = file?.[this.side()];
-    if (!file || !side || !['document', 'catalog'].includes(file.kind)) return null;
+    const isBook = this.mode().startsWith('book_'), mode = isBook ? this.mode().slice(5) : this.mode();
+    const book = isBook ? d.book : null, file = d.scope.file, side = file?.[this.side()];
+    if (isBook ? !book : !file || !side || !['document', 'catalog'].includes(file.kind)) return null;
     let selection: { kind: 'document' } | { kind: 'section'; section_id: string } | { kind: 'lines'; start_line: number; end_line: number };
-    if (this.mode() === 'document') { if (file.kind !== 'document' || !side.document_id) return null; selection = { kind: 'document' }; }
-    else if (this.mode() === 'section') {
-      if (file.kind !== 'document' || !side.document_id || !/^[A-Z0-9-]{1,120}$/.test(this.sectionId())) return null;
+    if (mode === 'document') { if (!book && (file?.kind !== 'document' || !side?.document_id)) return null; selection = { kind: 'document' }; }
+    else if (mode === 'section') {
+      if (!book && (file?.kind !== 'document' || !side?.document_id) || !/^[A-Z0-9-]{1,120}$/.test(this.sectionId())) return null;
       selection = { kind: 'section', section_id: this.sectionId() };
-    } else if (this.mode() === 'lines' && integer(this.startLine(), Number.MAX_SAFE_INTEGER, 1)
+    } else if (mode === 'lines' && integer(this.startLine(), Number.MAX_SAFE_INTEGER, 1)
       && integer(this.endLine(), Number.MAX_SAFE_INTEGER, this.startLine()) && this.endLine() - this.startLine() < 500) {
       selection = { kind: 'lines', start_line: this.startLine(), end_line: this.endLine() };
     } else return null;
-    return { ...common, anchor: { kind: 'file', file_id: file.id, side: this.side(), selection } };
+    return { ...common, anchor: book ? { kind: 'book_document', entry_id: book.id, selection }
+      : { kind: 'file', file_id: file!.id, side: this.side(), selection } };
   }
   send(): void {
     if (!this.canSend()) return;
@@ -208,6 +249,7 @@ export class DiscussionsView implements OnDestroy {
     const attempt = this.pending();
     if (!attempt || this.sending() || this.retryWait() || !this.owns(attempt.scope, attempt.epoch) || !this.view()?.can_comment) return;
     ++this.listGeneration; ++this.detailGeneration; this.listRead?.unsubscribe(); this.detailRead?.unsubscribe();
+    ++this.bookGeneration; this.bookRead?.unsubscribe(); this.bookLoading.set(false);
     this.loading.set(false); this.reading.set(false); const generation = ++this.writeGeneration;
     this.sending.set(true); this.error.set(''); this.message.set('');
     this.write = this.api.write(attempt.scope.actor, attempt.scope.proposal, attempt.intent).pipe(timeout(90000)).subscribe({
@@ -246,6 +288,7 @@ export class DiscussionsView implements OnDestroy {
   private clear(): void {
     ++this.listGeneration; ++this.detailGeneration; ++this.writeGeneration;
     this.listRead?.unsubscribe(); this.detailRead?.unsubscribe(); this.write?.unsubscribe(); clearInterval(this.timer);
+    ++this.bookGeneration; this.bookRead?.unsubscribe(); this.bookData.set(null); this.bookLoading.set(false); this.bookError.set('');
     this.list.set(null); this.detail.set(null); this.selected.set(null); this.draft.set(null); this.pending.set(null); this.body.set('');
     this.loading.set(false); this.reading.set(false); this.sending.set(false); this.retryUntil.set(0); this.error.set(''); this.message.set('');
   }

@@ -4,6 +4,28 @@
   @if (message()) {<p role="status">{{ message() }}</p>}
   @if (loading()) {<p role="status">טוענים דיונים…</p>}
   <button type="button" (click)="refresh()" [disabled]="sending() || loading()">רענון דיונים והודעות</button>
+  @if (scope().snapshot) {
+    <details><summary>מסמכי הספר בגרסת הסקירה — כולל מסמכים שלא השתנו</summary>
+      <button type="button" (click)="loadBook()" [disabled]="sending() || bookLoading()">טעינת מסמכי הספר</button>
+      @if (bookLoading()) {<p role="status">טוענים מסמכים…</p>}
+      @if (bookError()) {<p role="alert">{{ bookError() }}</p>}
+      @if (book(); as page) {
+        @if (!page.available) {<p>בגרסה זו לא נשמרה רשימת מסמכים מלאה. אפשר לפתוח דיון כללי או לבחור גרסת סקירה חדשה.</p>}
+        @else {
+          <p>{{ page.total }} מסמכים בגרסת הספר שנבחרה.</p>
+          @if (!page.documents.length) {<p>אין מסמכים בעמוד זה.</p>}
+          <ol class="book-documents" [start]="page.offset + 1">@for (document of page.documents; track document.id) {
+            <li><p><bdi>{{ document.source.document_id }}</bdi> · <bdi>{{ document.source.path }}</bdi></p>
+              <a [href]="bookHref(document)" target="_blank" rel="noopener noreferrer">קריאת המסמך בכרטיסייה חדשה</a>
+              @if (view()?.can_comment) {<button type="button" (click)="beginBook(document)" [disabled]="hasDraft()">פתיחת דיון במסמך</button>}
+            </li>
+          }</ol>
+          <div class="actions">@if (page.offset) {<button type="button" (click)="loadBook(page.offset < 20 ? 0 : page.offset - 20)" [disabled]="sending()">מסמכים קודמים</button>}
+            @if (page.next_offset != null) {<button type="button" (click)="loadBook(page.next_offset)" [disabled]="sending()">מסמכים נוספים</button>}</div>
+        }
+      }
+    </details>
+  }
   @if (view(); as page) {
     <p>דיונים חוסמים פתוחים בכל ההצעה: <strong>{{ page.unresolved_blockers }}</strong></p>
     @if (page.can_comment) {<button type="button" (click)="beginOpen()" [disabled]="hasDraft()">פתיחת דיון חדש</button>}
@@ -72,19 +94,27 @@
         <select id="discussion-mode" [ngModel]="mode()" (ngModelChange)="mode.set($event)" name="mode" [disabled]="!!pending() || sending()">
           <option value="proposal">ההצעה כולה — גרסה שמורה {{ draft.version }}</option>
           @if (draft.scope.snapshot) {<option value="snapshot">גרסת הסקירה המוצגת</option>}
+          @if (draft.book) {
+            <option value="book_document">מסמך הספר שנבחר</option><option value="book_section">סעיף במסמך הספר שנבחר</option><option value="book_lines">שורות במקור של מסמך הספר שנבחר</option>
+          }
           @if (targetFile(); as file) {
             @if (file.kind === 'document') {<option value="document">המסמך שנבחר להשוואה</option><option value="section">סעיף במסמך שנבחר</option>}
             @if (file.kind === 'document' || file.kind === 'catalog') {<option value="lines">שורות בצד ההשוואה שנבחר</option>}
           }
         </select>
+        @if (mode() === 'book_document' || mode() === 'book_section' || mode() === 'book_lines') {
+          <p>המסמך שנבחר: <bdi>{{ draft.book?.source?.document_id }}</bdi> · <bdi>{{ draft.book?.source?.path }}</bdi></p>
+          <p>הדיון יישמר בגרסת הספר המקורית. טעינת עמוד מסמכים אחר אינה משנה את הבחירה.</p>
+          @if (draft.book; as document) {<a [href]="bookHref(document)" target="_blank" rel="noopener noreferrer">קריאת המסמך בכרטיסייה חדשה</a>}
+        }
         @if (mode() === 'document' || mode() === 'section' || mode() === 'lines') {
           <p>הקובץ שנבחר: <bdi>{{ targetFile()?.after?.path ?? targetFile()?.before?.path }}</bdi></p>
           <label for="discussion-side">צד ההשוואה</label><select id="discussion-side" name="side" [ngModel]="side()" (ngModelChange)="side.set($event)" [disabled]="!!pending() || sending()">
             @if (targetFile()?.before) {<option value="before">לפני</option>}@if (targetFile()?.after) {<option value="after">אחרי</option>}
           </select>
         }
-        @if (mode() === 'section') {<label for="discussion-section">מזהה הסעיף בגרסה שנבחרה</label><input id="discussion-section" name="section" [ngModel]="sectionId()" (ngModelChange)="sectionId.set($event)" [disabled]="!!pending() || sending()" dir="ltr" />}
-        @if (mode() === 'lines') {
+        @if (mode() === 'section' || mode() === 'book_section') {<label for="discussion-section">מזהה הסעיף בגרסה שנבחרה</label><input id="discussion-section" name="section" [ngModel]="sectionId()" (ngModelChange)="sectionId.set($event)" [disabled]="!!pending() || sending()" dir="ltr" />}
+        @if (mode() === 'lines' || mode() === 'book_lines') {
           <p>מספרי שורות במקור של הצד שנבחר, כולל שורות הכותרת. אפשר לבחור עד 500 שורות.</p>
           <label for="discussion-start">משורה</label><input id="discussion-start" type="number" min="1" name="start" [ngModel]="startLine()" (ngModelChange)="startLine.set($event)" [disabled]="!!pending() || sending()" />
           <label for="discussion-end">עד שורה</label><input id="discussion-end" type="number" min="1" name="end" [ngModel]="endLine()" (ngModelChange)="endLine.set($event)" [disabled]="!!pending() || sending()" />
@@ -94,7 +124,7 @@
       <label for="discussion-body">תוכן ההודעה</label><textarea id="discussion-body" name="body" rows="5" dir="auto" [ngModel]="body()" (ngModelChange)="body.set($event)" [disabled]="!!pending() || sending()"></textarea>
       <p>{{ length() }} / 10,000 תווים</p>
       <div class="actions"><button type="submit" [disabled]="!canSend()">שמירת ההודעה</button>
-        <button type="button" (click)="updateContext()" [disabled]="!!pending() || sending()">שימוש בהקשר העדכני לאחר בדיקה</button>
+        @if (draft.kind !== 'open' || mode() === 'proposal') {<button type="button" (click)="updateContext()" [disabled]="!!pending() || sending()">שימוש בהקשר העדכני לאחר בדיקה</button>}
         <button type="button" (click)="cancel()" [disabled]="sending()">ביטול הטיוטה</button></div>
     </form>
   }

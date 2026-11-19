@@ -5,6 +5,8 @@ use crate::{
     review_configuration::ReviewerSelection,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use specspace_git_adapter::CommitSha;
 use uuid::Uuid;
 
 /// Complete head-book identity, including documents absent from the diff.
@@ -14,6 +16,23 @@ use uuid::Uuid;
 pub struct ReviewBookDocument {
     pub id: String,
     pub source: Side,
+}
+impl ReviewBookDocument {
+    /// Pure metadata identity; this calculation does not verify source or grant
+    /// authority. The publication plan and source reader use the same encoding.
+    pub fn identity(
+        repository: Uuid,
+        head: &CommitSha,
+        source: &Side,
+    ) -> Result<String, serde_json::Error> {
+        let encoded = serde_json::to_vec(&(
+            "specspace-review-book-document-v1",
+            repository,
+            head.as_str(),
+            source,
+        ))?;
+        Ok(format!("{:x}", Sha256::digest(encoded)))
+    }
 }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]

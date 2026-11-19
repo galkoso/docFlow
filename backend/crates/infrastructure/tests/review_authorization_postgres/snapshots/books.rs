@@ -1,5 +1,157 @@
 use super::*;
 use serde_json::{Value, json};
+use specspace_application::comparison_file::{
+    ComparisonFileReader, FileReadError, book::ReviewBookAuthorization, discussion::TextSelection,
+};
+use specspace_infrastructure::review_files::{
+    PgReviewBookAuthorization, PgReviewFileAuthorization,
+};
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn unchanged_document_source_proofs_are_scoped_to_the_sealed_book_not_the_diff(pool: PgPool) {
+    let (f, source, preparer) = setup_book_options(&pool, false, None, false, None, true).await;
+    let (lease, verified) = prepared(&pool, &f, &preparer, 2).await;
+    let store = PgReviewSnapshots::new(pool.clone());
+    let publication = store.publish(&lease, &verified, &preparer).await.unwrap();
+    let viewer = user(&pool, f.org, "READER", vec![]).await;
+    let documents = store
+        .book_documents(viewer, f.proposal, publication.snapshot_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let entry = &documents[0];
+    assert_eq!(entry.source.document_id.as_deref(), Some("DOC-B"));
+    let authorization = Arc::new(PgReviewBookAuthorization::new(pool.clone()));
+    let base = ComparisonFileReader::new(
+        Arc::new(PgReviewFileAuthorization::new(pool.clone())),
+        Arc::new(Factory {
+            source: source.clone(),
+            repository: f.repository,
+        }),
+        Duration::from_secs(30),
+    )
+    .unwrap();
+    let reader = base.with_book_authorization(authorization.clone());
+    let reads = source.reads.load(Ordering::SeqCst);
+    let context = authorization
+        .resolve_document(viewer, f.proposal, publication.snapshot_id, &entry.id)
+        .await
+        .unwrap();
+    assert_eq!(context.head, sha(1));
+    assert_eq!(context.fingerprint, publication.fingerprint);
+    assert_eq!(context.scope.version, 3);
+    assert_eq!(context.document, *entry);
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
+    let proof = reader
+        .load_anchor(
+            viewer,
+            f.proposal,
+            publication.snapshot_id,
+            &entry.id,
+            TextSelection::Section {
+                section_id: "SEC-B".into(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(proof.text().quote().contains("Unchanged original body"));
+    assert_eq!(proof.commit(), &sha(1));
+    assert_eq!(proof.source().path, "docs/b.md");
+    assert_eq!(
+        proof.text().source_sha256(),
+        entry.source.sha256.as_deref().unwrap()
+    );
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads + 1);
+    // Book entry IDs do not become read authority in the diff namespace.
+    assert!(
+        base.load(viewer, f.proposal, publication.snapshot_id, &entry.id)
+            .await
+            .is_err()
+    );
+    for (proposal, snapshot, entry_id) in [
+        (Uuid::new_v4(), publication.snapshot_id, entry.id.as_str()),
+        (f.proposal, Uuid::new_v4(), entry.id.as_str()),
+        (
+            f.proposal,
+            publication.snapshot_id,
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        ),
+    ] {
+        assert!(
+            authorization
+                .resolve_document(viewer, proposal, snapshot, entry_id)
+                .await
+                .is_err()
+        );
+    }
+    sqlx::query("UPDATE proposals SET head_sha=$2,version=version+1 WHERE id=$1")
+        .bind(f.proposal)
+        .bind(sha(3).as_str())
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(reader.recheck(viewer, &proof).await.is_err());
+    let historical = reader
+        .load_anchor(
+            viewer,
+            f.proposal,
+            publication.snapshot_id,
+            &entry.id,
+            TextSelection::Document {},
+        )
+        .await
+        .unwrap();
+    assert_eq!(historical.commit(), &sha(1));
+    assert_eq!(historical.context().scope.recorded_head, sha(3));
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1")
+        .bind(viewer)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let reads = source.reads.load(Ordering::SeqCst);
+    assert!(reader.recheck(viewer, &historical).await.is_err());
+    assert!(
+        reader
+            .load_anchor(
+                viewer,
+                f.proposal,
+                publication.snapshot_id,
+                &entry.id,
+                TextSelection::Document {}
+            )
+            .await
+            .is_err()
+    );
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn changed_repository_bindings_cannot_authorize_original_book_source(pool: PgPool) {
+    let (f, source, preparer) = setup_media(&pool, false).await;
+    let (lease, verified) = prepared(&pool, &f, &preparer, 2).await;
+    let store = PgReviewSnapshots::new(pool.clone());
+    let published = store.publish(&lease, &verified, &preparer).await.unwrap();
+    let entry = store
+        .book_documents(f.owner, f.proposal, published.snapshot_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .remove(0);
+    let authorization = PgReviewBookAuthorization::new(pool.clone());
+    sqlx::query("UPDATE repositories SET remote_id='43' WHERE id=$1")
+        .bind(f.repository)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let reads = source.reads.load(Ordering::SeqCst);
+    assert!(matches!(
+        authorization
+            .resolve_document(f.owner, f.proposal, published.snapshot_id, &entry.id)
+            .await,
+        Err(FileReadError::Access(ComparisonReadError::ContextChanged))
+    ));
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
+}
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn migration_preserves_legacy_snapshots_without_fabricating_complete_book_evidence(
@@ -25,6 +177,14 @@ async fn migration_preserves_legacy_snapshots_without_fabricating_complete_book_
         .bind(original.snapshot_id).fetch_one(&pool).await.unwrap();
     assert_eq!(before, after);
     assert_eq!(version, 0);
+    let authorization = PgReviewBookAuthorization::new(pool.clone());
+    let entry = &verified.candidate().plan().book_documents()[0];
+    assert!(matches!(
+        authorization
+            .resolve_document(f.owner, f.proposal, original.snapshot_id, &entry.id)
+            .await,
+        Err(FileReadError::NotReady)
+    ));
     assert!(
         store
             .book_documents(f.owner, f.proposal, original.snapshot_id)

@@ -2105,3 +2105,19 @@ Checkboxes represent verified work only.
   source preservation, and rejection of malformed delimiter lines. The document
   engine suite passes, as do both focused front-matter cases and all 129 current
   application cases. Complete-book anchor integration remains separate work.
+
+- Complete-book anchor source verification: a separate current-member resolver
+  and bounded reader now derive opaque proofs from sealed complete-book entries,
+  including unchanged documents. Entry identity, frozen repository/head/path,
+  source byte count/blob/SHA-256 and stable document identity are checked before
+  returning original document/section/line anchors. Current authority is checked
+  around all successful asynchronous source boundaries and later proof reuse.
+  Shared two-source capacity, deadlines, cancellation and provider backoff are
+  preserved. Book entries do not authorize changed-file reads, and legacy
+  snapshots return not-ready. Nine application cases and database source,
+  binding and legacy cases cover the new path. Discussion write orchestration,
+  persistence/API acceptance and document browsing/UI remain to be connected;
+  the entire remaining specification stays active. The full backend run passes
+  663 tests with two existing performance measurements excluded. Workspace
+  Clippy/formatting pass; the exported OpenAPI is unchanged. The rebuilt local
+  API is ready. This stage adds no migration or public route.

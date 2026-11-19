@@ -1,6 +1,7 @@
 //! Authorized, source-verified file reads from immutable snapshots. Browser paths
 //! and refs never enter provider calls; only server-resolved immutable evidence.
 pub mod before_image;
+pub mod book;
 mod cache;
 pub mod discussion;
 pub mod image;

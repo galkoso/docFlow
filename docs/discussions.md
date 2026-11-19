@@ -287,3 +287,30 @@ surrounding review evidence. Metadata-only history refresh keeps discussion draf
 The layout wraps controls and text, has visible keyboard focus and native labelled
 inputs. Physical keyboard, RTL and 320px browser verification remains pending
 because no browser connection is available in this workspace session.
+
+## Complete-book source proofs
+
+`ReviewBookReader` can now derive document, stable-section or bounded-line
+anchors from the sealed complete head-book manifest, including unchanged
+documents. Its authorization namespace is separate from changed-file reads;
+book entries never become synthetic diff entries. Entry IDs bind repository,
+frozen head and the exact source descriptor with the same identity encoding
+used by publication.
+
+Current membership, proposal scope and frozen repository connection are checked
+before provider IO and again after connecting, reading and processing source.
+The reader fetches only the manifest path at the sealed head. It verifies byte
+count, Git blob identity and SHA-256, checks the stable document identity against
+actual front matter even for line selection, and captures original source ranges
+and bounded quotes. CRLF source remains byte-for-byte intact. Legacy snapshots
+without complete-book evidence return not-ready rather than borrowing current
+source or reconstructing a document from the diff.
+
+`VerifiedBookAnchor` has no deserialization, serialization or public constructor.
+It retains both current authority context and immutable source/snapshot identity;
+later awaits require a fresh recheck before the mutation transaction's own locked
+authority check. Read authority does not grant comment permission. Complete-book
+and changed-file readers share the existing two-source capacity and deadline;
+CPU work keeps its permit through cancellation. Provider backoff remains explicit
+for the mutation orchestrator. These proofs are not yet accepted by discussion
+writes or exposed through document browsing/UI; that integration remains pending.

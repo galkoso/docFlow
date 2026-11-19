@@ -1,7 +1,9 @@
 //! Shared review body authority. Current organization access and repository
 //! binding are re-read; paths, commits and media receipts come only from the
 //! sealed shared snapshot, never a browser locator or private comparison job.
+mod book;
 mod media;
+pub use book::PgReviewBookAuthorization;
 pub use media::PgReviewMediaAuthorization;
 
 use crate::comparison_authorization;
@@ -125,13 +127,7 @@ fn frozen_context(
     change: Change,
     published_after_image: Option<PublishedImageEvidence>,
 ) -> Result<FileReadContext, FileReadError> {
-    if binding.repository_id != scope.connection.repository
-        || binding.remote_id.parse::<u64>().ok() != Some(scope.connection.remote_id)
-        || binding.installation_id.parse::<u64>().ok() != Some(scope.connection.installation_id)
-        || binding.branch != scope.branch.as_str()
-    {
-        return Err(FileReadError::Access(ComparisonReadError::ContextChanged));
-    }
+    check_binding(&scope, &binding)?;
     Ok(FileReadContext {
         scope,
         snapshot,
@@ -145,4 +141,14 @@ fn frozen_context(
         change,
         published_after_image,
     })
+}
+fn check_binding(scope: &ReadContext, binding: &FrozenBinding) -> Result<(), FileReadError> {
+    if binding.repository_id != scope.connection.repository
+        || binding.remote_id.parse::<u64>().ok() != Some(scope.connection.remote_id)
+        || binding.installation_id.parse::<u64>().ok() != Some(scope.connection.installation_id)
+        || binding.branch != scope.branch.as_str()
+    {
+        return Err(FileReadError::Access(ComparisonReadError::ContextChanged));
+    }
+    Ok(())
 }

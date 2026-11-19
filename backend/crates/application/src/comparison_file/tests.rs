@@ -9,6 +9,7 @@ use std::sync::{
     Mutex,
     atomic::{AtomicUsize, Ordering},
 };
+mod book;
 
 fn sha(n: char) -> CommitSha {
     CommitSha::parse(n.to_string().repeat(40)).unwrap()

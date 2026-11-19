@@ -229,15 +229,9 @@ impl PreparedReview {
             {
                 return Err(ReviewError::Invalid("REVIEW_DOCUMENT_IDENTITY_INVALID"));
             }
-            let identity = serde_json::to_vec(&(
-                "specspace-review-book-document-v1",
-                loaded.repository(),
-                loaded.head().as_str(),
-                side,
-            ))
-            .map_err(|_| ReviewError::Invalid("REVIEW_FINGERPRINT_FAILED"))?;
             book_documents.push(ReviewBookDocument {
-                id: format!("{:x}", Sha256::digest(identity)),
+                id: ReviewBookDocument::identity(loaded.repository(), loaded.head(), side)
+                    .map_err(|_| ReviewError::Invalid("REVIEW_FINGERPRINT_FAILED"))?,
                 source: (*side).clone(),
             });
         }

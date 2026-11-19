@@ -11,6 +11,7 @@ export class SharedReviewState implements OnDestroy {
   private readonly api = inject(ReviewApi);
   private requests = new Subscription();
   private generation = 0;
+  private historyAfter?: string;
   readonly owner = signal<string | null>(null);
   readonly history = signal<ReviewHistory | null>(null);
   readonly snapshot = signal<ReviewSnapshot | null>(null);
@@ -22,6 +23,7 @@ export class SharedReviewState implements OnDestroy {
   readonly authRequired = signal(false);
   open(actor: string, proposal: string, location: ReviewLocation): void {
     this.clear(); this.owner.set(actor);
+    this.historyAfter = location.after;
     if (!uuid(actor) || !uuid(proposal) || location.snapshot != null && !uuid(location.snapshot) || location.after != null && !uuid(location.after)
       || !integer(location.files, 40000) || !integer(location.media, 20000)
       || !location.snapshot && (location.files !== 0 || location.media !== 0)) {
@@ -55,6 +57,23 @@ export class SharedReviewState implements OnDestroy {
             }, error: error => { if (generation === this.generation) this.failure(error); },
           }));
       }, error: error => { if (generation === this.generation) this.failure(error); },
+    }));
+  }
+  refreshHistory(actor: string, proposal: string): void {
+    if (this.owner() !== actor || !this.snapshot()) return;
+    const generation = this.generation, after = this.historyAfter;
+    this.requests.add(this.api.history(actor, proposal, after).pipe(timeout(20000)).subscribe({
+      next: value => {
+        if (generation !== this.generation || this.owner() !== actor) return;
+        if (!validHistory(value, proposal, after)) { this.invalid(); return; }
+        this.history.set(value);
+      },
+      error: error => {
+        if (generation !== this.generation) return;
+        if ([401, 403, 404].includes(error?.status) || error?.error?.error?.code === 'SESSION_IDENTITY_CHANGED') {
+          this.clear(); this.authRequired.set(true);
+        } else this.error.set('ההחלטה נשמרה, אך פרטי מצב ההצעה לא עודכנו בתצוגה. יש לטעון אותם מחדש.');
+      },
     }));
   }
   private invalid(): void { this.snapshot.set(null); this.files.set(null); this.media.set(null); this.phase.set('error'); this.error.set('נתוני גרסת הסקירה אינם תואמים לבקשה. יש לטעון את הגרסה מחדש.'); }

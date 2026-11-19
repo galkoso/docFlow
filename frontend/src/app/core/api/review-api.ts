@@ -14,6 +14,9 @@ export type ReviewPrStatus = components['schemas']['ReviewPrStatus'];
 export type PrRecoveryRequest = components['schemas']['PrRecoveryRequest'];
 export type PrRecoveryAccepted = components['schemas']['PrRecoveryAccepted'];
 export type ReviewDetail = components['schemas']['ProposalDetail'];
+export type OfficialHistory = components['schemas']['OfficialReviewHistory'];
+export type OfficialRequest = components['schemas']['OfficialReviewRequest'];
+export type OfficialRecorded = components['schemas']['OfficialReviewRecorded'];
 
 @Injectable({ providedIn: 'root' })
 export class ReviewApi {
@@ -48,6 +51,14 @@ export class ReviewApi {
     return this.http.get<ReviewMedia>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/media`, {
       headers: this.actor(actor), params: { offset, limit: 50 },
     });
+  }
+  decisions(actor: string, proposal: string, snapshot: string, after?: string) {
+    return this.http.get<OfficialHistory>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/decisions`, {
+      headers: this.actor(actor), params: after ? { after } : {},
+    });
+  }
+  recordDecision(actor: string, proposal: string, snapshot: string, body: Readonly<OfficialRequest>) {
+    return this.http.post<OfficialRecorded>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/decisions`, body, { headers: this.actor(actor) });
   }
   private actor(actor: string) { return { 'X-Expected-Actor': actor }; }
   private proposal(id: string) { return `/api/v1/proposals/${encodeURIComponent(id)}`; }

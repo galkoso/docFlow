@@ -1908,3 +1908,19 @@ Checkboxes represent verified work only.
   Migration 019 is applied locally. Required-check publication/current-evidence
   assembly, section coverage, discussion/product blockers, merge, bundles and all
   remaining full-spec requirements remain open.
+
+- Official reviewer controls: the selected saved snapshot now displays paged
+  decision history, current assignment hints and explicit domain-scoped comment,
+  revision-request and approve-all controls. Full approval scope and unseen-content
+  warnings stay visible; every action requires an explanation. Captured immutable
+  request IDs survive uncertain replies for explicit replay, while history refresh
+  remains GET-only and Retry-After prevents premature retry. Live actor/logout/
+  snapshot checks reject late responses; scoped denial clears sibling content and
+  notes. Route/query changes, reload, logout and unload guard unsent notes or
+  unresolved requests. Saved decisions refresh proposal metadata without replacing
+  the displayed immutable snapshot. All 427 frontend tests pass across 48 files;
+  the production build passes. The restarted local API is ready and the live
+  decisions route enforces authentication. Browser verification could not run
+  because no browser is connected; physical keyboard/RTL/320px acceptance remains
+  open. Required policy/check integration, sections/discussions/product decisions,
+  merge, bundles and all unfinished full-spec requirements remain pending.

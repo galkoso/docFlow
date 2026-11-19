@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject, OnDestroy, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject, OnDestroy, signal, untracked, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -7,15 +7,18 @@ import { stateLabel } from '../proposals/proposal-labels';
 import { ReviewSubmission } from './review-submission';
 import { SharedReviewBody } from './shared-review-body';
 import { ReviewPrStatusView } from './review-pr-status';
+import { OfficialReviewsView } from './official-reviews-view';
 import type { RawScope } from '../comparison/raw-state';
 import { SharedReviewState } from './shared-review-state';
 import { reviewLocation, type ReviewPageLocation } from './review-location';
 
 @Component({
-  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody, ReviewPrStatusView], providers: [ReviewSubmission, SharedReviewState],
+  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody, ReviewPrStatusView, OfficialReviewsView],
+  providers: [ReviewSubmission, SharedReviewState],
   changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './review-snapshots-page.html', styleUrl: './review-snapshots-page.css',
 })
 export class ReviewSnapshotsPage implements OnDestroy {
+  private readonly official = viewChild(OfficialReviewsView);
   readonly session = inject(SessionState);
   readonly submission = inject(ReviewSubmission);
   readonly state = inject(SharedReviewState);
@@ -101,6 +104,7 @@ export class ReviewSnapshotsPage implements OnDestroy {
     }
   }
   reload(): void {
+    if (this.official()?.hasDraft() && !this.canLeave()) return;
     const actor = this.session.profile()?.user_id, proposal = this.proposal();
     if (!actor || !proposal) return;
     let location = this.location();
@@ -129,11 +133,23 @@ export class ReviewSnapshotsPage implements OnDestroy {
   setMode(mode: 'raw' | 'readable'): void { if (this.fileScope()) this.navigate({ mode, unit: null }); }
   selectUnit(unit: string | null): void { if (this.fileScope()) this.navigate({ unit }); }
   bodyDenied(): void { this.blocked.set(true); this.state.clear(); this.routeKey = ''; }
+  decisionRecorded(): void {
+    const actor = this.session.profile()?.user_id, proposal = this.proposal();
+    if (actor && proposal && this.visible()) this.state.refreshHistory(actor, proposal);
+  }
   mediaPage(offset: number): void { this.navigate({ snapshot: this.state.selected(), media: offset }); }
   historyPage(after: string | null): void { this.navigate({ after }); }
   previous(offset: number): number { return Math.max(0, offset - 50); }
   private navigate(params: Record<string, string | number | null>, replaceUrl = false): void {
     void this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge', replaceUrl });
+  }
+  canNavigate(url?: string): boolean {
+    if (!url || url.split('?')[0] !== this.router.url.split('?')[0]) return this.canLeave();
+    const next = reviewLocation(this.router.parseUrl(url).queryParamMap), current = this.location();
+    const selected = next?.snapshot ?? this.state.history()?.active_snapshot_id ?? this.state.history()?.snapshots[0]?.snapshot_id;
+    if (next && current && selected === this.state.snapshot()?.snapshot_id && next.files === current.files && next.media === current.media
+      && (next.after ?? '') === (current.after ?? '')) return true;
+    return this.canLeave();
   }
   phaseLabel(phase: string): string {
     return ({ checking: 'בודקים את הגרסה השמורה', prepared: 'מוכנה לשליחה', sending: 'שולחים את הבקשה', observing: 'בודקים את העבודה הקיימת', uncertain: 'תוצאת השליחה טרם אומתה',
@@ -147,8 +163,11 @@ export class ReviewSnapshotsPage implements OnDestroy {
     return ({ IMAGE_ALT_REQUIRED: 'חסר תיאור חלופי לתמונה', UNSUPPORTED_HTML: 'בלוק HTML דורש בדיקה במקור',
       UNSUPPORTED_HEADING_LEVEL: 'רמת הכותרת אינה נתמכת בעורך' } as Record<string, string>)[value] ?? value;
   }
-  canLeave(): boolean { return !this.submission.pending() || window.confirm('בקשת שליחה עדיין ממתינה או שתוצאתה אינה ודאית. ייתכן שהעבודה נמשכת בשרת; לעזוב ולבדוק את הגרסאות בכניסה הבאה?'); }
+  canLeave(): boolean {
+    return !this.submission.pending() && !this.official()?.hasDraft()
+      || window.confirm('טיוטה או בקשת סקירה עדיין ממתינה או שתוצאתה אינה ודאית. לעזוב ולבדוק את הגרסאות וההיסטוריה בכניסה הבאה?');
+  }
   @HostListener('window:beforeunload', ['$event'])
-  beforeUnload(event: BeforeUnloadEvent): void { if (this.submission.pending()) { event.preventDefault(); event.returnValue = ''; } }
+  beforeUnload(event: BeforeUnloadEvent): void { if (this.submission.pending() || this.official()?.hasDraft()) { event.preventDefault(); event.returnValue = ''; } }
   ngOnDestroy(): void { this.releaseLogout(); this.state.clear(); this.submission.clear(); }
 }

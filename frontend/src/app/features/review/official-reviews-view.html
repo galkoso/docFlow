@@ -1,0 +1,45 @@
+<section aria-label="החלטות סקירה רשמיות">
+  <h3>החלטות סקירה רשמיות</h3>
+  <p>ההחלטות מתייחסות לכל השינויים בגרסה המוצגת בתחום הסקירה שנבחר. אישור אינו מפרסם תוכן באפיון המאושר.</p>
+  @if (busy()) {<p role="status">טוענים החלטות סקירה…</p>}
+  @if (sending()) {<p role="status">בודקים הרשאות וענפים ושומרים החלטה…</p>}
+  @if (error(); as error) {<p role="alert">{{ error }}</p>}
+  @if (message(); as message) {<p role="status">{{ message }}</p>}
+  @if (pending()) {<p>הטקסט והגרסה של הבקשה המקורית נשמרים בעמוד עד לאימות התוצאה.</p>
+    @if (retryWait()) {<p>ניתן לנסות שוב בעוד {{ retryWait() }} שניות.</p>}
+    <button type="button" (click)="retry()" [disabled]="sending() || busy() || !!retryWait()">בדיקת אותה בקשת סקירה</button>}
+  @if (view(); as history) {
+    @if (!history.current_for_metadata) {<p>זו גרסה היסטורית או שאינה תואמת לפרטי ההצעה השמורים כעת. לא ניתן להגיש לה החלטה חדשה.</p>}
+    @if (history.domains.length) {
+      <form (ngSubmit)="send()">
+        <fieldset [disabled]="sending() || !!pending()"><legend>החלטה בתחום האחריות שלי</legend>
+          <label>תחום סקירה <select name="review-domain" [ngModel]="domain()" (ngModelChange)="domain.set($event)">
+            @for (item of history.domains; track item) {<option [value]="item">{{ area(item) }}</option>}
+          </select></label>
+          <label>סוג החלטה <select name="review-decision" [ngModel]="decision()" (ngModelChange)="decision.set($event)">
+            <option value="COMMENT">הערת סקירה</option><option value="REQUEST_CHANGES">בקשת תיקונים</option>
+            <option value="APPROVE_ALL" [disabled]="!history.approve_all_available">אישור כל שינויי הגרסה</option>
+          </select></label>
+          @if (!history.approve_all_available) {<p>אישור כל השינויים דורש גרסה נוכחית, בסיס מעודכן והכרעה בהשפעת הממשק.</p>}
+          @if (decision() === 'APPROVE_ALL') {<p role="note">האישור חל על כל השינויים בגרסה זו בתחום {{ area(domain()) }}. אין תיעוד שרתי של מעבר על כל המקטעים; ייתכן שיש תוכן שטרם צפית בו. יש לבדוק אותו לפני אישור.</p>}
+          <label>הסבר להחלטה <textarea name="review-explanation" rows="5" maxlength="20000" [ngModel]="explanation()" (ngModelChange)="explanation.set($event)"></textarea></label>
+          <p>{{ length() }} / 10,000 תווים. ההסבר נדרש גם לאישור וגם לבקשת תיקונים.</p>
+          <button type="submit" [disabled]="!canSend()">{{ label(decision()) }} לגרסה זו</button>
+        </fieldset>
+      </form>
+    } @else {<p>אין לך תחום סקירה כשיר ומוקצה להגשת החלטה חדשה בגרסה זו.</p>
+      @if (explanation()) {<label>טיוטת ההסבר מהעמוד <textarea readonly [value]="explanation()"></textarea></label>}}
+    <p>הכשירות המוצגת נבדקה מול הנתונים השמורים באתר. מצב הענפים וההרשאות נבדק שוב בשליחה ולפני מיזוג.</p>
+    <p>נתוני ההחלטות והכשירות נקראו ב־{{ history.read_at | date:'dd/MM/yyyy HH:mm:ss' }}.</p>
+    @if (!history.entries.length) {<p>אין החלטות בעמוד זה.</p>}
+    <ol>@for (item of history.entries; track item.id) {<li>
+      <p><strong>{{ item.reviewer_name }}</strong> · {{ area(item.domain) }} · {{ label(item.decision) }} · {{ item.recorded_at | date:'dd/MM/yyyy HH:mm:ss' }}</p>
+      <p class="explanation">{{ item.explanation }}</p>
+      @if (item.effective) {<p>{{ item.valid_for_stored_context ? 'ההחלטה האחרונה של הסוקר בתחום זה; מתאימה להקשר השמור.' : 'ההחלטה האחרונה בתחום זה נשמרת בהיסטוריה, אך אינה תקפה להקשר השמור כעת.' }}</p>}
+      @else if (item.decision !== 'COMMENT') {<p>החלטה קודמת שהוחלפה בהחלטה מפורשת.</p>}
+      @if (!item.reviewer_eligible) {<p>הסוקר אינו כשיר כעת בתחום זה.</p>}
+    </li>}</ol>
+    @if (history.next_after) {<button type="button" (click)="refresh(history.next_after)" [disabled]="sending() || busy()">החלטות קודמות</button>}
+  }
+  <button type="button" (click)="refresh()" [disabled]="sending() || busy()">טעינת ההחלטות האחרונות</button>
+</section>

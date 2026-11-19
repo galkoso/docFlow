@@ -8,24 +8,24 @@ import { SessionState } from '../../core/auth/session-state';
 import { ReviewSnapshotsPage } from './review-snapshots-page';
 import { reviewSnapshotExit } from './review-snapshot-exit';
 import { actor, proposal, snapshot, other, configuration, detail, history, metadata, files, media,
-  ticket, publication, job, prStatus } from '../../../testing/review-fixtures';
+  ticket, publication, job, prStatus, officialHistory, product } from '../../../testing/review-fixtures';
 
 @Component({ template: '<p>Elsewhere</p>' })
 class Away {}
 describe('Review snapshots page', () => {
   afterEach(() => vi.restoreAllMocks());
   const route = `/changes/${proposal}/review/snapshots`, root = `/api/v1/proposals/${proposal}`, snapshots = `${root}/review/snapshots`;
-  async function create(query = `?snapshot=${snapshot}`) {
+  async function create(query = `?snapshot=${snapshot}`, viewer = actor) {
     const profile = signal<{ user_id: string } | null>(null), logoutEpoch = signal(0); let guard = () => true;
     const released = vi.fn();
     await TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(),
-      provideRouter([{ path: 'changes/:id/review/snapshots', component: ReviewSnapshotsPage, canDeactivate: [reviewSnapshotExit] }, { path: 'away', component: Away }]),
+      provideRouter([{ path: 'changes/:id/review/snapshots', component: ReviewSnapshotsPage, canDeactivate: [reviewSnapshotExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange' }, { path: 'away', component: Away }]),
       { provide: SessionState, useValue: { profile, logoutEpoch, status: () => profile() ? 'authenticated' : 'anonymous', refresh: vi.fn(),
         guardLogout: (callback: () => boolean) => { guard = callback; return released; } } }],
     }).compileComponents();
     const harness = await RouterTestingHarness.create(), page = await harness.navigateByUrl(`${route}${query}`, ReviewSnapshotsPage);
     const http = TestBed.inject(HttpTestingController), router = TestBed.inject(Router);
-    profile.set({ user_id: actor }); harness.detectChanges();
+    profile.set({ user_id: viewer }); harness.detectChanges();
     const settle = async () => { await harness.fixture.whenStable(); harness.detectChanges(); };
     const load = (unsafe = false) => {
       const value = history(), body = metadata();
@@ -36,6 +36,7 @@ describe('Review snapshots page', () => {
       http.expectOne(req => req.url === `${snapshots}/${snapshot}/files`).flush(files());
       http.expectOne(req => req.url === `${snapshots}/${snapshot}/media`).flush(media()); harness.detectChanges();
       http.expectOne(`${snapshots}/${snapshot}/pr-sync`).flush(prStatus()); harness.detectChanges();
+      http.expectOne(`${snapshots}/${snapshot}/decisions`).flush(officialHistory(viewer)); harness.detectChanges();
     };
     const prepare = () => { page.prepare(); http.expectOne(`${root}/review/configuration`).flush(configuration()); http.expectOne(root).flush(detail()); harness.detectChanges(); };
     return { harness, page, http, router, profile, logoutEpoch, released, guard: () => guard(), settle, load, prepare };
@@ -64,6 +65,22 @@ describe('Review snapshots page', () => {
     await settle(); expect(page.blocked()).toBe(true); expect(page.state.snapshot()).toBeNull();
     expect(harness.routeNativeElement!.querySelector('app-shared-review-body')).toBeNull();
     expect(harness.routeNativeElement!.querySelector('app-review-pr-status')).toBeNull(); http.verify();
+  });
+  it('protects an unsent official decision on query navigation, route leave, logout, unload and reload', async () => {
+    const { harness, page, http, router, load, settle, guard } = await create(`?snapshot=${snapshot}`, product); load(); await settle();
+    const note = harness.routeNativeElement!.querySelector('textarea[name="review-explanation"]') as HTMLTextAreaElement;
+    note.value = 'Unsent official review'; note.dispatchEvent(new Event('input')); harness.detectChanges(); await settle();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    expect(await router.navigateByUrl(`${route}?snapshot=${other}`)).toBe(false);
+    expect(router.url).toContain(`snapshot=${snapshot}`); expect(await router.navigateByUrl('/away')).toBe(false); expect(guard()).toBe(false);
+    page.reload(); http.expectNone(req => req.url === snapshots);
+    const unload = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent; page.beforeUnload(unload); expect(unload.defaultPrevented).toBe(true);
+    confirm.mockReturnValue(true); expect(await router.navigateByUrl('/away')).toBe(true); http.verify();
+  });
+  it('refreshes proposal metadata after a decision without replacing the displayed snapshot', async () => {
+    const { page, http, load, settle } = await create(); load(); await settle(); const displayed = page.state.snapshot();
+    page.decisionRecorded(); http.expectOne(req => req.url === snapshots).flush({ ...history(), current_proposal_state: 'CHANGES_REQUESTED' }); await settle();
+    expect(page.state.history()?.current_proposal_state).toBe('CHANGES_REQUESTED'); expect(page.state.snapshot()).toBe(displayed); http.verify();
   });
   it('restores a job URL through observation only, never reconstructing a submission', async () => {
     const { page, http, load, settle } = await create(`?snapshot=${snapshot}&job=${ticket.job_id}`); load();

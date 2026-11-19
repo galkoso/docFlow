@@ -53,7 +53,17 @@ remaining Retry-After seconds. Receipt replay bypasses provider IO, quota and
 cooldown after current reviewer access is checked. Provider failures do not close
 the proposal or delete its saved snapshot.
 
-Reviewer controls are added in the following implementation stage.
+The shared review page displays history to readers and shows decision controls
+only for server-provided current qualified assignments. Approve-all explains the
+whole-snapshot/domain scope, requires an explanation and always warns that no
+server section-visit receipts exist yet. Submitting still rechecks fresh authority
+and refs. A lost or unverified reply retains one immutable body/request ID for an
+explicit retry; history refresh never sends a POST. Known context rejection keeps
+the unsent text available for correction, and Retry-After blocks premature retry.
+Account/snapshot/logout changes cancel requests and discard late responses; scoped
+access denial purges sibling saved content as well. Notes/uncertain requests guard
+route/query navigation, reload, logout and unload. A saved decision refreshes the
+proposal header without replacing the displayed immutable snapshot.
 
 Section visits/coverage, broader threaded discussions and product questions,
 current policy-evidence assembly, required-check publication/reconciliation and

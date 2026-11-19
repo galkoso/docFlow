@@ -1,6 +1,11 @@
 import type { ReviewConfiguration } from '../app/core/api/review-configuration-api';
 import type { ReviewAccepted, ReviewDetail, ReviewFiles, ReviewHistory, ReviewJob, ReviewMedia,
-  ReviewPublication, ReviewSnapshot, ReviewPrStatus } from '../app/core/api/review-api';
+  ReviewPublication, ReviewSnapshot, ReviewPrStatus, OfficialHistory } from '../app/core/api/review-api';
+
+export const officialHistory = (viewer = actor): OfficialHistory => ({ proposal_id: proposal, snapshot_id: snapshot, fingerprint: metadata().fingerprint,
+  head_sha: head, target_sha: target, policy_version: 1, configuration_version: 2, current_for_metadata: true,
+  domains: viewer === product ? ['PRODUCT'] : [], approve_all_available: false, unviewed_content_warning: true,
+  read_at: '2026-11-19T00:00:01Z', entries: [], next_after: null });
 
 export const prStatus = (): ReviewPrStatus => ({ proposal_id: proposal, snapshot_id: snapshot, fingerprint: metadata().fingerprint,
   head_sha: head, target_sha: target, current_for_sync: true, binding_current: true, read_at: '2026-11-18T00:00:01Z',

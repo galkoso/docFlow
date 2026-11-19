@@ -13,7 +13,7 @@ export const routes: Routes = [
   { path: 'changes/:id/diff', title: 'השוואת השינוי | SpecSpace', loadComponent: () => import('./features/comparison/comparison-page').then(m => m.ComparisonPage) },
   { path: 'changes/:id/review', title: 'הגדרת סקירה | SpecSpace', canDeactivate: [reviewExit],
     loadComponent: () => import('./features/review/review-configuration-page').then(m => m.ReviewConfigurationPage) },
-  { path: 'changes/:id/review/snapshots', title: 'גרסאות סקירה | SpecSpace', canDeactivate: [reviewSnapshotExit],
+  { path: 'changes/:id/review/snapshots', title: 'גרסאות סקירה | SpecSpace', canDeactivate: [reviewSnapshotExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange',
     loadComponent: () => import('./features/review/review-snapshots-page').then(m => m.ReviewSnapshotsPage) },
   { path: 'changes/:id/book', title: 'תוכן ההצעה | SpecSpace', loadComponent: () => import('./features/specification/specification').then(m => m.Specification) },
   { path: 'changes/:id/edit/:document', title: 'עריכת הצעה | SpecSpace', canDeactivate: [editorExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange',

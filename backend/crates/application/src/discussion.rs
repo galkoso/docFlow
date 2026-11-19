@@ -1,5 +1,6 @@
 //! Browser intent only. Paths, refs, source digests, quotes, roles and trusted
 //! anchor evidence cannot be supplied through these request types.
+pub mod read;
 use crate::comparison_file::discussion::{AnchorSide, TextSelection};
 use serde::{Deserialize, Serialize};
 use specspace_domain::discussion::CommentBody;

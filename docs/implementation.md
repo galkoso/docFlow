@@ -1996,3 +1996,17 @@ Checkboxes represent verified work only.
   public API contract is unchanged. Read endpoints, HTTP orchestration/source backoff,
   reviewer UI, unchanged-document anchors, provider/check integration and every
   unfinished full-spec requirement remain pending.
+
+- Current discussion reads: member-scoped repeatable-read projections now expose
+  original immutable anchors, thread state, current message bodies/tombstones,
+  author/resolver identities and UTC times. Current-role capabilities preserve
+  author-only message changes and independent-reviewer blocker rules. Scoped
+  keyset pages retain creation order; continued comment paging requires the same
+  thread version and rejects intervening changes. Old/edited message bodies are
+  not returned. Outdated context uses recorded refs/bindings without provider IO;
+  metadata-only changes preserve context and all unresolved historical blockers
+  still count. Migration 021 adds thread/message/resolution indexes. Five new
+  database cases cover roles, tombstones, resolution identity, pagination,
+  current access, stale origins and provider-free reads. Read HTTP routes,
+  mutation orchestration/source backoff, reviewer UI and full-spec integration
+  are tracked as separate stages.

@@ -1,4 +1,6 @@
 use super::*;
+#[path = "history.rs"]
+mod history;
 use serde_json::{Value, json};
 use specspace_application::{
     comparison_file::{

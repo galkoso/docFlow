@@ -7,6 +7,7 @@ use specspace_document_engine::discussion_anchor::{AnchorError, MAX_SELECTED_LIN
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AnchorSide {
     Before,
     After,

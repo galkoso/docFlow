@@ -15,6 +15,7 @@ use specspace_domain::{
 };
 use sqlx::{FromRow, PgConnection, PgPool, Postgres, Transaction};
 use uuid::Uuid;
+mod history;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DiscussionStoreError {

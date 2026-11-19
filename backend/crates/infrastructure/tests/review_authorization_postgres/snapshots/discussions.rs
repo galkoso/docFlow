@@ -1,4 +1,6 @@
 use super::*;
+#[path = "discussions/service.rs"]
+mod service;
 
 struct Revision {
     thread: Uuid,

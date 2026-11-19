@@ -1,8 +1,8 @@
 # Discussions
 
 Implementation of specification REV-03–06 is in progress. The source-selection
-engine, pure authorization rules and append-only database schema are available.
-Authenticated mutation services, APIs, reviewer UI and required-check integration
+engine, pure authorization rules, append-only database schema and authenticated
+mutation services are available. APIs, reviewer UI and required-check integration
 are not yet connected.
 
 ## Source anchors
@@ -124,3 +124,42 @@ fresh policy, validate full Unicode comment bodies, compare expected versions,
 perform source work without a database transaction, and recheck the final scope.
 No discussion HTTP endpoint or runtime merge enforcement is provided by the
 schema alone.
+
+## Mutation service
+
+`PgDiscussions::admit_open` validates text/selection intent and current write
+permission, checks the expected proposal version or snapshot fingerprint, handles
+exact recorded replay, and commits a durable admission. It returns an opaque
+`OpenAdmission`, with no database connection held. A caller resolves any requested
+file anchor through the shared immutable reader only after this admission.
+
+`complete_open` accepts that admission and the requested opaque file proof. It
+locks current proposal/membership/repository scope again, rejects intervening
+scope changes, and checks the proof's actor, organization, proposal, snapshot,
+provider binding, refs, selected side/file and selection. Missing, opposite-side
+or differently selected evidence cannot open the thread. A historical snapshot
+retains its historical refs even after the recorded proposal head advances.
+Proposal-wide discussions work before the first saved review and require no
+provider read. Snapshot-wide discussions also require no file proof.
+
+`mutate` handles replies, author-only edits/tombstones, resolution, reopening and
+blocking changes in one database transaction. Every new action compares the
+expected thread version; edits/tombstones also compare the expected comment
+version. Reply targets are scoped to the same thread. Tombstoned messages cannot
+be edited back into existence. Discussion actions preserve proposal content,
+proposal versions and official-review decisions; existing closed/merged content
+does not become editable through this service.
+
+Receipts bind the actor, request, proposal, thread/revision and optional comment
+version. Request hashes bind the complete exact intent, including its target.
+Exact successful replay checks current write access but consumes no new admission
+or provider read, even after later thread/proposal changes. Failed/abandoned
+source admissions stay charged and bind subsequent attempts to the same intent.
+Audit failure rolls back thread/revision/event creation while retaining the
+earlier admission. Reusing that admission after recovery yields one durable
+receipt. Database proposal locks serialize competing expected-version updates.
+
+HTTP orchestration, source backoff/error presentation, scoped paginated reads,
+outdated-context display, UI, unchanged-document resolution and check/provider
+synchronization still need integration. These services do not enforce merge
+readiness on their own.

@@ -1976,3 +1976,23 @@ Checkboxes represent verified work only.
   enforcement, eleven valid/forged origin variants and concurrent transitions.
   The mutation service, APIs/UI, unchanged-document resolver, provider discussion
   synchronization and all remaining full-spec integration remain pending.
+
+- Authenticated discussion mutation service: opaque admissions check current
+  membership and expected context before source work; completion rechecks locks,
+  scope and exact verified file selection before atomically opening a thread.
+  Proposal-wide discussions require no saved snapshot/provider read. Replies,
+  edits/tombstones and resolution/blocking changes use separate expected thread
+  and comment versions, domain permissions and atomic audit/event receipts.
+  Exact actor/scope/body replay bypasses new quota/source work while still
+  checking current access; failed/abandoned source admissions stay charged.
+  Historical source never moves to the current head. Eleven service database cases
+  and a request-decoding security case cover real reader proofs, replay/races,
+  current authority, scope drift, audit rollback/recovery, Unicode limits and
+  actor/organization quotas, including a real official revision request retained
+  after its separate discussion message is tombstoned. The full backend run passes
+  628 tests with two existing performance measurements excluded; the final
+  17-case discussion run also passes, including that additional retention case.
+  Workspace Clippy and formatting pass. Migration 020 is applied locally; the
+  public API contract is unchanged. Read endpoints, HTTP orchestration/source backoff,
+  reviewer UI, unchanged-document anchors, provider/check integration and every
+  unfinished full-spec requirement remain pending.

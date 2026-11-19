@@ -4,6 +4,7 @@ pub mod comparison_authorization;
 pub mod comparison_worker;
 pub mod comparisons;
 pub mod creation_context;
+pub mod discussions;
 pub mod drafts;
 pub mod github_source;
 pub mod index_worker;

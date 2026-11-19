@@ -1,4 +1,5 @@
 //! Pure domain rules shared by API and worker. No provider or HTTP dependencies.
+pub mod discussion;
 mod identifiers;
 pub mod policy;
 pub mod review_check;

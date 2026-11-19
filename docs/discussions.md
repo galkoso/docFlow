@@ -1,8 +1,9 @@
 # Discussions
 
 Implementation of specification REV-03–06 is in progress. The source-selection
-engine is available; discussion persistence, authorization, APIs, reviewer UI and
-required-check integration are not yet connected.
+engine and pure authorization rules are available; discussion persistence,
+authenticated context loading, APIs, reviewer UI and required-check integration
+are not yet connected.
 
 ## Source anchors
 
@@ -38,3 +39,33 @@ repository/provider binding, side, path and blob, and recheck current permission
 and the expected context after source I/O. Browser-supplied source, refs, paths,
 hashes and quotes must never supply that proof. Historical anchors remain attached
 to their original context, and outdated status must never clear a blocking thread.
+
+## Default discussion policy
+
+`specspace-domain::discussion` uses current membership and repository access for
+every action. Any active non-Reader member can comment without being an assigned
+editor. Only the original message author may edit or tombstone that message; even
+an Admin does not gain permission to rewrite another person's words. Neither
+action withdraws an official review decision or resolves a thread.
+
+A thread's creator or a current Reviewer, Maintainer or Admin may resolve or
+reopen it. The creator or a current Maintainer/Admin may change its blocking
+status. When an independent Reviewer/Maintainer/Admin creates or enables a
+blocking requirement, the thread retains that provenance permanently. The
+proposal author cannot resolve or unmark that thread, including when the author
+is an Admin. This conservative restriction remains after role changes or an
+independent person's intervening resolution/unmarking; reopening preserves it.
+The original creator can withdraw their own requirement while they retain
+comment permission, including after a role change to Contributor. A Reader or
+revoked member cannot mutate their former threads/messages.
+
+An unresolved blocking thread blocks merge regardless of its snapshot's age or
+whether any message was tombstoned. These pure rules neither update proposal
+state nor alter official-review decisions. Database code must serialize them with
+the final merge check and persist thread versions, resolution identity/time,
+monotonic independent provenance, immutable comment revisions, replay receipts,
+audit and outbox events atomically. They are not runtime merge enforcement yet.
+
+Comment bodies preserve exact submitted text, with a limit of 10,000 Unicode
+scalar values (PostgreSQL `char_length`), rather than UTF-8 bytes or JavaScript
+UTF-16 code units. Whitespace-only text and NUL are rejected.

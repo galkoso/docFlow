@@ -1935,3 +1935,16 @@ Checkboxes represent verified work only.
   This is the source-processing layer only; authenticated snapshot binding,
   discussion persistence/API/UI, blocking resolution and all remaining full-spec
   work are still pending. See `docs/discussions.md`.
+
+- Discussion authorization rules: current non-Reader membership and repository
+  access are required even for a creator's own threads/messages. Only message
+  authors can edit/tombstone; thread resolution, reopening and blocking changes
+  have distinct role checks. Independent reviewer blocking provenance is
+  monotonic, preventing proposal authors (including Admins) from clearing the
+  requirement through resolution or unmarking, role changes or later reopening.
+  Unresolved blockers remain blockers regardless of age or tombstones. Comments
+  preserve exact text with a 10,000-Unicode-scalar limit. Nine new domain cases
+  cover permissions, revocation, author bypasses, independent provenance and text
+  boundaries. These pure rules await authenticated database/context integration;
+  no discussion endpoints or runtime merge enforcement are claimed. All remaining
+  specification requirements stay active.

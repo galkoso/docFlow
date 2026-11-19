@@ -24,6 +24,8 @@ use std::{
     },
     time::Duration,
 };
+#[path = "snapshots/discussions.rs"]
+mod discussions;
 #[path = "snapshots/files.rs"]
 mod files;
 #[path = "snapshots/official_reviews.rs"]

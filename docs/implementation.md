@@ -1964,3 +1964,15 @@ Checkboxes represent verified work only.
   performance measurements excluded; workspace Clippy and formatting pass. No
   migration or public API contract changed. The first two discussion stages also
   passed both Backend and Frontend CI before this integration stage was pushed.
+
+- Discussion ledger (migration 020): immutable origins bind proposal or READY
+  snapshot context; append-only revisions preserve thread state, independent
+  reviewer provenance and separate comment versions, including edits and
+  tombstones. Database guards enforce current membership, message ownership,
+  resolution authority, immutable event envelopes and atomic audit/outbox proof.
+  Durable admissions bind actor/scope/request hashes and enforce serialized
+  actor/organization quotas. Six database cases cover tombstone/reopen/role
+  behavior, rollback and immutability, message versions and revocation, nonce/quota
+  enforcement, eleven valid/forged origin variants and concurrent transitions.
+  The mutation service, APIs/UI, unchanged-document resolver, provider discussion
+  synchronization and all remaining full-spec integration remain pending.

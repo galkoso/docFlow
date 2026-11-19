@@ -1,8 +1,8 @@
 # Discussions
 
 Implementation of specification REV-03–06 is in progress. The source-selection
-engine and pure authorization rules are available; discussion persistence,
-authenticated context loading, APIs, reviewer UI and required-check integration
+engine, pure authorization rules and append-only database schema are available.
+Authenticated mutation services, APIs, reviewer UI and required-check integration
 are not yet connected.
 
 ## Source anchors
@@ -95,3 +95,32 @@ with shared-review authorization for shared discussion operations, never the
 private comparison-job namespace. Document/section anchors for unchanged files
 still need an authorized full-book resolver; the source-selection engine already
 supports their content independently of the changed-file manifest.
+
+## Durable revisions
+
+Migration 020 stores immutable thread origins and ordered revisions. Each revision
+captures current blocking/resolved state and monotonic independent-reviewer
+provenance. Message changes have a separate comment version: edits preserve prior
+text, tombstones contain no replacement body, and a tombstoned message cannot be
+resurrected. Thread history and current message projections will be derived from
+these records; deleting a message never erases its thread or official decisions.
+
+Database guards serialize revisions on the proposal, enforce current membership,
+message ownership and thread policy, and reject stale versions. Origins bind
+current repository settings and either recorded proposal refs or an immutable
+READY snapshot and its exact file-side manifest. A source quote is plain text;
+browser claims alone cannot construct the application's verified anchor proof.
+
+Every committed revision requires its matching audit and content-free outbox
+envelope. Origins cannot exist without their opening revision. Admission attempts
+bind request IDs to actor/proposal/body hash and count even when later source
+processing fails. A serialized ten-minute quota allows 60 attempts per actor and
+600 per organization. Exact successful replay must be checked before charging a
+new attempt. Origins, revisions, admissions and event envelopes are protected
+against update/delete/truncate; event delivery timestamps may advance once.
+
+These schema constraints are defense in depth. Application code must still load
+fresh policy, validate full Unicode comment bodies, compare expected versions,
+perform source work without a database transaction, and recheck the final scope.
+No discussion HTTP endpoint or runtime merge enforcement is provided by the
+schema alone.

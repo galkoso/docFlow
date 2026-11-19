@@ -2025,3 +2025,11 @@ Checkboxes represent verified work only.
   invocations. No mutation timeout or concurrency rule was weakened. Mutation
   HTTP/source backoff, reviewer UI, unchanged-document anchors, provider/check
   integration and all unfinished specification scope remain pending.
+
+- Shared review-source cooldown: official-review provider backoff now delegates
+  to a reusable repository-connection helper, preserving the existing durable
+  table and exact organization/repository/remote/installation key. Remaining
+  Retry-After is rounded up and bounded; concurrent updates keep the longest
+  delay. All 11 official-review database cases pass with this extraction, and
+  workspace Clippy passes. Discussion source orchestration and write HTTP are
+  separate integration stages; the full remaining specification stays active.

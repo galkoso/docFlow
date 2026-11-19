@@ -27,12 +27,14 @@ pub(super) async fn admit(
     if mismatch {
         return Err(OfficialReviewError::IdempotencyMismatch);
     }
-    let delay:Option<f64>=sqlx::query_scalar("SELECT ceil(extract(epoch FROM until_at-clock_timestamp()))::float8 FROM official_review_backoff WHERE organization_id=$1 AND repository_id=$2 AND remote_id=$3 AND installation_id=$4 AND until_at>clock_timestamp()")
-        .bind(s.organization_id).bind(s.repository_id).bind(&s.remote_id).bind(&s.installation_id).fetch_optional(&mut *conn).await?;
-    if let Some(delay) = delay {
-        return Err(OfficialReviewError::ProviderRateLimited(
-            delay.clamp(1., u32::MAX as f64) as u32,
-        ));
+    let key = crate::provider_backoff::ConnectionKey {
+        organization: s.organization_id,
+        repository: s.repository_id,
+        remote_id: &s.remote_id,
+        installation_id: &s.installation_id,
+    };
+    if let Some(delay) = crate::provider_backoff::remaining(conn, &key).await? {
+        return Err(OfficialReviewError::ProviderRateLimited(delay));
     }
     let allowed:bool=sqlx::query_scalar("SELECT count(*)<200 AND count(*) FILTER(WHERE reviewer_id=$2)<30 FROM official_review_reads WHERE organization_id=$1 AND created_at>clock_timestamp()-interval '10 minutes'")
         .bind(s.organization_id).bind(actor).fetch_one(&mut *conn).await?;
@@ -48,8 +50,14 @@ pub(super) async fn backoff(
     s: &Scope,
     seconds: u32,
 ) -> Result<(), OfficialReviewError> {
-    sqlx::query("INSERT INTO official_review_backoff(organization_id,repository_id,remote_id,installation_id,until_at) VALUES($1,$2,$3,$4,clock_timestamp()+make_interval(secs=>$5)) ON CONFLICT(organization_id,repository_id,remote_id,installation_id) DO UPDATE SET until_at=greatest(official_review_backoff.until_at,excluded.until_at)")
-        .bind(s.organization_id).bind(s.repository_id).bind(&s.remote_id).bind(&s.installation_id).bind(f64::from(seconds)).execute(pool).await?;
+    let mut conn = pool.acquire().await?;
+    let key = crate::provider_backoff::ConnectionKey {
+        organization: s.organization_id,
+        repository: s.repository_id,
+        remote_id: &s.remote_id,
+        installation_id: &s.installation_id,
+    };
+    crate::provider_backoff::defer(&mut conn, &key, seconds).await?;
     Ok(())
 }
 

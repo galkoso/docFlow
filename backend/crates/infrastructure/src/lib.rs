@@ -15,6 +15,7 @@ pub mod pr_sync;
 pub mod pr_sync_worker;
 pub mod proposal_worker;
 pub mod proposals;
+mod provider_backoff;
 pub mod provisioning;
 pub mod review_authorization;
 pub mod review_configuration;

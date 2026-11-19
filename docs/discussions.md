@@ -255,3 +255,35 @@ available. Stored current-role capabilities reflect that barrier, including
 introducing a new change. This prepares the discussion side of merge
 serialization; the merge/check workflow itself remains a separate unfinished
 integration.
+
+## Discussion interface
+
+The shared review page shows proposal-wide discussion history even before the
+first review snapshot exists. Readers can inspect current messages and original
+context. Current capabilities govern opening, replying, editing one's own message,
+tombstoning, resolving, reopening and changing blocking status. Source quotes and
+messages render as plain text. Outdated context, independent requirements,
+tombstones and the last resolution actor remain visible.
+
+New drafts capture the proposal version or selected immutable snapshot. Text-file
+anchors capture the selected file and before/after side, with a document, stable
+section ID or up to 500 original source lines. Only selection intent is submitted;
+the server constructs the source proof. Message limits count Unicode scalars,
+preserve whitespace and line endings, and reject blank/NUL bodies. Replies and
+edits capture thread and message versions; adopting refreshed context requires an
+explicit action while preserving the draft text.
+
+Each write freezes one request ID and body. Network uncertainty, malformed receipts,
+denials and rate limits preserve that exact attempt for explicit retry. Retry-After
+never triggers automatic POSTs. History refresh uses GET only, and a verified
+receipt clears the draft before loading current history. Known validation/context
+failures preserve the text for correction. Abandoning an uncertain attempt requires
+confirmation and warns the user to inspect history.
+
+Route changes, file selection, reload, logout and page close protect unsent or
+uncertain discussion work. Changing the actor, logout epoch or captured context
+cancels outstanding work and removes private text. Scoped access loss clears the
+surrounding review evidence. Metadata-only history refresh keeps discussion drafts.
+The layout wraps controls and text, has visible keyboard focus and native labelled
+inputs. Physical keyboard, RTL and 320px browser verification remains pending
+because no browser connection is available in this workspace session.

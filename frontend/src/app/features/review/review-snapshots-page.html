@@ -51,6 +51,7 @@
         @if (history.next_after) {<button (click)="historyPage(history.next_after)">גרסאות קודמות</button>}
       </section>
     }
+    @if (discussionScope(); as scope) {<app-discussions [scope]="scope" (accessDenied)="bodyDenied()" />}
     @if (mismatched()) {<p role="alert">פרטי הגרסה אינם תואמים לתוצאת השליחה. יש לטעון מחדש לפני המשך סקירה.</p>}
     @else if (state.snapshot(); as snapshot) {
       <section aria-labelledby="snapshot-title"><h2 id="snapshot-title">הגרסה המוצגת: {{ snapshot.title }}</h2>

@@ -1,0 +1,103 @@
+<section aria-labelledby="discussion-title">
+  <header><h2 id="discussion-title">דיונים והערות</h2><p>הודעות אינן משנות את האפיון המאושר או מבטלות החלטת סקירה רשמית. הזמנים מוצגים בשעון המקומי.</p></header>
+  @if (error()) {<p role="alert" class="notice">{{ error() }}</p>}
+  @if (message()) {<p role="status">{{ message() }}</p>}
+  @if (loading()) {<p role="status">טוענים דיונים…</p>}
+  <button type="button" (click)="refresh()" [disabled]="sending() || loading()">רענון דיונים והודעות</button>
+  @if (view(); as page) {
+    <p>דיונים חוסמים פתוחים בכל ההצעה: <strong>{{ page.unresolved_blockers }}</strong></p>
+    @if (page.can_comment) {<button type="button" (click)="beginOpen()" [disabled]="hasDraft()">פתיחת דיון חדש</button>}
+    @if (!page.threads.length) {<p>אין דיונים בעמוד זה.</p>}
+    <ol class="threads">@for (thread of page.threads; track thread.id) {
+      <li><button type="button" (click)="select(thread)" [disabled]="sending()" [attr.aria-pressed]="selected() === thread.id">
+        {{ thread.creator.name }} · {{ thread.created_at | date:'dd/MM/yyyy HH:mm:ss' }} · {{ thread.comment_count }} הודעות
+        · {{ thread.resolved ? 'נפתר' : thread.blocking ? 'חוסם' : 'לא חוסם' }}</button>
+        @if (thread.outdated_context) {<span>הקשר קודם</span>}</li>
+    }</ol>
+    <div class="actions"><button (click)="this.page()" [disabled]="sending()">לדיונים האחרונים</button>
+      @if (page.next_after) {<button (click)="this.page(page.next_after)" [disabled]="sending()">דיונים קודמים</button>}</div>
+  }
+  @if (reading()) {<p role="status">טוענים הודעות…</p>}
+  @if (comments(); as page) {
+    <article aria-labelledby="selected-discussion-title"><h3 id="selected-discussion-title">הדיון הנבחר</h3>
+      <p>{{ page.thread.creator.name }} · <time [attr.datetime]="page.thread.created_at" [title]="page.thread.created_at">{{ page.thread.created_at | date:'dd/MM/yyyy HH:mm:ss' }}</time>
+        · {{ page.thread.resolved ? 'נפתר' : page.thread.blocking ? 'חוסם' : 'לא חוסם' }}</p>
+      @if (page.thread.independent_requirement) {<p>החסימה נוצרה מדרישה של סוקר בלתי תלוי.</p>}
+      @if (page.thread.outdated_context) {<p class="notice">ההקשר שייך לגרסה קודמת. דיון חוסם נשאר חוסם עד לפתרון.</p>}
+      @if (page.thread.repository_binding_changed) {<p class="notice">הקישור למאגר השתנה. מוצג ההקשר השמור בלבד.</p>}
+      @if (page.thread.resolution; as resolution) {<p>נפתר בידי {{ resolution.actor.name }} · <time [attr.datetime]="resolution.recorded_at">{{ resolution.recorded_at | date:'dd/MM/yyyy HH:mm:ss' }}</time></p>}
+      <details><summary>ההקשר המקורי של הדיון</summary>
+        <p>ענף: <bdi>{{ page.thread.origin.branch }}</bdi></p>
+        @if (page.thread.origin.snapshot_id) {<p>גרסת הסקירה: <bdi>{{ page.thread.origin.snapshot_id }}</bdi></p>}
+        @if (page.thread.origin.anchor.kind === 'file') {
+          <p><bdi>{{ page.thread.origin.anchor.source.path }}</bdi> · {{ page.thread.origin.anchor.side === 'before' ? 'לפני' : 'אחרי' }}</p>
+          <p>שורות {{ page.thread.origin.anchor.text.start_line }}–{{ page.thread.origin.anchor.text.end_line }} בהקשר המקורי</p>
+          @if (page.thread.origin.anchor.text.selection.kind === 'section') {<p>סעיף: <bdi>{{ page.thread.origin.anchor.text.selection.section_id }}</bdi></p>}
+          <pre dir="auto">{{ page.thread.origin.anchor.text.quote }}</pre>
+          @if (page.thread.origin.anchor.text.quote_truncated) {<p>הציטוט מקוצר; העוגן המלא נשמר לגרסה המקורית.</p>}
+        } @else {<p>דיון כללי בהצעה או בגרסת הסקירה.</p>}
+      </details>
+      <div class="actions">
+        @if (page.thread.permissions.can_comment) {<button (click)="reply()" [disabled]="hasDraft()">תגובה לדיון</button>}
+        @if (page.thread.permissions.can_resolve) {<button (click)="act('resolve')" [disabled]="hasDraft()">פתרון הדיון</button>}
+        @if (page.thread.permissions.can_reopen) {<button (click)="act('reopen')" [disabled]="hasDraft()">פתיחה מחדש של הדיון</button>}
+        @if (page.thread.permissions.can_toggle_blocking) {<button (click)="act('set_blocking')" [disabled]="hasDraft()">{{ page.thread.blocking ? 'הסרת סימון כחוסם' : 'סימון הדיון כחוסם' }}</button>}
+      </div>
+      <ol class="comments">@for (comment of page.comments; track comment.id) {
+        <li><p><strong>{{ comment.author.name }}</strong> · <time [attr.datetime]="comment.created_at" [title]="comment.created_at">{{ comment.created_at | date:'dd/MM/yyyy HH:mm:ss' }}</time>
+          @if (comment.reply_to_id) {<span> · תשובה להודעה בשרשור</span>}</p>
+          @if (comment.tombstoned_at) {<p>תוכן ההודעה נמחק · {{ comment.tombstoned_at | date:'dd/MM/yyyy HH:mm:ss' }}</p>}
+          @else {<p class="message" dir="auto">{{ comment.body }}</p>}
+          @if (comment.edited_at) {<p>נערכה · {{ comment.edited_at | date:'dd/MM/yyyy HH:mm:ss' }}</p>}
+          <div class="actions">
+            @if (page.thread.permissions.can_comment) {<button (click)="reply(comment)" [disabled]="hasDraft()">תשובה להודעה</button>}
+            @if (comment.can_edit) {<button (click)="edit(comment)" [disabled]="hasDraft()">עריכת ההודעה שלי</button>}
+            @if (comment.can_tombstone) {<button (click)="act('tombstone', comment)" [disabled]="hasDraft()">מחיקת תוכן ההודעה שלי</button>}
+          </div>
+        </li>
+      }</ol>
+      <div class="actions"><button (click)="commentPage()" [disabled]="sending()">לתחילת השרשור</button>
+        @if (page.next_after) {<button (click)="commentPage(page.next_after)" [disabled]="sending()">הודעות נוספות</button>}</div>
+    </article>
+  }
+  @if (draft(); as draft) {
+    <form (ngSubmit)="send()" aria-label="כתיבת הודעה בדיון">
+      <h3>{{ draft.kind === 'open' ? 'דיון חדש' : draft.kind === 'edit' ? 'עריכת ההודעה שלי' : 'תגובה לדיון' }}</h3>
+      @if (draft.kind === 'open') {
+        <label for="discussion-mode">ההקשר של הדיון</label>
+        <select id="discussion-mode" [ngModel]="mode()" (ngModelChange)="mode.set($event)" name="mode" [disabled]="!!pending() || sending()">
+          <option value="proposal">ההצעה כולה — גרסה שמורה {{ draft.version }}</option>
+          @if (draft.scope.snapshot) {<option value="snapshot">גרסת הסקירה המוצגת</option>}
+          @if (targetFile(); as file) {
+            @if (file.kind === 'document') {<option value="document">המסמך שנבחר להשוואה</option><option value="section">סעיף במסמך שנבחר</option>}
+            @if (file.kind === 'document' || file.kind === 'catalog') {<option value="lines">שורות בצד ההשוואה שנבחר</option>}
+          }
+        </select>
+        @if (mode() === 'document' || mode() === 'section' || mode() === 'lines') {
+          <p>הקובץ שנבחר: <bdi>{{ targetFile()?.after?.path ?? targetFile()?.before?.path }}</bdi></p>
+          <label for="discussion-side">צד ההשוואה</label><select id="discussion-side" name="side" [ngModel]="side()" (ngModelChange)="side.set($event)" [disabled]="!!pending() || sending()">
+            @if (targetFile()?.before) {<option value="before">לפני</option>}@if (targetFile()?.after) {<option value="after">אחרי</option>}
+          </select>
+        }
+        @if (mode() === 'section') {<label for="discussion-section">מזהה הסעיף בגרסה שנבחרה</label><input id="discussion-section" name="section" [ngModel]="sectionId()" (ngModelChange)="sectionId.set($event)" [disabled]="!!pending() || sending()" dir="ltr" />}
+        @if (mode() === 'lines') {
+          <p>מספרי שורות במקור של הצד שנבחר, כולל שורות הכותרת. אפשר לבחור עד 500 שורות.</p>
+          <label for="discussion-start">משורה</label><input id="discussion-start" type="number" min="1" name="start" [ngModel]="startLine()" (ngModelChange)="startLine.set($event)" [disabled]="!!pending() || sending()" />
+          <label for="discussion-end">עד שורה</label><input id="discussion-end" type="number" min="1" name="end" [ngModel]="endLine()" (ngModelChange)="endLine.set($event)" [disabled]="!!pending() || sending()" />
+        }
+        <label><input type="checkbox" name="blocking" [ngModel]="blocking()" (ngModelChange)="blocking.set($event)" [disabled]="!!pending() || sending() || (!view()?.can_open_blocking_thread && !blocking())" /> דיון חוסם</label>
+      }
+      <label for="discussion-body">תוכן ההודעה</label><textarea id="discussion-body" name="body" rows="5" dir="auto" [ngModel]="body()" (ngModelChange)="body.set($event)" [disabled]="!!pending() || sending()"></textarea>
+      <p>{{ length() }} / 10,000 תווים</p>
+      <div class="actions"><button type="submit" [disabled]="!canSend()">שמירת ההודעה</button>
+        <button type="button" (click)="updateContext()" [disabled]="!!pending() || sending()">שימוש בהקשר העדכני לאחר בדיקה</button>
+        <button type="button" (click)="cancel()" [disabled]="sending()">ביטול הטיוטה</button></div>
+    </form>
+  }
+  @if (pending()) {
+    <p role="status">{{ sending() ? 'שומרים את פעולת הדיון…' : 'הבקשה המקורית נשמרת בעמוד לבדיקה נוספת.' }}</p>
+    @if (retryWait()) {<p>אפשר לנסות שוב בעוד {{ retryWait() }} שניות.</p>}
+    <button (click)="retry()" [disabled]="sending() || !!retryWait() || !view()?.can_comment">בדיקת אותה בקשה</button>
+    <button (click)="cancel()" [disabled]="sending()">עזיבת הבקשה לאחר בדיקת ההיסטוריה</button>
+  }
+</section>

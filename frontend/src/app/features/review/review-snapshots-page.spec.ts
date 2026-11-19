@@ -4,8 +4,11 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { By } from '@angular/platform-browser';
 import { SessionState } from '../../core/auth/session-state';
 import { ReviewSnapshotsPage } from './review-snapshots-page';
+import { DiscussionsView } from './discussions-view';
+import { discussionThreads } from '../../../testing/discussion-fixtures';
 import { reviewSnapshotExit } from './review-snapshot-exit';
 import { actor, proposal, snapshot, other, configuration, detail, history, metadata, files, media,
   ticket, publication, job, prStatus, officialHistory, product } from '../../../testing/review-fixtures';
@@ -37,6 +40,7 @@ describe('Review snapshots page', () => {
       http.expectOne(req => req.url === `${snapshots}/${snapshot}/media`).flush(media()); harness.detectChanges();
       http.expectOne(`${snapshots}/${snapshot}/pr-sync`).flush(prStatus()); harness.detectChanges();
       http.expectOne(`${snapshots}/${snapshot}/decisions`).flush(officialHistory(viewer)); harness.detectChanges();
+      http.expectOne(`${root}/threads`).flush(discussionThreads(viewer)); harness.detectChanges();
     };
     const prepare = () => { page.prepare(); http.expectOne(`${root}/review/configuration`).flush(configuration()); http.expectOne(root).flush(detail()); harness.detectChanges(); };
     return { harness, page, http, router, profile, logoutEpoch, released, guard: () => guard(), settle, load, prepare };
@@ -81,6 +85,20 @@ describe('Review snapshots page', () => {
     const { page, http, load, settle } = await create(); load(); await settle(); const displayed = page.state.snapshot();
     page.decisionRecorded(); http.expectOne(req => req.url === snapshots).flush({ ...history(), current_proposal_state: 'CHANGES_REQUESTED' }); await settle();
     expect(page.state.history()?.current_proposal_state).toBe('CHANGES_REQUESTED'); expect(page.state.snapshot()).toBe(displayed); http.verify();
+  });
+  it('protects discussion drafts on navigation, logout, reload and unload while retaining them through metadata refresh', async () => {
+    const { harness, page, http, router, load, settle, guard } = await create(`?snapshot=${snapshot}`, product); load(); await settle();
+    const discussions = harness.routeDebugElement!.query(By.directive(DiscussionsView)).componentInstance as DiscussionsView;
+    discussions.beginOpen(); discussions.body.set('Unsent discussion'); harness.detectChanges();
+    page.decisionRecorded(); http.expectOne(req => req.url === snapshots).flush(history()); await settle();
+    expect(discussions.body()).toBe('Unsent discussion');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    expect(await router.navigateByUrl(`${route}?snapshot=${other}`)).toBe(false);
+    expect(await router.navigateByUrl(`${route}?snapshot=${snapshot}&file=${files().files[0].id}`)).toBe(false);
+    expect(await router.navigateByUrl('/away')).toBe(false); expect(guard()).toBe(false);
+    page.reload(); http.expectNone(req => req.url === snapshots);
+    const unload = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent; page.beforeUnload(unload); expect(unload.defaultPrevented).toBe(true);
+    confirm.mockReturnValue(true); expect(await router.navigateByUrl('/away')).toBe(true); expect(discussions.body()).toBe(''); http.verify();
   });
   it('restores a job URL through observation only, never reconstructing a submission', async () => {
     const { page, http, load, settle } = await create(`?snapshot=${snapshot}&job=${ticket.job_id}`); load();

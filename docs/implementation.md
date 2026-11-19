@@ -2054,3 +2054,19 @@ Checkboxes represent verified work only.
   specification, including unchanged-document/media anchors, reviewer UI,
   provider/check/merge integration, bundles and remaining requirements, stays
   active.
+
+- Discussion interface: the shared review page now includes member-scoped history,
+  plain-text messages and original anchor context, replies, author-only editing
+  and tombstones, resolution/reopening and blocking controls. Drafts capture their
+  proposal/snapshot/file side and versions; source proofs remain server-owned.
+  Explicit context updates preserve draft text. Frozen request IDs/bodies survive
+  unknown outcomes and Retry-After, with explicit retries and GET-only refresh.
+  Route/file changes, reload, logout and unload protect drafts, and actor/context
+  changes or scope loss purge private data. Metadata refresh preserves drafts.
+  All 449 frontend tests in 51 files and the production build pass, including
+  evidence validation, scoped API calls, replay uncertainty, merge-barrier
+  capabilities, Unicode limits, message ownership and parent navigation guards.
+  No backend schema or behavior changes in this stage. Browser discovery reports
+  no available browser; physical keyboard/RTL/320px review remains pending.
+  Unchanged-document/media anchors, provider/check/merge integration, bundles and
+  every other unfinished requirement in the full specification remain active.

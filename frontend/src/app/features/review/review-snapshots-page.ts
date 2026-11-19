@@ -8,17 +8,19 @@ import { ReviewSubmission } from './review-submission';
 import { SharedReviewBody } from './shared-review-body';
 import { ReviewPrStatusView } from './review-pr-status';
 import { OfficialReviewsView } from './official-reviews-view';
+import { DiscussionsView, type DiscussionScope } from './discussions-view';
 import type { RawScope } from '../comparison/raw-state';
 import { SharedReviewState } from './shared-review-state';
 import { reviewLocation, type ReviewPageLocation } from './review-location';
 
 @Component({
-  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody, ReviewPrStatusView, OfficialReviewsView],
+  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody, ReviewPrStatusView, OfficialReviewsView, DiscussionsView],
   providers: [ReviewSubmission, SharedReviewState],
   changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './review-snapshots-page.html', styleUrl: './review-snapshots-page.css',
 })
 export class ReviewSnapshotsPage implements OnDestroy {
   private readonly official = viewChild(OfficialReviewsView);
+  private readonly discussions = viewChild(DiscussionsView);
   readonly session = inject(SessionState);
   readonly submission = inject(ReviewSubmission);
   readonly state = inject(SharedReviewState);
@@ -51,6 +53,11 @@ export class ReviewSnapshotsPage implements OnDestroy {
     return { actor, proposal, snapshot: snapshot.snapshot_id, content: summary.comparison_content_id, head: summary.head_sha, base: summary.merge_base_sha, file };
   });
   readonly stateLabel = stateLabel;
+  readonly discussionScope = computed<DiscussionScope | null>(() => {
+    const actor = this.session.profile()?.user_id, proposal = this.proposal();
+    return this.visible() && this.state.phase() === 'ready' && actor && proposal
+      ? { actor, proposal, snapshot: this.state.snapshot(), file: this.selectedFile() } : null;
+  });
   private readonly releaseLogout = this.session.guardLogout(() => this.canLeave());
   constructor() {
     effect(() => {
@@ -104,7 +111,7 @@ export class ReviewSnapshotsPage implements OnDestroy {
     }
   }
   reload(): void {
-    if (this.official()?.hasDraft() && !this.canLeave()) return;
+    if ((this.official()?.hasDraft() || this.discussions()?.hasDraft()) && !this.canLeave()) return;
     const actor = this.session.profile()?.user_id, proposal = this.proposal();
     if (!actor || !proposal) return;
     let location = this.location();
@@ -148,7 +155,10 @@ export class ReviewSnapshotsPage implements OnDestroy {
     const next = reviewLocation(this.router.parseUrl(url).queryParamMap), current = this.location();
     const selected = next?.snapshot ?? this.state.history()?.active_snapshot_id ?? this.state.history()?.snapshots[0]?.snapshot_id;
     if (next && current && selected === this.state.snapshot()?.snapshot_id && next.files === current.files && next.media === current.media
-      && (next.after ?? '') === (current.after ?? '')) return true;
+      && (next.after ?? '') === (current.after ?? '')) {
+      if (next.file !== current.file && this.discussions()?.hasDraft()) return this.canLeave();
+      return true;
+    }
     return this.canLeave();
   }
   phaseLabel(phase: string): string {
@@ -164,10 +174,12 @@ export class ReviewSnapshotsPage implements OnDestroy {
       UNSUPPORTED_HEADING_LEVEL: 'רמת הכותרת אינה נתמכת בעורך' } as Record<string, string>)[value] ?? value;
   }
   canLeave(): boolean {
-    return !this.submission.pending() && !this.official()?.hasDraft()
-      || window.confirm('טיוטה או בקשת סקירה עדיין ממתינה או שתוצאתה אינה ודאית. לעזוב ולבדוק את הגרסאות וההיסטוריה בכניסה הבאה?');
+    return !this.submission.pending() && !this.official()?.hasDraft() && !this.discussions()?.hasDraft()
+      || window.confirm('הודעה, טיוטה או בקשת סקירה עדיין ממתינה או שתוצאתה אינה ודאית. לעזוב ולבדוק את הגרסאות וההיסטוריה בכניסה הבאה?');
   }
   @HostListener('window:beforeunload', ['$event'])
-  beforeUnload(event: BeforeUnloadEvent): void { if (this.submission.pending() || this.official()?.hasDraft()) { event.preventDefault(); event.returnValue = ''; } }
+  beforeUnload(event: BeforeUnloadEvent): void {
+    if (this.submission.pending() || this.official()?.hasDraft() || this.discussions()?.hasDraft()) { event.preventDefault(); event.returnValue = ''; }
+  }
   ngOnDestroy(): void { this.releaseLogout(); this.state.clear(); this.submission.clear(); }
 }

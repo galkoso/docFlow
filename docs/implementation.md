@@ -2289,3 +2289,8 @@ Checkboxes represent verified work only.
   limits, expiry, replay, changed roles/heads, provider errors and mid-read access
   loss. Review UI controls, whole-unit coverage and section approvals remain
   unfinished; the approve-all warning remains conservative.
+  The full backend run passes 709 tests with two existing performance measurements
+  excluded. All 510 frontend tests in 54 files, workspace Clippy/formatting and
+  both builds pass. The rebuilt local API is ready; source and acknowledgement
+  routes require authentication and return no-store responses. No migration is
+  added in this HTTP/client stage.

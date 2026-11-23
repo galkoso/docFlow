@@ -1,4 +1,6 @@
 use super::*;
+#[path = "visits/approvals.rs"]
+mod approvals;
 use sha2::{Digest, Sha256};
 struct Ready {
     f: Fixture,

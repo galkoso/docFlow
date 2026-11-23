@@ -130,7 +130,7 @@ async fn post_raw(
     if status == StatusCode::TOO_MANY_REQUESTS && !uri.ends_with("/decisions") {
         assert_eq!(
             response.headers()["Retry-After"],
-            if uri.ends_with("/recover") {
+            if uri.ends_with("/recover") || uri.ends_with("/unit-approvals") {
                 "600"
             } else {
                 "60"

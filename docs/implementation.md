@@ -2429,3 +2429,20 @@ Checkboxes represent verified work only.
   public OpenAPI export remains unchanged at this internal stage. Migration 028
   is applied locally and the standard migrator reruns cleanly; the rebuilt API is
   ready and anonymous coverage reads remain authenticated no-store responses.
+
+- Individual approval HTTP and typed client: a caller-bound no-store status GET
+  and explicit POST now expose the guarded persistence service. Strict queries,
+  bounded pages and 4 KiB bodies preserve captured fingerprint/domain/unit scope;
+  POSTs require session actor, Origin and CSRF proof. Fresh approvals return 201,
+  exact receipts replay with 200, unread/unknown/conflicting contexts have distinct
+  409 outcomes, and quota/storage failures retain bounded retry responses. Six
+  real HTTP cases cover lifecycle/concurrent replay, authentication/CSRF, strict
+  inputs/paging, historical context and revocation, atomic failure and quota replay.
+  Approvals still leave refs, proposal state and official decisions unchanged.
+  OpenAPI, generated types and Angular methods expose separate status reads and
+  immutable explicit intents. Review-panel controls and final-check assembly
+  remain separate stages; the full specification goal stays active.
+  The full backend run passes 734 tests with the same two performance measurements
+  excluded. All backend binary builds and workspace Clippy/formatting pass. The
+  local API is rebuilt and ready; anonymous approval-status reads return no-store
+  authentication failures. No migration is added in this HTTP/client stage.

@@ -4,6 +4,11 @@ import type { components } from './generated/schema';
 
 export type ReviewCoverage = components['schemas']['ReviewCoverage'];
 export type ReviewCoverageRequest = components['schemas']['ReviewCoverageRequest'];
+export type UnitApprovalRequest = components['schemas']['UnitApprovalRequest'];
+export type UnitApprovalRecorded = components['schemas']['UnitApprovalRecorded'];
+export type UnitApprovalPageRequest = components['schemas']['UnitApprovalPageRequest'];
+export type UnitApprovalPage = components['schemas']['UnitApprovalPage'];
+export type UnitApprovalStatus = components['schemas']['UnitApprovalStatus'];
 export type ReviewUnitCoverage = components['schemas']['ReviewUnitCoverage'];
 export type ReviewSourceRequest = components['schemas']['ReviewSourceRequest'];
 export type ReviewSourceWindow = components['schemas']['ReviewSourceWindow'];
@@ -72,6 +77,14 @@ export class ReviewApi {
   }
   acknowledge(actor: string, proposal: string, snapshot: string, body: Readonly<ReviewVisitRequest>) {
     return this.http.post<ReviewVisitRecorded>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/visits`, body, { headers: this.actor(actor) });
+  }
+  unitApprovals(actor: string, proposal: string, snapshot: string, request: Readonly<UnitApprovalPageRequest>) {
+    return this.http.get<UnitApprovalPage>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/unit-approvals`, {
+      headers: this.actor(actor), params: { expected_fingerprint: request.expected_fingerprint, domain: request.domain, offset: request.offset, limit: request.limit },
+    });
+  }
+  approveUnit(actor: string, proposal: string, snapshot: string, body: Readonly<UnitApprovalRequest>) {
+    return this.http.post<UnitApprovalRecorded>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/unit-approvals`, body, { headers: this.actor(actor) });
   }
   prStatus(actor: string, proposal: string, snapshot: string) {
     return this.http.get<ReviewPrStatus>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/pr-sync`, { headers: this.actor(actor) });

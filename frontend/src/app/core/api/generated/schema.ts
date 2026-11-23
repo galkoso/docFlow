@@ -712,6 +712,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/unit-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalUnitApprovalStatus"];
+        put?: never;
+        post: operations["approveProposalReviewUnit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units": {
         parameters: {
             query?: never;
@@ -2667,6 +2683,79 @@ export interface components {
         };
         /** @enum {string} */
         UiImpact: "yes" | "no" | "undecided";
+        UnitApprovalPage: {
+            /** Format: uuid */
+            actor_id: string;
+            /** Format: int32 */
+            approved_units: number;
+            available: boolean;
+            /** Format: int64 */
+            configuration_version: number;
+            current_for_metadata: boolean;
+            domain: components["schemas"]["ReviewArea"];
+            fingerprint: string;
+            head_sha: string;
+            /** Format: int32 */
+            next_offset?: number | null;
+            /** Format: int32 */
+            offset: number;
+            /** Format: int64 */
+            policy_version: number;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            target_sha: string;
+            /** Format: int32 */
+            total_units: number;
+            /** Format: int32 */
+            unapproved_units: number;
+            units: components["schemas"]["UnitApprovalStatus"][];
+        };
+        UnitApprovalPageRequest: {
+            domain: components["schemas"]["ReviewArea"];
+            expected_fingerprint: string;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        UnitApprovalRecorded: {
+            /** Format: uuid */
+            actor_id: string;
+            /** Format: int64 */
+            configuration_version: number;
+            domain: components["schemas"]["ReviewArea"];
+            fingerprint: string;
+            head_sha: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            policy_version: number;
+            /** Format: uuid */
+            proposal_id: string;
+            recorded_at: string;
+            replayed: boolean;
+            /** Format: uuid */
+            request_id: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            target_sha: string;
+            unit_id: string;
+        };
+        UnitApprovalRequest: {
+            domain: components["schemas"]["ReviewArea"];
+            expected_fingerprint: string;
+            /** Format: uuid */
+            request_id: string;
+            unit_id: string;
+        };
+        UnitApprovalStatus: {
+            /** Format: uuid */
+            approval_id?: string | null;
+            approved_at?: string | null;
+            unit_id: string;
+        };
         UnitChange: {
             after_index?: number | null;
             before_index?: number | null;
@@ -6312,6 +6401,188 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PrRecoveryAccepted"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalUnitApprovalStatus: {
+        parameters: {
+            query: {
+                expected_fingerprint: string;
+                domain: components["schemas"]["ReviewArea"];
+                offset?: number;
+                limit?: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Caller/domain individual approval status pinned to the sealed snapshot; no merge authority */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitApprovalPage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approveProposalReviewUnit: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnitApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Original receipt replayed; current approval validity remains separate */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitApprovalRecorded"];
+                };
+            };
+            /** @description Explicit approval of one fully acknowledged mandatory unit; no proposal state or Git changes */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitApprovalRecorded"];
                 };
             };
             400: {

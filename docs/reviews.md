@@ -253,8 +253,20 @@ observation of the stored receipt and still requires current eligibility; a new
 action requires the current snapshot context. Historical counts remain labelled
 not current, and matching unit IDs in a new snapshot inherit no approvals. Legacy
 manifests remain unavailable. The service reads no provider data, changes no refs
-or proposal state, and creates no official snapshot decision. HTTP/UI controls
-and assembly of final approval requirements remain unfinished.
+or proposal state, and creates no official snapshot decision. Review-panel
+controls and assembly of final approval requirements remain unfinished.
+
+`GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/unit-approvals`
+exposes the caller's scoped status with strict fingerprint/domain queries and
+bounded paging (default 20, maximum 100; offsets 0–40,000). `POST` to that path
+accepts only the captured request nonce, fingerprint, domain and unit ID, with a
+4 KiB limit and session actor/Origin/CSRF checks. It returns 201 for a new explicit
+approval and 200 for exact receipt replay. Unread requirements and unavailable
+legacy evidence are distinct 409 outcomes; conflicting nonce reuse also returns
+409. Successful-write quotas return 429 with a 600-second Retry-After, while
+storage failures return a bounded retryable 503 and roll back all approval
+evidence. Both operations return no-store responses. Generated client methods
+keep status GETs separate from frozen explicit POST intents.
 
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks

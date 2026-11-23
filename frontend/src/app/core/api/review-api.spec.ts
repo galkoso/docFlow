@@ -61,5 +61,20 @@ describe('Review API request scope', () => {
     expect(read.request.params.get('domain')).toBe('PRODUCT'); expect(read.request.params.get('offset')).toBe('20');
     expect(read.request.params.get('limit')).toBe('20'); read.flush({}); http.expectNone(req => req.method === 'POST'); http.verify();
   });
+  it('keeps approval status reads separate from an immutable explicit item approval', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ReviewApi), http = TestBed.inject(HttpTestingController);
+    const scope = Object.freeze({ expected_fingerprint: 'a'.repeat(64), domain: 'PRODUCT' as const, offset: 20, limit: 20 });
+    const url = '/api/v1/proposals/p%2Fother/review/snapshots/h%2Fother/unit-approvals';
+    api.unitApprovals(actor, 'p/other', 'h/other', scope).subscribe(); const read = http.expectOne(req => req.url === url);
+    expect(read.request.method).toBe('GET'); expect(read.request.headers.get('X-Expected-Actor')).toBe(actor);
+    expect(read.request.params.get('expected_fingerprint')).toBe(scope.expected_fingerprint); expect(read.request.params.get('domain')).toBe('PRODUCT');
+    expect(read.request.params.get('offset')).toBe('20'); expect(read.request.params.get('limit')).toBe('20'); read.flush({});
+    http.expectNone(req => req.method === 'POST');
+    const intent = Object.freeze({ request_id: other, expected_fingerprint: scope.expected_fingerprint, domain: 'PRODUCT' as const, unit_id: 'b'.repeat(64) });
+    api.approveUnit(actor, 'p/other', 'h/other', intent).subscribe(); const write = http.expectOne(url);
+    expect(write.request.method).toBe('POST'); expect(write.request.headers.get('X-Expected-Actor')).toBe(actor);
+    expect(write.request.body).toBe(intent); expect(write.request.params.keys()).toEqual([]); write.flush({}); http.verify();
+  });
 
 });

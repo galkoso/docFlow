@@ -14,6 +14,7 @@ mod review_visits;
 pub mod reviews;
 pub mod saves;
 pub mod specification;
+mod unit_approvals;
 
 use axum::{
     Json, Router,
@@ -83,6 +84,7 @@ pub struct AppState {
     pub review_snapshots: Arc<PgReviewSnapshots>,
     pub pr_sync: Arc<PgPrSync>,
     pub official_reviews: Arc<specspace_infrastructure::official_reviews::PgOfficialReviews>,
+    pub unit_approvals: Arc<specspace_infrastructure::unit_approvals::PgUnitApprovals>,
     pub discussions: Arc<specspace_infrastructure::discussions::PgDiscussions>,
     pr_source: Arc<dyn PrProviderFactory>,
     bound_source: Arc<dyn BoundProviderFactory>,
@@ -161,6 +163,9 @@ impl AppState {
             discussions: Arc::new(specspace_infrastructure::discussions::PgDiscussions::new(
                 database.clone(),
             )),
+            unit_approvals: Arc::new(
+                specspace_infrastructure::unit_approvals::PgUnitApprovals::new(database.clone()),
+            ),
             pr_source: source.clone(),
             bound_source: source.clone(),
             saves: Arc::new(PgSaves::new(database.clone())),
@@ -372,6 +377,7 @@ pub fn router(state: AppState) -> Router {
         .merge(reviews::routes())
         .merge(official_reviews::routes())
         .merge(review_visits::routes())
+        .merge(unit_approvals::routes())
         .merge(discussions::routes())
         .merge(comparisons::routes())
         .route("/api/v1/health/live", get(live))

@@ -102,6 +102,28 @@ impl PgOfficialReviews {
                 }
             }
         }
+        let mut unviewed_domains = Vec::new();
+        for &domain in &domains {
+            let coverage = crate::review_coverage::read(
+                &mut tx,
+                crate::review_coverage::CoverageScope {
+                    organization: org,
+                    proposal,
+                    snapshot,
+                    actor,
+                    domain,
+                    fingerprint: &h.fingerprint,
+                },
+                0,
+                1,
+            )
+            .await
+            .map_err(|_| OfficialReviewError::Unavailable)?;
+            if coverage.has_unviewed() {
+                unviewed_domains.push(domain);
+            }
+        }
+        let unviewed_content_warning = domains.is_empty() || !unviewed_domains.is_empty();
         let before = if let Some(id) = after {
             sqlx::query_scalar::<_,i64>("SELECT revision FROM official_reviews WHERE id=$1 AND organization_id=$2 AND proposal_id=$3 AND snapshot_id=$4").bind(id).bind(org).bind(proposal).bind(snapshot).fetch_optional(&mut *tx).await?.ok_or(OfficialReviewError::Invalid)?
         } else {
@@ -163,7 +185,8 @@ impl PgOfficialReviews {
             current_for_metadata: current,
             approve_all_available: available,
             domains,
-            unviewed_content_warning: true,
+            unviewed_content_warning,
+            unviewed_domains,
             read_at: now.to_rfc3339(),
             entries,
             next_after,

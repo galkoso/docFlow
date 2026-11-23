@@ -51,6 +51,9 @@ async fn shared_history_and_qualified_snapshot_decisions_keep_comments_and_repla
     assert_eq!(hints.1["domains"], json!(["PRODUCT"]));
     assert_eq!(hints.1["approve_all_available"], true);
     assert_eq!(hints.1["unviewed_content_warning"], true);
+    assert_eq!(hints.1["unviewed_domains"], json!(["PRODUCT"]));
+    assert_eq!(empty.1["unviewed_content_warning"], true);
+    assert_eq!(empty.1["unviewed_domains"], json!([]));
     let value = body(&fp, "APPROVE_ALL");
     let created = post(&f, &product, &path, value.clone()).await;
     assert_eq!(created.0, StatusCode::CREATED, "{}", created.1);

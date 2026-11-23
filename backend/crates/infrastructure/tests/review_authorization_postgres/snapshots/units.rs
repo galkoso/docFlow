@@ -168,6 +168,15 @@ async fn unit_migration_preserves_legacy_evidence_and_requires_new_complete_publ
         (0, 0, 0)
     );
     assert!(coverage.units.is_empty());
+    let warning = specspace_infrastructure::official_reviews::PgOfficialReviews::new(pool.clone())
+        .history(f.product, f.proposal, old.snapshot_id, None)
+        .await
+        .unwrap();
+    assert!(warning.unviewed_content_warning);
+    assert_eq!(
+        warning.unviewed_domains,
+        vec![specspace_application::review_configuration::ReviewArea::Product]
+    );
 
     {
         use specspace_application::comparison_file::{

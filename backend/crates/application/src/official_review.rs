@@ -96,8 +96,11 @@ pub struct OfficialReviewHistory {
     /// Current caller assignments; each POST independently rechecks eligibility.
     pub domains: Vec<ReviewArea>,
     pub approve_all_available: bool,
-    /// No server section-visit receipt exists yet; always warn before approve-all.
+    /// True when any eligible domain is unread/unknown, or no domain is eligible.
     pub unviewed_content_warning: bool,
+    /// Eligible domains with incomplete or unavailable acknowledged coverage.
+    /// These read facts do not confer section approval or permission to merge.
+    pub unviewed_domains: Vec<ReviewArea>,
     pub read_at: String,
     pub entries: Vec<OfficialReviewEntry>,
     pub next_after: Option<Uuid>,

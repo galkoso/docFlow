@@ -6,7 +6,18 @@ use specspace_application::{
     proposal::UiImpact,
     review_configuration::{ReviewConfigurationRequest, ReviewSettings, ReviewerSelection},
 };
+use specspace_infrastructure::official_reviews::PgOfficialReviews;
 use specspace_infrastructure::review_configuration::PgReviewConfiguration;
+async fn history(
+    pool: &PgPool,
+    r: &Ready,
+    actor: Uuid,
+) -> specspace_application::official_review::OfficialReviewHistory {
+    PgOfficialReviews::new(pool.clone())
+        .history(actor, r.f.proposal, r.snapshot, None)
+        .await
+        .unwrap()
+}
 async fn coverage(r: &Ready) -> ReviewCoverage {
     r.store
         .coverage(
@@ -180,6 +191,10 @@ async fn coverage_requires_explicit_acknowledgement_of_every_present_side_withou
     );
     assert_eq!(before.units[0].before, State::Unviewed);
     assert_eq!(before.units[0].after, State::Unviewed);
+    assert_eq!(
+        history(&pool, &r, r.f.product).await.unviewed_domains,
+        vec![ReviewArea::Product]
+    );
     deliver(&r).await.unwrap();
     assert_eq!(coverage(&r).await.units[0].after, State::Unviewed);
     acknowledge(&r, AnchorSide::After, 0).await;
@@ -187,11 +202,18 @@ async fn coverage_requires_explicit_acknowledgement_of_every_present_side_withou
     assert_eq!(after.units[0].after, State::Viewed);
     assert!(!after.units[0].viewed);
     assert_eq!(after.viewed_units, 0);
+    assert!(
+        history(&pool, &r, r.f.product)
+            .await
+            .unviewed_content_warning
+    );
     acknowledge(&r, AnchorSide::Before, 0).await;
     let reads = r.source.reads.load(Ordering::SeqCst);
     let complete = coverage(&r).await;
     assert!(complete.units[0].viewed);
     assert_eq!((complete.viewed_units, complete.unviewed_units), (1, 0));
+    let warning = history(&pool, &r, r.f.product).await;
+    assert!(!warning.unviewed_content_warning && warning.unviewed_domains.is_empty());
     assert_eq!(r.source.reads.load(Ordering::SeqCst), reads);
     assert_eq!(
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM official_reviews")
@@ -213,6 +235,11 @@ async fn overlapping_duplicate_and_empty_tail_visits_cannot_hide_unread_gaps(poo
     acknowledge(&r, AnchorSide::After, 0).await;
     acknowledge(&r, AnchorSide::After, 131072).await;
     assert_eq!(coverage(&r).await.units[0].after, State::Partial);
+    assert!(
+        history(&pool, &r, r.f.product)
+            .await
+            .unviewed_content_warning
+    );
     acknowledge(&r, AnchorSide::After, 65536).await;
     let joined = coverage(&r).await;
     assert_eq!(joined.units[0].after, State::Viewed);
@@ -297,6 +324,118 @@ async fn identical_actor_and_unit_ids_do_not_transfer_coverage_across_domains_or
     let old = coverage(&r).await;
     assert!(!old.current_for_metadata);
     assert_eq!(old.viewed_units, 1);
+    let historical = history(&pool, &r, r.f.product).await;
+    assert!(
+        !historical.current_for_metadata
+            && historical.domains.is_empty()
+            && historical.unviewed_content_warning
+    );
+    let fresh = PgOfficialReviews::new(pool.clone())
+        .history(r.f.product, r.f.proposal, snapshot, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        fresh.unviewed_domains,
+        vec![ReviewArea::Design, ReviewArea::Product]
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn warning_is_scoped_to_each_eligible_actor_domain_and_never_creates_a_decision(
+    pool: PgPool,
+) {
+    let r = custom(&pool, None, false, true).await;
+    assert_eq!(
+        history(&pool, &r, r.f.product).await.unviewed_domains,
+        vec![ReviewArea::Design, ReviewArea::Product]
+    );
+    acknowledge(&r, AnchorSide::Before, 0).await;
+    acknowledge(&r, AnchorSide::After, 0).await;
+    let product_read = history(&pool, &r, r.f.product).await;
+    assert!(product_read.unviewed_content_warning);
+    assert_eq!(product_read.unviewed_domains, vec![ReviewArea::Design]);
+    for side in [AnchorSide::Before, AnchorSide::After] {
+        let mut request = r.request.clone();
+        request.domain = ReviewArea::Design;
+        request.side = side;
+        let w = r
+            .store
+            .deliver(r.f.product, r.f.proposal, r.snapshot, request)
+            .await
+            .unwrap();
+        r.store
+            .acknowledge(r.f.product, r.f.proposal, r.snapshot, ack(&w))
+            .await
+            .unwrap();
+    }
+    assert!(
+        !history(&pool, &r, r.f.product)
+            .await
+            .unviewed_content_warning
+    );
+    assert_eq!(
+        history(&pool, &r, r.f.development).await.unviewed_domains,
+        vec![ReviewArea::Development]
+    );
+    let author = history(&pool, &r, r.f.owner).await;
+    assert!(
+        author.domains.is_empty()
+            && author.unviewed_domains.is_empty()
+            && author.unviewed_content_warning
+    );
+    sqlx::query("UPDATE memberships SET review_domains='{}' WHERE user_id=$1")
+        .bind(r.f.product)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let revoked = history(&pool, &r, r.f.product).await;
+    assert!(revoked.domains.is_empty() && revoked.unviewed_content_warning);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM official_reviews")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn reading_all_text_cannot_hide_off_page_unsupported_work_from_approve_all_warning(
+    pool: PgPool,
+) {
+    let r = custom(&pool, None, true, false).await;
+    let page = PgReviewSnapshots::new(pool.clone())
+        .units(r.f.product, r.f.proposal, r.snapshot, 0, 100)
+        .await
+        .unwrap();
+    for unit in page.units {
+        for side in [AnchorSide::Before, AnchorSide::After] {
+            let source = match side {
+                AnchorSide::Before => &unit.before,
+                AnchorSide::After => &unit.after,
+            };
+            if !source.as_ref().is_some_and(|s| s.range.is_some()) {
+                continue;
+            }
+            let mut request = r.request.clone();
+            request.unit_id = unit.id.clone();
+            request.side = side;
+            let w = r
+                .store
+                .deliver(r.f.product, r.f.proposal, r.snapshot, request)
+                .await
+                .unwrap();
+            r.store
+                .acknowledge(r.f.product, r.f.proposal, r.snapshot, ack(&w))
+                .await
+                .unwrap();
+        }
+    }
+    let counts = coverage(&r).await;
+    assert!(counts.viewed_units > 0 && counts.unsupported_units > 0);
+    let hints = history(&pool, &r, r.f.product).await;
+    assert!(hints.unviewed_content_warning);
+    assert_eq!(hints.unviewed_domains, vec![ReviewArea::Product]);
 }
 #[sqlx::test(migrations = "../../migrations")]
 async fn coverage_reports_unsupported_media_and_bounds_paging_scope_and_current_membership(

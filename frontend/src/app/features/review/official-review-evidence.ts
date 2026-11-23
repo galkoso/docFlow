@@ -10,7 +10,9 @@ export function validOfficialHistory(v: OfficialHistory, actor: string, proposal
   if (!v || v.proposal_id !== proposal || v.snapshot_id !== snapshot.snapshot_id || v.fingerprint !== snapshot.fingerprint
     || v.head_sha !== s.head_sha || v.target_sha !== s.target_sha || v.policy_version !== s.policy_version || v.configuration_version !== s.configuration_version
     || !utc(v.read_at) || typeof v.current_for_metadata !== 'boolean' || typeof v.approve_all_available !== 'boolean'
-    || v.unviewed_content_warning !== true || !Array.isArray(v.domains) || v.domains.length > 3 || new Set(v.domains).size !== v.domains.length
+    || !Array.isArray(v.domains) || v.domains.length > 3 || new Set(v.domains).size !== v.domains.length
+    || !Array.isArray(v.unviewed_domains) || v.unviewed_domains.length > 3 || new Set(v.unviewed_domains).size !== v.unviewed_domains.length
+    || v.unviewed_domains.some(d => !v.domains.includes(d)) || v.unviewed_content_warning !== (!v.domains.length || !!v.unviewed_domains.length)
     || v.domains.some(d => !reviewAreas.includes(d) || !snapshot.metadata.assignments.some(a => a.reviewer_id === actor && a.domain === d))
     || v.domains.length > 0 && (!v.current_for_metadata || snapshot.metadata.context.author_id === actor)
     || v.approve_all_available && (!v.current_for_metadata || !v.domains.length || s.ui_impact === 'UNDECIDED'

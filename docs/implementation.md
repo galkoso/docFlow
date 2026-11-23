@@ -2367,3 +2367,18 @@ Checkboxes represent verified work only.
   media acknowledgements and required-check assembly remain unfinished, and
   approve-all warnings stay conservative. The full specification goal remains
   active.
+
+- Server-backed approve-all reading warnings: official-review history now reads
+  acknowledged range coverage in its existing repeatable-read transaction. A
+  shared database reader supplies both this calculation and the coverage API,
+  preserving exact actor/domain/snapshot/fingerprint/source binding and global
+  counts. The new `unviewed_domains` contract reports each eligible caller domain
+  independently; the aggregate warning also remains true for an ineligible
+  caller. Legacy evidence, unread gaps, incomplete sides and unsupported media
+  retain warnings. This read performs no provider IO and creates no decision.
+  Database cases cover domain/actor isolation and remaining media, with existing
+  lifecycle, gap, policy and legacy cases extended for warning behavior. HTTP
+  checks compare real visit coverage with history while preserving independent
+  reviewer warnings. OpenAPI and generated client types include the domain list;
+  client evidence rejects missing, duplicate, foreign-domain and inconsistent
+  warning data. Section approval and merge authority remain separate work.

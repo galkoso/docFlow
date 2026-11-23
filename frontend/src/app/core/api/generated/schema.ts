@@ -1595,8 +1595,13 @@ export interface components {
             /** Format: uuid */
             snapshot_id: string;
             target_sha: string;
-            /** @description No server section-visit receipt exists yet; always warn before approve-all. */
+            /** @description True when any eligible domain is unread/unknown, or no domain is eligible. */
             unviewed_content_warning: boolean;
+            /**
+             * @description Eligible domains with incomplete or unavailable acknowledged coverage.
+             *     These read facts do not confer section approval or permission to merge.
+             */
+            unviewed_domains: components["schemas"]["ReviewArea"][];
         };
         OfficialReviewRecorded: {
             /** Format: int64 */

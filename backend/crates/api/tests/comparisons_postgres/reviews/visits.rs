@@ -353,6 +353,9 @@ async fn http_coverage_reads_exact_acknowledged_ranges_without_provider_io_or_ap
     assert_eq!(initial.1["fingerprint"], r.fp);
     assert_eq!(initial.1["viewed_units"], 0);
     assert_eq!(initial.1["available"], true);
+    let decisions = format!("{}/decisions", r.root);
+    let warning = get(&r.f.app, &r.product, &decisions, true).await;
+    assert_eq!(warning.1["unviewed_domains"], json!(["PRODUCT"]));
     let w = get(&r.f.app, &r.product, &r.source, true).await;
     post(&r, body(&w.1)).await;
     if !r.unit["before"].is_null() {
@@ -388,6 +391,20 @@ async fn http_coverage_reads_exact_acknowledged_ranges_without_provider_io_or_ap
     .await;
     assert_eq!(other.0, StatusCode::OK);
     assert_eq!(other.1["viewed_units"], 0);
+    let read = get(&r.f.app, &r.product, &decisions, true).await;
+    assert_eq!(read.0, StatusCode::OK);
+    let unread = result.1["unviewed_units"].as_i64().unwrap() > 0;
+    assert_eq!(read.1["unviewed_content_warning"], unread);
+    assert_eq!(
+        read.1["unviewed_domains"],
+        if unread {
+            json!(["PRODUCT"])
+        } else {
+            json!([])
+        }
+    );
+    let independent = get(&r.f.app, &r.development, &decisions, true).await;
+    assert_eq!(independent.1["unviewed_domains"], json!(["DEVELOPMENT"]));
     assert_eq!(r.f.provider.reads.load(Ordering::SeqCst), reads);
     assert!(!result.1.to_string().contains("PRIVATE SOURCE SENTINEL"));
     assert_eq!(

@@ -10110,6 +10110,7 @@
           "domains",
           "approve_all_available",
           "unviewed_content_warning",
+          "unviewed_domains",
           "read_at",
           "entries"
         ],
@@ -10170,7 +10171,14 @@
           },
           "unviewed_content_warning": {
             "type": "boolean",
-            "description": "No server section-visit receipt exists yet; always warn before approve-all."
+            "description": "True when any eligible domain is unread/unknown, or no domain is eligible."
+          },
+          "unviewed_domains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewArea"
+            },
+            "description": "Eligible domains with incomplete or unavailable acknowledged coverage.\nThese read facts do not confer section approval or permission to merge."
           }
         }
       },

@@ -25,3 +25,4 @@ pub mod pr_recovery;
 pub mod pr_sync;
 
 pub mod review_visits;
+pub mod unit_approval;

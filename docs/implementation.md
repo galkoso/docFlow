@@ -2398,3 +2398,11 @@ Checkboxes represent verified work only.
   decision-history reads return no-store authentication failures. Browser visual
   acceptance remains pending; section approvals, media acknowledgement support,
   required-check assembly and the rest of the full specification remain open.
+
+- Individual review-item approval contracts: strict requests bind one nonce,
+  fingerprint, domain and sealed mandatory unit. Separate receipt and paged status
+  types include actor, snapshot, head, target and policy/configuration context;
+  unavailable manifests stay distinct from complete approval. The contract test
+  rejects malformed identities and caller-supplied actor/viewed/approved/source
+  claims. These DTOs confer no eligibility or publication authority. Persistence,
+  HTTP/UI integration and final-check assembly are separate stages.

@@ -2492,3 +2492,24 @@ Checkboxes represent verified work only.
   62 files and the production build pass. Browser discovery still has no connection,
   so physical keyboard/RTL/320px acceptance remains pending. Final required-check
   assembly, media acknowledgements and the remaining full specification stay open.
+
+- Regular official approval coverage: migration 029 adds APPROVE as a distinct
+  action from the explicit all-snapshot override. A shared scope-bound database
+  function counts real distinct individual approvals against the complete sealed
+  unit set, for official submission and readiness assembly. Regular approval
+  requires every mandatory item in the selected actor/domain, a current positive
+  base/UI context and fresh provider refs; coverage is checked before IO, after
+  IO under locks, and by the insert guard. Empty optional explanations are allowed
+  only for this regular action. Approve-all retains its required explanation and
+  independent warning without inventing individual records. Four database cases
+  cover subsets versus complete evidence, read-only visits, repeat counts, domain
+  isolation, provider-boundary revocation, effective comments and direct insertion.
+  An end-to-end HTTP case exercises all item approvals before a regular decision
+  and exact replay; a contract case preserves explanation rules. Legacy migration
+  reconstruction includes the new function. This supplies a missing readiness
+  input; final evaluation/publication and blocker/question assembly remain open.
+  The full backend run passes 740 tests with the same two performance measurements
+  excluded. Workspace Clippy/formatting and all backend binary builds pass. The
+  exported OpenAPI contract matches generated types. Migration 029 is applied
+  locally and reruns cleanly; the rebuilt API is ready and decision history remains
+  authenticated with no-store responses.

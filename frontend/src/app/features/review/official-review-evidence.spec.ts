@@ -1,3 +1,4 @@
+import type { OfficialHistory } from '../../core/api/review-api';
 import { product, actor, proposal, other, metadata, officialHistory } from '../../../testing/review-fixtures';
 import { validOfficialHistory } from './official-review-evidence';
 
@@ -41,5 +42,23 @@ describe('Official review evidence validation', () => {
     if (fault === 'ineligible') { value.domains = []; value.unviewed_domains = []; value.unviewed_content_warning = false; }
     if (fault === 'empty') value.unviewed_domains = [];
     expect(validOfficialHistory(value, product, proposal, metadata())).toBe(false);
+  });
+  it('accepts regular approval readiness only in an eligible current complete domain and permits its optional explanation', () => {
+    const s = metadata(); s.metadata.summary.recorded_base_sha = s.metadata.summary.target_sha; s.metadata.summary.merge_base_sha = s.metadata.summary.target_sha; s.metadata.summary.base_outdated = false;
+    const value = { ...officialHistory(product), approve_all_available: true, approve_domains: ['PRODUCT' as const], unviewed_domains: [], unviewed_content_warning: false };
+    value.entries = [{ id: other, reviewer_id: product, reviewer_name: 'Reviewer', domain: 'PRODUCT', decision: 'APPROVE', explanation: '',
+      recorded_at: '2026-11-19T00:00:00Z', effective: true, reviewer_eligible: true, valid_for_stored_context: true }];
+    expect(validOfficialHistory(value, product, proposal, s)).toBe(true);
+    value.entries[0].decision = 'APPROVE_ALL'; expect(validOfficialHistory(value, product, proposal, s)).toBe(false);
+  });
+  it.each(['missing', 'duplicate', 'unassigned', 'unviewed', 'unavailable'])('rejects inconsistent %s regular approval hints', fault => {
+    const s = metadata(); s.metadata.summary.recorded_base_sha = s.metadata.summary.target_sha; s.metadata.summary.merge_base_sha = s.metadata.summary.target_sha; s.metadata.summary.base_outdated = false;
+    const value: OfficialHistory = { ...officialHistory(product), approve_all_available: true, approve_domains: ['PRODUCT'], unviewed_domains: [], unviewed_content_warning: false };
+    if (fault === 'missing') delete (value as Partial<typeof value>).approve_domains;
+    if (fault === 'duplicate') value.approve_domains = ['PRODUCT', 'PRODUCT'];
+    if (fault === 'unassigned') value.approve_domains = ['DESIGN'];
+    if (fault === 'unviewed') { value.unviewed_domains = ['PRODUCT']; value.unviewed_content_warning = true; }
+    if (fault === 'unavailable') value.approve_all_available = false;
+    expect(validOfficialHistory(value, product, proposal, s)).toBe(false);
   });
 });

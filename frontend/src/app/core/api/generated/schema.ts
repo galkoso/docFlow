@@ -1593,6 +1593,11 @@ export interface components {
         };
         OfficialReviewHistory: {
             approve_all_available: boolean;
+            /**
+             * @description Caller domains ready for regular approval after all mandatory individual
+             *     approvals. Submission independently rechecks coverage and provider refs.
+             */
+            approve_domains: components["schemas"]["ReviewArea"][];
             /** Format: int64 */
             configuration_version: number;
             current_for_metadata: boolean;
@@ -2051,7 +2056,7 @@ export interface components {
             offset: number;
         };
         /** @enum {string} */
-        ReviewDecision: "APPROVE_ALL" | "REQUEST_CHANGES" | "COMMENT";
+        ReviewDecision: "APPROVE" | "APPROVE_ALL" | "REQUEST_CHANGES" | "COMMENT";
         /** @enum {string} */
         ReviewFindingSeverity: "warning" | "blocker";
         /**

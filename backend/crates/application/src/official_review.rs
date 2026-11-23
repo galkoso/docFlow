@@ -8,6 +8,7 @@ use uuid::Uuid;
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum ReviewDecision {
+    Approve,
     ApproveAll,
     RequestChanges,
     Comment,
@@ -15,6 +16,7 @@ pub enum ReviewDecision {
 impl ReviewDecision {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::Approve => "APPROVE",
             Self::ApproveAll => "APPROVE_ALL",
             Self::RequestChanges => "REQUEST_CHANGES",
             Self::Comment => "COMMENT",
@@ -40,7 +42,7 @@ impl OfficialReviewRequest {
                 .expected_fingerprint
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-            || self.explanation.is_empty()
+            || self.decision != ReviewDecision::Approve && self.explanation.is_empty()
             || self.explanation.chars().count() > 10000
             || self.explanation.contains('\0')
         {
@@ -96,6 +98,9 @@ pub struct OfficialReviewHistory {
     /// Current caller assignments; each POST independently rechecks eligibility.
     pub domains: Vec<ReviewArea>,
     pub approve_all_available: bool,
+    /// Caller domains ready for regular approval after all mandatory individual
+    /// approvals. Submission independently rechecks coverage and provider refs.
+    pub approve_domains: Vec<ReviewArea>,
     /// True when any eligible domain is unread/unknown, or no domain is eligible.
     pub unviewed_content_warning: bool,
     /// Eligible domains with incomplete or unavailable acknowledged coverage.
@@ -104,4 +109,30 @@ pub struct OfficialReviewHistory {
     pub read_at: String,
     pub entries: Vec<OfficialReviewEntry>,
     pub next_after: Option<Uuid>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn only_regular_approval_allows_an_empty_optional_explanation() {
+        for decision in [
+            ReviewDecision::Approve,
+            ReviewDecision::ApproveAll,
+            ReviewDecision::RequestChanges,
+            ReviewDecision::Comment,
+        ] {
+            let mut request = OfficialReviewRequest {
+                request_id: Uuid::new_v4(),
+                expected_fingerprint: "a".repeat(64),
+                domain: ReviewArea::Product,
+                decision,
+                explanation: " \n ".into(),
+            };
+            assert_eq!(
+                request.normalize().is_ok(),
+                decision == ReviewDecision::Approve
+            );
+        }
+    }
 }

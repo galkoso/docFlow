@@ -22,6 +22,7 @@ pub enum OfficialReviewError {
     Stale,
     BaseOutdated,
     UiUndecided,
+    SectionsIncomplete,
     IdempotencyMismatch,
     Quota,
     ProviderUnavailable,
@@ -86,6 +87,7 @@ impl Recorded {
                 _ => return Err(OfficialReviewError::Unavailable),
             },
             decision: match self.decision.as_str() {
+                "APPROVE" => ReviewDecision::Approve,
                 "APPROVE_ALL" => ReviewDecision::ApproveAll,
                 "REQUEST_CHANGES" => ReviewDecision::RequestChanges,
                 "COMMENT" => ReviewDecision::Comment,
@@ -184,7 +186,10 @@ fn current(scope: &Scope, request: &OfficialReviewRequest) -> Result<(), Officia
     if !scope.current || scope.fingerprint != request.expected_fingerprint {
         return Err(OfficialReviewError::Stale);
     }
-    if request.decision == ReviewDecision::ApproveAll {
+    if matches!(
+        request.decision,
+        ReviewDecision::Approve | ReviewDecision::ApproveAll
+    ) {
         if scope.recorded_base_sha != scope.target_sha || scope.merge_base_sha != scope.target_sha {
             return Err(OfficialReviewError::BaseOutdated);
         }
@@ -197,6 +202,34 @@ fn current(scope: &Scope, request: &OfficialReviewRequest) -> Result<(), Officia
         ) {
             return Err(OfficialReviewError::UiUndecided);
         }
+    }
+    Ok(())
+}
+async fn individual_approvals(
+    conn: &mut PgConnection,
+    scope: &Scope,
+    actor: Uuid,
+    proposal: Uuid,
+    snapshot: Uuid,
+    request: &OfficialReviewRequest,
+) -> Result<(), OfficialReviewError> {
+    if request.decision != ReviewDecision::Approve {
+        return Ok(());
+    }
+    let coverage = crate::review_approval_coverage::read(
+        conn,
+        crate::review_coverage::CoverageScope {
+            organization: scope.organization_id,
+            proposal,
+            snapshot,
+            actor,
+            domain: request.domain,
+            fingerprint: &scope.fingerprint,
+        },
+    )
+    .await?;
+    if !coverage.complete() {
+        return Err(OfficialReviewError::SectionsIncomplete);
     }
     Ok(())
 }
@@ -296,6 +329,7 @@ impl PgOfficialReviews {
             return Ok(old);
         }
         current(&before, &request)?;
+        individual_approvals(&mut tx, &before, actor, proposal, snapshot, &request).await?;
         let _permit = self
             .slots
             .try_acquire()
@@ -378,6 +412,7 @@ impl PgOfficialReviews {
             return Ok(old);
         }
         current(&after, &request)?;
+        individual_approvals(&mut tx, &after, actor, proposal, snapshot, &request).await?;
         if before.organization_id != after.organization_id
             || before.repository_id != after.repository_id
             || before.remote_id != after.remote_id

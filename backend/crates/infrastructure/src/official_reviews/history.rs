@@ -103,6 +103,7 @@ impl PgOfficialReviews {
             }
         }
         let mut unviewed_domains = Vec::new();
+        let mut approve_domains = Vec::new();
         for &domain in &domains {
             let coverage = crate::review_coverage::read(
                 &mut tx,
@@ -121,6 +122,21 @@ impl PgOfficialReviews {
             .map_err(|_| OfficialReviewError::Unavailable)?;
             if coverage.has_unviewed() {
                 unviewed_domains.push(domain);
+            }
+            let approvals = crate::review_approval_coverage::read(
+                &mut tx,
+                crate::review_coverage::CoverageScope {
+                    organization: org,
+                    proposal,
+                    snapshot,
+                    actor,
+                    domain,
+                    fingerprint: &h.fingerprint,
+                },
+            )
+            .await?;
+            if approvals.complete() {
+                approve_domains.push(domain);
             }
         }
         let unviewed_content_warning = domains.is_empty() || !unviewed_domains.is_empty();
@@ -147,6 +163,7 @@ impl PgOfficialReviews {
                     reviewer_name: r.reviewer_name,
                     domain: area(&r.domain)?,
                     decision: match r.decision.as_str() {
+                        "APPROVE" => ReviewDecision::Approve,
                         "APPROVE_ALL" => ReviewDecision::ApproveAll,
                         "REQUEST_CHANGES" => ReviewDecision::RequestChanges,
                         "COMMENT" => ReviewDecision::Comment,
@@ -173,6 +190,9 @@ impl PgOfficialReviews {
                     .and_then(Value::as_str),
                 Some("YES" | "NO")
             );
+        if !available {
+            approve_domains.clear();
+        }
         tx.commit().await?;
         Ok(OfficialReviewHistory {
             proposal_id: proposal,
@@ -184,6 +204,7 @@ impl PgOfficialReviews {
             configuration_version: h.configuration_version,
             current_for_metadata: current,
             approve_all_available: available,
+            approve_domains,
             domains,
             unviewed_content_warning,
             unviewed_domains,

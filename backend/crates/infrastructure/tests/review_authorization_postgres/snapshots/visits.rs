@@ -3,6 +3,8 @@ use super::*;
 mod approvals;
 #[path = "visits/coverage.rs"]
 mod coverage;
+#[path = "visits/regular.rs"]
+mod regular;
 use serde_json::Value;
 use specspace_application::{
     comparison_file::{

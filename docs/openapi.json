@@ -10411,6 +10411,7 @@
           "current_for_metadata",
           "domains",
           "approve_all_available",
+          "approve_domains",
           "unviewed_content_warning",
           "unviewed_domains",
           "read_at",
@@ -10419,6 +10420,13 @@
         "properties": {
           "approve_all_available": {
             "type": "boolean"
+          },
+          "approve_domains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewArea"
+            },
+            "description": "Caller domains ready for regular approval after all mandatory individual\napprovals. Submission independently rechecks coverage and provider refs."
           },
           "configuration_version": {
             "type": "integer",
@@ -12115,6 +12123,7 @@
       "ReviewDecision": {
         "type": "string",
         "enum": [
+          "APPROVE",
           "APPROVE_ALL",
           "REQUEST_CHANGES",
           "COMMENT"

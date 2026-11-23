@@ -44,6 +44,97 @@ async fn count(pool: &PgPool) -> i64 {
         .await
         .unwrap()
 }
+#[sqlx::test(migrations = "../../migrations")]
+async fn ordinary_official_approval_waits_for_all_individual_records_and_keeps_the_explicit_all_option_separate(
+    pool: PgPool,
+) {
+    let (f, product, development) = configured(&pool, false).await;
+    f.provider.base_updated.store(true, Ordering::SeqCst);
+    sqlx::query("UPDATE proposals SET base_sha=$2 WHERE id=$1")
+        .bind(f.proposal)
+        .bind(MAIN)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (published, snapshot) = publish(&f, 2).await;
+    let root = format!("{}/{snapshot}", history_path(&f));
+    let fp = published["review"]["fingerprint"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let units = get(
+        &f.app,
+        &product,
+        &format!("{root}/units?offset=0&limit=100"),
+        true,
+    )
+    .await;
+    assert_eq!(units.0, StatusCode::OK);
+    let first = units.1["units"][0].clone();
+    let r = Ready {
+        f,
+        product,
+        development,
+        root: root.clone(),
+        source: String::new(),
+        fp: fp.clone(),
+        unit: first,
+    };
+    let decision = json!({"request_id":Uuid::new_v4(),"expected_fingerprint":fp,"domain":"PRODUCT","decision":"APPROVE","explanation":""});
+    let decisions = format!("{root}/decisions");
+    let initial = post_raw(
+        &r.f.app,
+        Some(&r.product),
+        &decisions,
+        decision.to_string(),
+        PostOptions::new(&r.product, "unused"),
+    )
+    .await;
+    assert_eq!(initial.0, StatusCode::CONFLICT);
+    assert_eq!(initial.1["error"]["code"], "REVIEW_SECTIONS_INCOMPLETE");
+    for unit in units.1["units"].as_array().unwrap() {
+        for side in ["before", "after"] {
+            if unit[side].is_null() {
+                continue;
+            }
+            let path = format!(
+                "{root}/units/{}/source?expected_fingerprint={fp}&domain=PRODUCT&side={side}&offset=0",
+                unit["id"].as_str().unwrap()
+            );
+            let w = get(&r.f.app, &r.product, &path, true).await;
+            assert_eq!(w.0, StatusCode::OK, "{}", w.1);
+            assert_eq!(super::post(&r, body(&w.1)).await.0, StatusCode::CREATED);
+        }
+        let mut approve = intent(&r);
+        approve["unit_id"] = unit["id"].clone();
+        assert_eq!(submit(&r, approve).await.0, StatusCode::CREATED);
+    }
+    let hints = get(&r.f.app, &r.product, &decisions, true).await;
+    assert_eq!(hints.1["approve_domains"], json!(["PRODUCT"]));
+    let created = post_raw(
+        &r.f.app,
+        Some(&r.product),
+        &decisions,
+        decision.to_string(),
+        PostOptions::new(&r.product, "unused"),
+    )
+    .await;
+    assert_eq!(created.0, StatusCode::CREATED, "{}", created.1);
+    assert_eq!(created.1["decision"], "APPROVE");
+    let replay = post_raw(
+        &r.f.app,
+        Some(&r.product),
+        &decisions,
+        decision.to_string(),
+        PostOptions::new(&r.product, "unused"),
+    )
+    .await;
+    assert_eq!(replay.0, StatusCode::OK);
+    assert_eq!(replay.1["id"], created.1["id"]);
+    let independent = get(&r.f.app, &r.development, &decisions, true).await;
+    assert_eq!(independent.1["approve_domains"], json!([]));
+    assert_eq!(independent.1["approve_all_available"], true);
+}
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn explicit_unit_approval_is_distinct_from_visits_and_concurrent_exact_requests_replay_without_git_changes(

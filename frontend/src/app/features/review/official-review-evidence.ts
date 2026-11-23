@@ -3,7 +3,7 @@ import { uuid } from '../comparison/comparison-evidence';
 import { text, utc } from './snapshot-evidence';
 
 export const reviewAreas = ['PRODUCT', 'DEVELOPMENT', 'DESIGN'] as const;
-export const reviewDecisions = ['APPROVE_ALL', 'REQUEST_CHANGES', 'COMMENT'] as const;
+export const reviewDecisions = ['APPROVE', 'APPROVE_ALL', 'REQUEST_CHANGES', 'COMMENT'] as const;
 const order = (v: string) => { const [base, fraction = ''] = v.replace(/(?:Z|\+00:00)$/, '').split('.'); return `${base}.${fraction.padEnd(9, '0')}`; };
 export function validOfficialHistory(v: OfficialHistory, actor: string, proposal: string, snapshot: ReviewSnapshot, after?: string): boolean {
   const s = snapshot.metadata.summary;
@@ -13,6 +13,8 @@ export function validOfficialHistory(v: OfficialHistory, actor: string, proposal
     || !Array.isArray(v.domains) || v.domains.length > 3 || new Set(v.domains).size !== v.domains.length
     || !Array.isArray(v.unviewed_domains) || v.unviewed_domains.length > 3 || new Set(v.unviewed_domains).size !== v.unviewed_domains.length
     || v.unviewed_domains.some(d => !v.domains.includes(d)) || v.unviewed_content_warning !== (!v.domains.length || !!v.unviewed_domains.length)
+    || !Array.isArray(v.approve_domains) || v.approve_domains.length > 3 || new Set(v.approve_domains).size !== v.approve_domains.length
+    || v.approve_domains.some(d => !v.domains.includes(d) || v.unviewed_domains.includes(d)) || v.approve_domains.length > 0 && !v.approve_all_available
     || v.domains.some(d => !reviewAreas.includes(d) || !snapshot.metadata.assignments.some(a => a.reviewer_id === actor && a.domain === d))
     || v.domains.length > 0 && (!v.current_for_metadata || snapshot.metadata.context.author_id === actor)
     || v.approve_all_available && (!v.current_for_metadata || !v.domains.length || s.ui_impact === 'UNDECIDED'
@@ -21,7 +23,7 @@ export function validOfficialHistory(v: OfficialHistory, actor: string, proposal
   const ids = new Set<string>();
   for (const item of v.entries) {
     if (!item || !uuid(item.id) || item.id === after || ids.has(item.id) || !uuid(item.reviewer_id) || !text(item.reviewer_name, 200)
-      || !reviewAreas.includes(item.domain) || !reviewDecisions.includes(item.decision) || !text(item.explanation, 10000, 1)
+      || !reviewAreas.includes(item.domain) || !reviewDecisions.includes(item.decision) || !text(item.explanation, 10000, item.decision === 'APPROVE' ? 0 : 1)
       || !utc(item.recorded_at) || order(item.recorded_at) > order(v.read_at) || typeof item.effective !== 'boolean'
       || typeof item.reviewer_eligible !== 'boolean' || item.decision === 'COMMENT' && item.effective
       || item.valid_for_stored_context !== (v.current_for_metadata && item.effective && item.reviewer_eligible)) return false;

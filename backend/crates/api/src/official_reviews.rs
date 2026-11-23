@@ -129,6 +129,7 @@ fn failure(error: OfficialReviewError) -> Response {
         Stale => (StatusCode::CONFLICT, "REVIEW_CONTEXT_CHANGED", None),
         BaseOutdated => (StatusCode::CONFLICT, "REVIEW_BASE_OUTDATED", None),
         UiUndecided => (StatusCode::CONFLICT, "UI_IMPACT_UNDECIDED", None),
+        SectionsIncomplete => (StatusCode::CONFLICT, "REVIEW_SECTIONS_INCOMPLETE", None),
         IdempotencyMismatch => (StatusCode::CONFLICT, "IDEMPOTENCY_MISMATCH", None),
         Quota => (
             StatusCode::TOO_MANY_REQUESTS,

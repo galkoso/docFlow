@@ -24,7 +24,7 @@ export const reviewUnits = (viewer = actor, offset = 0, total = 2): ReviewUnits 
 
 export const officialHistory = (viewer = actor): OfficialHistory => ({ proposal_id: proposal, snapshot_id: snapshot, fingerprint: metadata().fingerprint,
   head_sha: head, target_sha: target, policy_version: 1, configuration_version: 2, current_for_metadata: true,
-  domains: viewer === product ? ['PRODUCT'] : [], approve_all_available: false, unviewed_content_warning: true,
+  domains: viewer === product ? ['PRODUCT'] : [], approve_all_available: false, approve_domains: [], unviewed_content_warning: true,
   unviewed_domains: viewer === product ? ['PRODUCT'] : [],
   read_at: '2026-11-19T00:00:01Z', entries: [], next_after: null });
 

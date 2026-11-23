@@ -147,6 +147,7 @@ export class ReviewSnapshotsPage implements OnDestroy {
     const actor = this.session.profile()?.user_id, proposal = this.proposal();
     if (actor && proposal && this.visible()) this.state.refreshHistory(actor, proposal);
   }
+  individualApprovalRecorded(): void { if (this.visible()) this.official()?.refreshAfterUnitApproval(); }
   requirementPage(offset: number): void { this.navigate({ snapshot: this.state.selected(), requirements: offset }); }
   mediaPage(offset: number): void { this.navigate({ snapshot: this.state.selected(), media: offset }); }
   historyPage(after: string | null): void { this.navigate({ after }); }

@@ -2513,3 +2513,19 @@ Checkboxes represent verified work only.
   exported OpenAPI contract matches generated types. Migration 029 is applied
   locally and reruns cleanly; the rebuilt API is ready and decision history remains
   authenticated with no-store responses.
+
+- Regular approval UI and readiness hints: the official form now separates regular
+  approval after all individual items from the explicit all-changes action. The
+  regular explanation is optional; other decisions keep required text. Validated
+  domain-specific hints enable the regular action, with synchronous checks before
+  posting and exact original-body retry after uncertainty. Known incomplete-item
+  rejection removes regular availability without converting the action to an
+  override. A verified item receipt refreshes official hints, retaining source
+  selection and explanation drafts while formal submission is disabled during
+  the read. Failed refreshes clear old readiness data. Six evidence cases, four
+  form cases and a parent integration case cover the new contract and flow. All
+  689 frontend tests in 62 files and the production build pass. Browser discovery
+  still reports no connection, so physical keyboard/RTL/320px acceptance remains
+  pending. Required-check assembly/publication, blocker/question integration,
+  merge and the rest of the full specification remain unfinished; the goal stays
+  active.

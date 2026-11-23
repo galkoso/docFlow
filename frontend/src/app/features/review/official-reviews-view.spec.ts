@@ -27,6 +27,37 @@ describe('Official snapshot review controls', () => {
       policy_version: 1, configuration_version: 2, recorded_at: '2026-11-19T00:00:00Z', replayed: false };
   }
   afterEach(() => vi.useRealTimers());
+  it('offers regular approval only after fresh complete individual approvals and sends it explicitly without requiring an explanation', () => {
+    const { fixture, view, http, load, history } = create(true); load(); view.decision.set('APPROVE');
+    expect(view.canSend()).toBe(false); view.send(); http.expectNone(req => req.method === 'POST');
+    view.refreshAfterUnitApproval(); expect(view.view()?.domains).toEqual(['PRODUCT']); expect(view.canSend()).toBe(false);
+    http.expectOne(url).flush({ ...history(), approve_domains: ['PRODUCT'], unviewed_domains: [], unviewed_content_warning: false }); fixture.detectChanges();
+    expect(view.canSend()).toBe(true); expect(fixture.nativeElement.textContent).toContain('לכל פריטי התחום נשמר אישור אישי');
+    http.expectNone(req => req.method === 'POST'); view.send(); const post = http.expectOne(url);
+    expect(post.request.body.decision).toBe('APPROVE'); expect(post.request.body.explanation).toBe(''); post.flush(receipt(post.request.body));
+    http.expectOne(url).flush(history()); fixture.destroy(); http.verify();
+  });
+  it('preserves an uncertain regular approval across hint refresh and retries only the original body', () => {
+    const { fixture, view, http, history } = create(true);
+    http.expectOne(url).flush({ ...history(), approve_domains: ['PRODUCT'], unviewed_domains: [], unviewed_content_warning: false });
+    view.decision.set('APPROVE'); view.send(); const post = http.expectOne(url), body = post.request.body; post.error(new ProgressEvent('error'));
+    view.refreshAfterUnitApproval(); http.expectOne(url).flush(history()); expect(view.pending()?.body).toBe(body);
+    view.send(); http.expectNone(req => req.method === 'POST'); view.retry(); const retry = http.expectOne(url); expect(retry.request.body).toBe(body);
+    retry.flush({ ...receipt(body), replayed: true }); http.expectOne(url).flush(history()); fixture.destroy(); http.verify();
+  });
+  it('removes regular approval availability on a known incomplete-section rejection while retaining the explicit all-changes option', () => {
+    const { fixture, view, http, history } = create(true);
+    http.expectOne(url).flush({ ...history(), approve_domains: ['PRODUCT'], unviewed_domains: [], unviewed_content_warning: false });
+    view.decision.set('APPROVE'); view.send(); http.expectOne(url).flush({ error: { code: 'REVIEW_SECTIONS_INCOMPLETE' } }, { status: 409, statusText: 'Incomplete' });
+    expect(view.pending()).toBeNull(); expect(view.canSend()).toBe(false); expect(view.view()?.approve_all_available).toBe(true);
+    view.decision.set('APPROVE_ALL'); expect(view.canSend()).toBe(false); view.explanation.set('Explicit full-snapshot review'); expect(view.canSend()).toBe(true);
+    http.expectNone(req => req.method === 'POST'); fixture.destroy(); http.verify();
+  });
+  it('clears retained eligibility and readiness when a unit-triggered hint refresh fails', () => {
+    const { fixture, view, http, load } = create(true); load(); view.explanation.set('Draft'); view.refreshAfterUnitApproval();
+    expect(view.view()?.domains).toEqual(['PRODUCT']); http.expectOne(url).flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(view.view()).toBeNull(); expect(view.explanation()).toBe('Draft'); fixture.destroy(); http.verify();
+  });
   it('loads history with GET, warns before approve-all, requires an explanation and submits only on explicit action', () => {
     const { fixture, view, http, load, history, recorded } = create(true); load(); http.expectNone(req => req.method === 'POST');
     view.decision.set('APPROVE_ALL'); fixture.detectChanges(); expect(fixture.nativeElement.textContent).toContain('ייתכן שיש תוכן שטרם צפית בו');

@@ -288,6 +288,34 @@ immediately and clears the parent snapshot. Native labelled controls, visible
 focus, 44px buttons/selects and wrapping text support keyboard and narrow layouts;
 physical keyboard/RTL/320px verification still awaits an available browser.
 
+Migration 029 adds regular `APPROVE` alongside the explicit `APPROVE_ALL`
+snapshot decision. Regular approval requires a nonempty complete mandatory-unit
+manifest and actual individual approvals for every item in the caller's selected
+domain. Read visits alone do not satisfy it; repeated actions for one item cannot
+cover another, and Product/Design records of the same actor remain separate. A
+shared `review_unit_approval_coverage` function supplies real distinct counts for
+the official decision guard and future readiness assembly. Legacy unavailable
+manifests never satisfy regular approval through zero-of-zero counts.
+
+Both positive decisions require updated base and decided UI impact, current
+qualified independent assignment and fresh provider refs. Regular coverage is
+checked before provider IO and again inside the final locked transaction; the
+database insert guard independently enforces it. Regular approval permits an
+optional empty explanation. Approve-all, change requests and comments retain their
+required text. Approve-all stays an explicit whole-snapshot action with its
+reading warning; it fabricates no individual records. Comments do not replace
+either positive decision. Neither action sets final APPROVED state or publishes
+content before the full evaluator and merge integration are implemented.
+
+Official history reports `approve_domains` only for eligible complete domains
+whose stored base/UI context permits a positive decision. These are read hints;
+submission rechecks provider state and authority. The form exposes regular
+approval separately, preserves exact retry intents, and disables a known
+incomplete regular action until refreshed evidence is obtained. A verified
+individual receipt refreshes official hints while retaining the selected source
+and explanation draft; formal submission stays disabled during that read. Failed
+hint reads clear eligibility instead of preserving an old readiness claim.
+
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks
 current edit authority, then replays an identical actor-bound idempotency key or

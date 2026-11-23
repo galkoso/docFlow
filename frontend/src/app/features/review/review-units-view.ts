@@ -39,6 +39,8 @@ export class ReviewUnitsView implements OnDestroy {
   readonly sourceVisible = computed(() => !!this.source.scope() && this.sameRoot(this.capturedRoot));
   readonly offsetSelected = output<number>();
   readonly accessDenied = output<void>();
+  readonly approved = output<void>();
+  private notifiedApproval: string | null = null;
   private readonly api = inject(ReviewApi);
   private readonly session = inject(SessionState);
   private request?: Subscription;
@@ -67,6 +69,10 @@ export class ReviewUnitsView implements OnDestroy {
       if (root !== this.boundRoot) { this.boundRoot = root; this.source.clear(); this.approvals.clear(); }
     }); });
     effect(() => { if (this.source.denied() || this.approvals.denied()) untracked(() => this.coverageDenied()); });
+    effect(() => {
+      const result = this.approvals.result();
+      untracked(() => { if (result && result.receipt.id !== this.notifiedApproval) { this.notifiedApproval = result.receipt.id; this.approved.emit(); } });
+    });
     effect(() => {
       const domains = this.domains(), pending = this.hasPending();
       untracked(() => { if (!pending && domains.length && !domains.includes(this.domain())) { this.source.clear(); this.approvals.clear(); this.domain.set(domains[0]); } });

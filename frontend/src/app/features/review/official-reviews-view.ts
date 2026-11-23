@@ -48,8 +48,8 @@ export class OfficialReviewsView implements OnDestroy {
   readonly canSend = computed(() => {
     const v = this.view();
     return !!v && !this.busy() && !this.sending() && !this.pending() && !this.retryWait() && v.domains.includes(this.domain())
-      && reviewDecisions.includes(this.decision()) && !!this.explanation().trim() && this.length() <= 10000
-      && (this.decision() !== 'APPROVE_ALL' || v.approve_all_available);
+      && reviewDecisions.includes(this.decision()) && (this.decision() === 'APPROVE' || !!this.explanation().trim()) && this.length() <= 10000
+      && (this.decision() !== 'APPROVE_ALL' || v.approve_all_available) && (this.decision() !== 'APPROVE' || v.approve_domains.includes(this.domain()));
   });
   constructor() {
     effect(() => {
@@ -64,20 +64,23 @@ export class OfficialReviewsView implements OnDestroy {
   refresh(after?: string): void {
     if (!this.sending() && this.matches(this.owner, this.proposal(), this.snapshot(), this.epoch)) this.load(this.owner, this.proposal(), this.snapshot(), after);
   }
-  private load(actor: string, proposal: string, snapshot: ReviewSnapshot, after?: string): void {
+  refreshAfterUnitApproval(): void {
+    if (!this.sending() && this.matches(this.owner, this.proposal(), this.snapshot(), this.epoch)) this.load(this.owner, this.proposal(), this.snapshot(), undefined, true);
+  }
+  private load(actor: string, proposal: string, snapshot: ReviewSnapshot, after?: string, preserveView = false): void {
     this.reads?.unsubscribe(); const generation = ++this.generation, epoch = this.epoch;
-    this.busy.set(true); this.error.set(''); this.data.set(null);
+    this.busy.set(true); this.error.set(''); if (!preserveView) this.data.set(null);
     this.reads = this.api.decisions(actor, proposal, snapshot.snapshot_id, after).pipe(timeout(20000)).subscribe({
       next: value => {
         if (generation !== this.generation || !this.matches(actor, proposal, snapshot, epoch)) return;
         this.busy.set(false);
-        if (!validOfficialHistory(value, actor, proposal, snapshot, after)) { this.error.set('פרטי החלטות הסקירה אינם תואמים לגרסה.'); return; }
+        if (!validOfficialHistory(value, actor, proposal, snapshot, after)) { this.data.set(null); this.error.set('פרטי החלטות הסקירה אינם תואמים לגרסה.'); return; }
         this.data.set(value);
         if (!this.pending() && !value.domains.includes(this.domain()) && value.domains.length) this.domain.set(value.domains[0]);
       },
       error: error => {
         if (generation !== this.generation || !this.matches(actor, proposal, snapshot, epoch)) return;
-        this.busy.set(false);
+        this.busy.set(false); this.data.set(null);
         if (this.denied(error)) { this.clear(); this.accessDenied.emit(); return; }
         this.error.set('לא ניתן לטעון את החלטות הסקירה כרגע. גרסת התוכן השמורה עדיין זמינה.');
       },
@@ -113,9 +116,11 @@ export class OfficialReviewsView implements OnDestroy {
           this.retryTimer = setInterval(() => { this.now.set(Date.now()); if (!this.retryWait()) clearInterval(this.retryTimer); }, 1000);
         }
         const code = error?.error?.error?.code;
-        if (error?.status === 409 && ['REVIEW_CONTEXT_CHANGED', 'REVIEW_BASE_OUTDATED', 'UI_IMPACT_UNDECIDED'].includes(code)
+        if (error?.status === 409 && ['REVIEW_CONTEXT_CHANGED', 'REVIEW_BASE_OUTDATED', 'UI_IMPACT_UNDECIDED', 'REVIEW_SECTIONS_INCOMPLETE'].includes(code)
           || error?.status === 400 && code === 'INVALID_OFFICIAL_REVIEW') {
-          this.pending.set(null); this.error.set('ההחלטה לא נשמרה: יש לבדוק את הגרסה, עדכון הבסיס והשפעת הממשק. הטקסט נשאר בעמוד.');
+          this.pending.set(null);
+          if (code === 'REVIEW_SECTIONS_INCOMPLETE') this.data.update(v => v ? { ...v, approve_domains: [] } : v);
+          this.error.set('ההחלטה לא נשמרה: יש לבדוק את הגרסה, אישורי הפריטים, עדכון הבסיס והשפעת הממשק. הטקסט נשאר בעמוד.');
         } else this.error.set(error?.status === 429 ? 'נדרשת המתנה לפני ניסיון נוסף. הבקשה המקורית נשמרת בעמוד.'
           : 'תוצאת השליחה טרם אומתה. אפשר לטעון היסטוריה או לבדוק שוב את אותה בקשה.');
       },
@@ -125,7 +130,9 @@ export class OfficialReviewsView implements OnDestroy {
     return [401, 403, 404].includes(error?.status ?? 0) || error?.error?.error?.code === 'SESSION_IDENTITY_CHANGED';
   }
   area(value: string): string { return ({ PRODUCT: 'מוצר', DEVELOPMENT: 'פיתוח', DESIGN: 'עיצוב' } as Record<string, string>)[value] ?? value; }
-  label(value: string): string { return ({ APPROVE_ALL: 'אישור כל שינויי הגרסה', REQUEST_CHANGES: 'בקשת תיקונים', COMMENT: 'הערת סקירה' } as Record<string, string>)[value] ?? value; }
+  label(value: string): string {
+    return ({ APPROVE: 'אישור הגרסה לאחר אישור הפריטים', APPROVE_ALL: 'אישור כל שינויי הגרסה', REQUEST_CHANGES: 'בקשת תיקונים', COMMENT: 'הערת סקירה' } as Record<string, string>)[value] ?? value;
+  }
   private clear(): void {
     ++this.generation; this.reads?.unsubscribe(); this.writes?.unsubscribe(); this.data.set(null); this.pending.set(null);
     clearInterval(this.retryTimer); this.retryUntil.set(0);

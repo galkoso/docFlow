@@ -10,6 +10,7 @@ import { ReviewSnapshotsPage } from './review-snapshots-page';
 import { REVIEW_SOURCE_DIGEST } from './review-source-state';
 import { abcHash, sourceScope, sourceWindow, visitReceipt } from '../../../testing/review-source-fixtures';
 import { ReviewUnitsView } from './review-units-view';
+import { OfficialReviewsView } from './official-reviews-view';
 import { DiscussionsView } from './discussions-view';
 import { reviewCoverage } from '../../../testing/review-coverage-fixtures';
 import { unitApprovalPage, unitApprovalReceipt } from '../../../testing/unit-approval-fixtures';
@@ -23,7 +24,7 @@ class Away {}
 describe('Review snapshots page', () => {
   afterEach(() => vi.restoreAllMocks());
   const route = `/changes/${proposal}/review/snapshots`, root = `/api/v1/proposals/${proposal}`, snapshots = `${root}/review/snapshots`;
-  async function create(query = `?snapshot=${snapshot}`, viewer = actor) {
+  async function create(query = `?snapshot=${snapshot}`, viewer = actor, baseUpdated = false) {
     const profile = signal<{ user_id: string } | null>(null), logoutEpoch = signal(0); let guard = () => true;
     const released = vi.fn();
     await TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), { provide: REVIEW_SOURCE_DIGEST, useValue: async () => abcHash },
@@ -37,6 +38,7 @@ describe('Review snapshots page', () => {
     const settle = async () => { await harness.fixture.whenStable(); harness.detectChanges(); };
     const load = (unsafe = false) => {
       const value = history(), body = metadata();
+      if (baseUpdated) { body.metadata.summary.recorded_base_sha = body.metadata.summary.target_sha; body.metadata.summary.merge_base_sha = body.metadata.summary.target_sha; body.metadata.summary.base_outdated = false; }
       if (unsafe) { value.title = '<script>bad()</script>'; value.snapshots[0].title = '<script>bad()</script>'; body.title = '<script>bad()</script>';
         body.metadata.context.description = '<img src=x onerror=bad()> private description'; }
       http.expectOne(req => req.url === snapshots).flush(value);
@@ -44,7 +46,7 @@ describe('Review snapshots page', () => {
       http.expectOne(req => req.url === `${snapshots}/${snapshot}/files`).flush(files());
       http.expectOne(req => req.url === `${snapshots}/${snapshot}/media`).flush(media()); harness.detectChanges();
       http.expectOne(`${snapshots}/${snapshot}/pr-sync`).flush(prStatus()); harness.detectChanges();
-      http.expectOne(`${snapshots}/${snapshot}/decisions`).flush(officialHistory(viewer)); harness.detectChanges();
+      http.expectOne(`${snapshots}/${snapshot}/decisions`).flush({ ...officialHistory(viewer), approve_all_available: baseUpdated }); harness.detectChanges();
       http.expectOne(`${root}/threads`).flush(discussionThreads(viewer)); harness.detectChanges();
     };
     const prepare = () => { page.prepare(); http.expectOne(`${root}/review/configuration`).flush(configuration()); http.expectOne(root).flush(detail()); harness.detectChanges(); };
@@ -145,7 +147,25 @@ describe('Review snapshots page', () => {
     requirements.approvals.retry(); const retry = http.expectOne(`${snapshots}/${snapshot}/unit-approvals`); expect(retry.request.body).toBe(body);
     retry.flush({ ...unitApprovalReceipt(body), replayed: true }); const summary = unitApprovalPage(later); summary.approved_units = 1; summary.unapproved_units = 21;
     http.expectOne(req => req.method === 'GET' && req.url.endsWith('/unit-approvals')).flush(summary); await settle();
+    http.expectOne(`${snapshots}/${snapshot}/decisions`).flush(officialHistory(product)); await settle();
     expect(requirements.hasPending()).toBe(false); expect(page.canLeave()).toBe(true); http.verify();
+  });
+  it('refreshes regular approval readiness after a verified individual receipt while retaining the selected requirement scope', async () => {
+    const { harness, page, http, load, settle } = await create(`?snapshot=${snapshot}`, product, true); load(); await settle();
+    const requirements = harness.routeDebugElement!.query(By.directive(ReviewUnitsView)).componentInstance as ReviewUnitsView;
+    const official = harness.routeDebugElement!.query(By.directive(OfficialReviewsView)).componentInstance as OfficialReviewsView;
+    official.decision.set('APPROVE'); expect(official.canSend()).toBe(false); requirements.show(); harness.detectChanges(); const units = reviewUnits(product, 0, 1);
+    http.expectOne(req => req.url.endsWith('/units')).flush(units); await settle(); requirements.showApprovals(); harness.detectChanges();
+    const coverage = reviewCoverage(units); coverage.units[0] = { ...coverage.units[0], before: 'viewed', after: 'viewed', viewed: true }; coverage.viewed_units = 1; coverage.unviewed_units = 0;
+    http.expectOne(req => req.url.endsWith('/coverage')).flush(coverage); http.expectOne(req => req.url.endsWith('/unit-approvals')).flush(unitApprovalPage(units)); await settle();
+    requirements.approveUnit(requirements.view()!.units[0]); const post = http.expectOne(`${snapshots}/${snapshot}/unit-approvals`), body = post.request.body;
+    post.flush(unitApprovalReceipt(body)); const summary = unitApprovalPage(units); summary.approved_units = 1; summary.unapproved_units = 0;
+    summary.units[0] = { unit_id: body.unit_id, approval_id: unitApprovalReceipt(body).id, approved_at: unitApprovalReceipt(body).recorded_at };
+    http.expectOne(req => req.method === 'GET' && req.url.endsWith('/unit-approvals')).flush(summary); await settle();
+    expect(requirements.view()?.units[0].id).toBe(body.unit_id); expect(official.busy()).toBe(true); expect(official.canSend()).toBe(false);
+    const hints = { ...officialHistory(product), approve_all_available: true, approve_domains: ['PRODUCT' as const], unviewed_domains: [], unviewed_content_warning: false };
+    http.expectOne(`${snapshots}/${snapshot}/decisions`).flush(hints); await settle(); expect(official.canSend()).toBe(true); http.expectNone(req => req.method === 'POST');
+    expect(page.state.snapshot()?.snapshot_id).toBe(snapshot); http.verify();
   });
   it('purges the parent snapshot and source when an individual approval status read loses access', async () => {
     const { harness, page, http, load, settle } = await create(`?snapshot=${snapshot}`, product); load(); await settle();

@@ -18,9 +18,12 @@
           </select></label>
           <label>סוג החלטה <select name="review-decision" [ngModel]="decision()" (ngModelChange)="decision.set($event)">
             <option value="COMMENT">הערת סקירה</option><option value="REQUEST_CHANGES">בקשת תיקונים</option>
+            <option value="APPROVE" [disabled]="!history.approve_domains.includes(domain())">אישור הגרסה לאחר אישור הפריטים</option>
             <option value="APPROVE_ALL" [disabled]="!history.approve_all_available">אישור כל שינויי הגרסה</option>
           </select></label>
           @if (!history.approve_all_available) {<p>אישור כל השינויים דורש גרסה נוכחית, בסיס מעודכן והכרעה בהשפעת הממשק.</p>}
+          @if (!history.approve_domains.includes(domain())) {<p>אישור רגיל זמין לאחר השלמת אישורי הפריטים בתחום ובדיקת הגרסה המעודכנת.</p>}
+          @else if (decision() === 'APPROVE') {<p>לכל פריטי התחום נשמר אישור אישי בבדיקה האחרונה. אישור הגרסה אינו מפרסם אותה באפיון המאושר.</p>}
           @if (decision() === 'APPROVE_ALL') {
             <p role="note">האישור חל על כל השינויים בגרסה זו בתחום {{ area(domain()) }}.</p>
             @if (!history.domains.includes(domain())) {<p role="note">אין נתוני קריאה מאומתים לתחום זה בבדיקה הנוכחית.</p>}
@@ -29,7 +32,7 @@
             } @else {<p>קריאת כל הפריטים בתחום זה תועדה בבדיקה האחרונה. תיעוד קריאה אינו אישור סעיף או הרשאה למיזוג.</p>}
           }
           <label>הסבר להחלטה <textarea name="review-explanation" rows="5" maxlength="20000" [ngModel]="explanation()" (ngModelChange)="explanation.set($event)"></textarea></label>
-          <p>{{ length() }} / 10,000 תווים. ההסבר נדרש גם לאישור וגם לבקשת תיקונים.</p>
+          <p>{{ length() }} / 10,000 תווים. {{ decision() === 'APPROVE' ? 'אפשר להוסיף הסבר לאישור הרגיל.' : 'ההסבר נדרש בהחלטה זו, גם באישור כל השינויים ובבקשת תיקונים.' }}</p>
           <button type="submit" [disabled]="!canSend()">{{ label(decision()) }} לגרסה זו</button>
         </fieldset>
       </form>

@@ -143,7 +143,8 @@ opaque proof retains actor/proposal/snapshot/fingerprint, exact source and windo
 bounds; it can be rechecked after later awaits. It shares the file reader's
 verified cache, source capacity and deadline. Binary requirements need separate
 display verification. This internal proof is not a visit receipt or an approval;
-Browser delivery and acknowledgement controls remain to be wired.
+Browser source controls verify these identities and window hashes before
+rendering text or recording an acknowledgement.
 PostgreSQL unit authorization resolves only the selected ready snapshot's sealed
 manifest under current organization access and the exact repository/installation
 binding. It preserves the snapshot's immutable head/base/fingerprint if proposal
@@ -163,8 +164,8 @@ source bodies. Only an explicit actor/domain/snapshot-bound acknowledgement crea
 a visit, atomically with audit and event records. An exact recorded retry remains
 replayable after delivery expiry, subject to current authority; nonce reuse for
 another intent is rejected. Neither a delivery nor one window acknowledgement
-asserts whole-unit coverage or approval. Coverage assembly and review UI
-acknowledgement controls remain to be connected.
+asserts whole-unit coverage or approval. Whole-unit coverage assembly and section
+approval controls remain to be connected.
 
 The guarded HTTP boundary exposes
 `GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units/{unit}/source`
@@ -178,6 +179,15 @@ replays return 200. Unacknowledged expiry returns 410, scope/nonce conflicts ret
 409, and quota/provider cooldown responses include Retry-After. Provider failures
 never return partial source or invented receipts. OpenAPI and the typed Angular
 client describe source reads and explicit acknowledgements as separate calls.
+The required-item panel now offers a captured source pane for the review domains
+reported by the validated official-review read. It displays raw source inertly,
+uses verified next/previous windows, and records only an explicit “read this
+window” action. Scope changes and lost access hide/cancel private state. Pending
+or uncertain acknowledgements retain their original nonce and delivery for
+explicit retry, including after client-side delivery expiry. Retry-After causes
+a visible wait, never an automatic POST. Reload, logout, route exit and unload
+guards protect uncertain writes; list refresh/paging does not retarget a captured
+source window. These controls expose no whole-unit completion or approval count.
 Section decisions, coverage reads/UI and policy-check
 assembly remain separate integration stages. Approve-all still warns about
 unviewed content until real visit evidence is connected.

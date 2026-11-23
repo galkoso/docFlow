@@ -2304,3 +2304,21 @@ Checkboxes represent verified work only.
   Twenty-three new evidence cases cover scope mismatch, shortened/non-progressing
   windows, Unicode safety, hashes, empty spans and receipt binding. This evidence
   layer supplies neither whole-unit coverage nor section approval authority.
+
+- Captured source reading and explicit window acknowledgement UI: qualified
+  domains from validated official-review history now enable raw-source controls
+  in the required-item panel. Verified windows render as inert text with pinned
+  context; source metadata remains visible and cursor navigation records nothing
+  automatically. Explicit acknowledgement freezes one delivery/nonce, validates
+  its exact receipt and retains uncertain outcomes for manual same-intent retry.
+  Retry-After waits and delivery expiry never trigger automatic POSTs. Scope and
+  identity changes purge private reads; scoped denial also clears the parent.
+  Reload/logout/navigation/unload guards protect uncertain writes, while list
+  paging/refresh preserves the captured source context. Reviewer-history reads
+  safely return no eligibility before required child inputs are initialized.
+  All 551 frontend tests in 57 files and the production build pass, including
+  window evidence, state races, retry/expiry, cursor navigation, inert rendering
+  and parent guards. Browser discovery still reports no connection, so physical
+  keyboard/RTL/320px verification remains pending. Whole-unit coverage, media
+  acknowledgements, section approvals and required-check/merge assembly remain
+  unfinished; window acknowledgement alone supplies no approval authority.

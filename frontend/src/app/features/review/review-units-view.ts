@@ -1,12 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, OnDestroy, output, signal, untracked } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Subscription, timeout } from 'rxjs';
 import { ReviewApi, type ReviewUnits, type ReviewSnapshot } from '../../core/api/review-api';
 import { SessionState } from '../../core/auth/session-state';
 import { digest, integer, sha, uuid } from '../comparison/comparison-evidence';
+import { ReviewSourceState } from './review-source-state';
 import { validReviewUnits, type ReviewUnit } from './review-units-evidence';
 
 @Component({
-  selector: 'app-review-units', changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-review-units', imports: [FormsModule], providers: [ReviewSourceState], changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './review-units-view.html', styleUrl: './review-units-view.css',
 })
 export class ReviewUnitsView implements OnDestroy {
@@ -14,6 +16,17 @@ export class ReviewUnitsView implements OnDestroy {
   readonly proposal = input.required<string>();
   readonly snapshot = input.required<ReviewSnapshot>();
   readonly offset = input(0);
+  readonly domains = input<('PRODUCT' | 'DEVELOPMENT' | 'DESIGN')[]>([]);
+  readonly source = inject(ReviewSourceState);
+  readonly hasPending = this.source.hasPending;
+  readonly domain = signal<'PRODUCT' | 'DEVELOPMENT' | 'DESIGN'>('PRODUCT');
+  private capturedRoot: string | null = null;
+  private readonly rootKey = computed(() => {
+    const actor = this.actor(), snapshot = this.snapshot(), s = snapshot?.metadata?.summary;
+    return actor === this.session.profile()?.user_id && s ? JSON.stringify([actor, this.proposal(), snapshot.snapshot_id,
+      snapshot.fingerprint, s.head_sha, s.merge_base_sha, s.repository_id, this.session.logoutEpoch()]) : null;
+  });
+  readonly sourceVisible = computed(() => !!this.source.scope() && this.rootKey() === this.capturedRoot && this.rootKey() != null);
   readonly offsetSelected = output<number>();
   readonly accessDenied = output<void>();
   private readonly api = inject(ReviewApi);
@@ -39,6 +52,12 @@ export class ReviewUnitsView implements OnDestroy {
   readonly error = computed(() => { const failure = this.failure(); return failure?.key === this.key() ? failure?.message ?? '' : ''; });
   readonly sides = ['before', 'after'] as const;
   constructor() {
+    effect(() => { const root = this.rootKey(); untracked(() => { if (root !== this.capturedRoot) this.source.clear(); }); });
+    effect(() => { if (this.source.denied()) untracked(() => this.accessDenied.emit()); });
+    effect(() => {
+      const domains = this.domains();
+      untracked(() => { if (!this.source.hasPending() && domains.length && !domains.includes(this.domain())) this.domain.set(domains[0]); });
+    });
     effect(() => {
       const key = this.key(), offset = this.offset();
       untracked(() => {
@@ -92,6 +111,22 @@ export class ReviewUnitsView implements OnDestroy {
     if (side === 'before') params.set('repo', s.repository_id);
     return `${side === 'after' ? `/changes/${encodeURIComponent(this.proposal())}/book` : '/specification'}?${params}`;
   }
+  readSource(unit: ReviewUnit, side: 'before' | 'after'): void {
+    const root = this.rootKey(), snapshot = this.snapshot(), s = snapshot.metadata.summary;
+    if (!root || !this.view()?.units.includes(unit) || !unit[side]?.range || !this.domains().includes(this.domain()) || this.source.hasPending()) return;
+    this.capturedRoot = root;
+    this.source.open({ actor: this.actor(), proposal: this.proposal(), snapshot: snapshot.snapshot_id, fingerprint: snapshot.fingerprint,
+      head: s.head_sha, base: s.merge_base_sha, unit, side, domain: this.domain() }, () => this.rootKey() === root);
+  }
+  chooseDomain(value: string): void {
+    if (!this.domains().includes(value as 'PRODUCT' | 'DEVELOPMENT' | 'DESIGN') || this.source.hasPending()) return;
+    this.source.clear(); this.domain.set(value as 'PRODUCT' | 'DEVELOPMENT' | 'DESIGN');
+  }
+  closeSource(): void {
+    if (this.source.hasPending() && !window.confirm('יש בקשת תיעוד ממתינה או שתוצאתה אינה ידועה. לסגור בלי לבדוק שוב את אותה בקשה?')) return;
+    this.source.clear();
+  }
+  domainLabel(value: string): string { return ({ PRODUCT: 'מוצר', DEVELOPMENT: 'פיתוח', DESIGN: 'עיצוב' } as Record<string, string>)[value] ?? value; }
   private cancel(): void { this.generation++; this.request?.unsubscribe(); this.request = undefined; this.busy.set(false); }
-  ngOnDestroy(): void { this.cancel(); this.page.set(null); }
+  ngOnDestroy(): void { this.cancel(); this.page.set(null); this.source.clear(); }
 }

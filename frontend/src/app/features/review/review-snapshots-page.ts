@@ -22,6 +22,8 @@ import { reviewLocation, type ReviewPageLocation } from './review-location';
 export class ReviewSnapshotsPage implements OnDestroy {
   private readonly official = viewChild(OfficialReviewsView);
   private readonly discussions = viewChild(DiscussionsView);
+  private readonly requirements = viewChild(ReviewUnitsView);
+  readonly sourceDomains = computed(() => this.official()?.view()?.domains ?? []);
   readonly session = inject(SessionState);
   readonly submission = inject(ReviewSubmission);
   readonly state = inject(SharedReviewState);
@@ -112,7 +114,7 @@ export class ReviewSnapshotsPage implements OnDestroy {
     }
   }
   reload(): void {
-    if ((this.official()?.hasDraft() || this.discussions()?.hasDraft()) && !this.canLeave()) return;
+    if ((this.official()?.hasDraft() || this.discussions()?.hasDraft() || this.requirements()?.hasPending()) && !this.canLeave()) return;
     const actor = this.session.profile()?.user_id, proposal = this.proposal();
     if (!actor || !proposal) return;
     let location = this.location();
@@ -176,12 +178,12 @@ export class ReviewSnapshotsPage implements OnDestroy {
       UNSUPPORTED_HEADING_LEVEL: 'רמת הכותרת אינה נתמכת בעורך' } as Record<string, string>)[value] ?? value;
   }
   canLeave(): boolean {
-    return !this.submission.pending() && !this.official()?.hasDraft() && !this.discussions()?.hasDraft()
+    return !this.submission.pending() && !this.official()?.hasDraft() && !this.discussions()?.hasDraft() && !this.requirements()?.hasPending()
       || window.confirm('הודעה, טיוטה או בקשת סקירה עדיין ממתינה או שתוצאתה אינה ודאית. לעזוב ולבדוק את הגרסאות וההיסטוריה בכניסה הבאה?');
   }
   @HostListener('window:beforeunload', ['$event'])
   beforeUnload(event: BeforeUnloadEvent): void {
-    if (this.submission.pending() || this.official()?.hasDraft() || this.discussions()?.hasDraft()) { event.preventDefault(); event.returnValue = ''; }
+    if (this.submission.pending() || this.official()?.hasDraft() || this.discussions()?.hasDraft() || this.requirements()?.hasPending()) { event.preventDefault(); event.returnValue = ''; }
   }
   ngOnDestroy(): void { this.releaseLogout(); this.state.clear(); this.submission.clear(); }
 }

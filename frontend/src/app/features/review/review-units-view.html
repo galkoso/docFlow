@@ -10,6 +10,11 @@
       @else {
         <p>{{ page.total }} פריטים בגרסה זו.@if (page.units.length) { מוצגים {{ page.units.length }} פריטים, החל מפריט {{ page.offset + 1 }}.}</p>
         @if (!page.units.length) {<p>אין פריטים בעמוד זה.</p>}
+        @if (domains().length) {
+          <label>תחום לקריאת מקור ותיעוד קריאה <select [ngModel]="domain()" (ngModelChange)="chooseDomain($event)" [disabled]="source.hasPending()">
+            @for (choice of domains(); track choice) {<option [value]="choice">{{ domainLabel(choice) }}</option>}
+          </select></label>
+        }
         <ol [start]="page.offset + 1">@for (unit of page.units; track unit.id) {
           <li><strong>{{ label(unit) }}</strong>
             @if (unit.requirement.kind === 'section') {<p>מסמך <bdi>{{ unit.requirement.document_id }}</bdi> · סעיף <bdi>{{ unit.requirement.section_id }}</bdi></p>}
@@ -17,8 +22,14 @@
               <div class="source"><span>{{ side === 'before' ? 'לפני — לקריאה בלבד' : 'אחרי' }}</span>
                 @if (unit[side]; as evidence) {
                   <p><bdi>{{ evidence.source.path }}</bdi></p>
+                  @if (evidence.source.document_id) {<p>מסמך: <bdi>{{ evidence.source.document_id }}</bdi></p>}
+                  @if (evidence.source.catalog_position != null) {<p>מיקום בספר: {{ evidence.source.catalog_position! + 1 }}</p>}
+                  @if (unit.before?.source?.executable !== unit.after?.source?.executable) {<p>הרשאת הפעלה בקובץ: {{ evidence.source.executable ? 'כן' : 'לא' }}</p>}
                   @if (evidence.range; as range) {<p>שורות {{ range.start_line }}–{{ range.end_line }} במקור</p>}
                   @else {<p>יש לבדוק את הקובץ בהשוואת הקבצים.</p>}
+                  @if (evidence.range && domains().includes(domain())) {
+                    <button type="button" (click)="readSource(unit, side)" [disabled]="source.hasPending()">קריאת מקור ותיעוד קריאת מקטע</button>
+                  }
                   @if (bookHref(unit, side); as href) {<a [href]="href" target="_blank" rel="noopener noreferrer">קריאת {{ side === 'before' ? 'הבסיס' : 'ההצעה' }} בגרסה זו בכרטיסייה חדשה</a>}
                 } @else {<p>הפריט אינו קיים בצד זה.</p>}
               </div>
@@ -31,6 +42,37 @@
         </nav>
       }
       <button type="button" (click)="refresh()" [disabled]="busy()">טעינת רשימת הפריטים מחדש</button>
+    }
+  }
+  @if (sourceVisible()) {
+    @if (source.scope(); as capture) {
+      <section class="source-reader" aria-labelledby="review-source-title">
+        <h4 id="review-source-title">קריאת מקור — {{ capture.side === 'before' ? 'לפני — לקריאה בלבד' : 'אחרי' }}</h4>
+        <p>תחום: {{ domainLabel(capture.domain) }} · מקור: <bdi>{{ capture.unit[capture.side]?.source?.path }}</bdi></p>
+        @if (capture.unit.requirement.kind === 'section') {<p>סעיף: <bdi>{{ capture.unit.requirement.section_id }}</bdi></p>}
+        <p>גרסה: <bdi>{{ capture.side === 'after' ? capture.head : capture.base }}</bdi></p>
+        <p>הטקסט מוצג כפי שנשמר במקור, כולל סימונים ותוכן מוגן. תיעוד קריאת מקטע אינו אישור סעיף או הצעה.</p>
+        @if (source.busy()) {<p role="status">טוענים ובודקים את המקור…</p>}
+        @if (source.error(); as message) {<p role="alert">{{ message }}</p>}
+        @if (source.retryWait()) {<p role="status">ניתן לבדוק שוב בעוד {{ source.retryWait() }} שניות.</p>}
+        @if (source.view(); as window) {
+          <pre dir="auto" tabindex="0" aria-label="מקור המקטע שנבחר">{{ window.text }}</pre>
+          @if (!window.text.length) {<p>אין טקסט במקטע זה.</p>}
+          @if (source.expired() && !source.pending()) {<p>תוקף מסירת המקור פג. כדי לתעד קריאה, יש לטעון את המקטע מחדש.</p>}
+          @if (source.receipt()) {<p role="status">קריאת המקטע תועדה. אישור הסעיף או ההצעה נבדק בנפרד.</p>}
+          <button type="button" (click)="source.acknowledge()" [disabled]="!source.canAcknowledge()">קראתי את המקטע המוצג</button>
+          <div class="source-actions">
+            <button type="button" (click)="source.back()" [disabled]="!source.canBack() || source.busy() || source.hasPending() || !!source.retryWait()">המקטע הקודם</button>
+            <button type="button" (click)="source.next()" [disabled]="window.next_offset == null || source.busy() || source.hasPending() || !!source.retryWait()">המקטע הבא</button>
+          </div>
+        }
+        @if (source.pending()) {
+          <button type="button" (click)="source.retry()" [disabled]="source.sending() || !!source.retryWait()">בדיקת תוצאת אותה בקשת תיעוד</button>
+        } @else {
+          <button type="button" (click)="source.refresh()" [disabled]="source.busy() || !!source.retryWait()">טעינת המקטע מחדש</button>
+        }
+        <button type="button" (click)="closeSource()">סגירת קריאת המקור</button>
+      </section>
     }
   }
 </section>

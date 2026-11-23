@@ -7,6 +7,8 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { By } from '@angular/platform-browser';
 import { SessionState } from '../../core/auth/session-state';
 import { ReviewSnapshotsPage } from './review-snapshots-page';
+import { REVIEW_SOURCE_DIGEST } from './review-source-state';
+import { abcHash, sourceScope, sourceWindow, visitReceipt } from '../../../testing/review-source-fixtures';
 import { ReviewUnitsView } from './review-units-view';
 import { DiscussionsView } from './discussions-view';
 import { discussionThreads } from '../../../testing/discussion-fixtures';
@@ -22,7 +24,7 @@ describe('Review snapshots page', () => {
   async function create(query = `?snapshot=${snapshot}`, viewer = actor) {
     const profile = signal<{ user_id: string } | null>(null), logoutEpoch = signal(0); let guard = () => true;
     const released = vi.fn();
-    await TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(),
+    await TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), { provide: REVIEW_SOURCE_DIGEST, useValue: async () => abcHash },
       provideRouter([{ path: 'changes/:id/review/snapshots', component: ReviewSnapshotsPage, canDeactivate: [reviewSnapshotExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange' }, { path: 'away', component: Away }]),
       { provide: SessionState, useValue: { profile, logoutEpoch, status: () => profile() ? 'authenticated' : 'anonymous', refresh: vi.fn(),
         guardLogout: (callback: () => boolean) => { guard = callback; return released; } } }],
@@ -102,6 +104,23 @@ describe('Review snapshots page', () => {
     requirements.show(); harness.detectChanges();
     http.expectOne(req => req.url === `${snapshots}/${snapshot}/units`).flush({}, { status: 403, statusText: 'Forbidden' }); await settle();
     expect(page.blocked()).toBe(true); expect(page.state.snapshot()).toBeNull(); http.verify();
+  });
+  it('protects an uncertain source acknowledgement across reload, logout, route exit and unload', async () => {
+    const { harness, page, http, router, load, settle, guard } = await create(`?snapshot=${snapshot}`, product); load(); await settle();
+    const requirements = harness.routeDebugElement!.query(By.directive(ReviewUnitsView)).componentInstance as ReviewUnitsView;
+    expect(requirements.domains()).toEqual(['PRODUCT']); requirements.show(); harness.detectChanges();
+    const units = reviewUnits(product, 0, 1); units.units[0] = sourceScope().unit;
+    http.expectOne(req => req.url === `${snapshots}/${snapshot}/units`).flush(units); await settle();
+    requirements.readSource(requirements.view()!.units[0], 'after');
+    http.expectOne(req => req.url.endsWith('/source')).flush(sourceWindow()); await settle(); requirements.source.acknowledge();
+    const post = http.expectOne(`${snapshots}/${snapshot}/visits`), body = post.request.body; post.error(new ProgressEvent('error'));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    expect(await router.navigateByUrl('/away')).toBe(false); expect(guard()).toBe(false); page.reload(); http.expectNone(req => req.url === snapshots);
+    const unload = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent; page.beforeUnload(unload); expect(unload.defaultPrevented).toBe(true);
+    expect(requirements.source.pending()!.body).toBe(body); expect(confirm).toHaveBeenCalled();
+    requirements.source.retry(); const retry = http.expectOne(`${snapshots}/${snapshot}/visits`); expect(retry.request.body).toBe(body);
+    retry.flush({ ...visitReceipt(body), replayed: true }); expect(requirements.hasPending()).toBe(false);
+    expect(page.canLeave()).toBe(true); http.verify();
   });
   it('refreshes proposal metadata after a decision without replacing the displayed snapshot', async () => {
     const { page, http, load, settle } = await create(); load(); await settle(); const displayed = page.state.snapshot();

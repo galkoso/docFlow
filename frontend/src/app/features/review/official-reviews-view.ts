@@ -40,7 +40,8 @@ export class OfficialReviewsView implements OnDestroy {
   readonly hasDraft = computed(() => !!this.explanation().trim() || !!this.pending() || this.sending());
   readonly length = computed(() => Array.from(this.explanation()).length);
   readonly view = computed(() => {
-    const value = this.data(), snapshot = this.snapshot();
+    const value = this.data(); if (!value) return null;
+    const snapshot = this.snapshot();
     return this.session.profile()?.user_id === this.owner && this.actor() === this.owner && this.session.logoutEpoch() === this.epoch
       && value?.proposal_id === this.proposal() && value.snapshot_id === snapshot.snapshot_id && value.fingerprint === snapshot.fingerprint ? value : null;
   });

@@ -2294,3 +2294,13 @@ Checkboxes represent verified work only.
   both builds pass. The rebuilt local API is ready; source and acknowledgement
   routes require authentication and return no-store responses. No migration is
   added in this HTTP/client stage.
+
+- Client source and acknowledgement evidence: the review client now validates
+  captured actor/proposal/snapshot/fingerprint/domain, original source descriptors
+  and ranges, UTF-8 window size/cursors and SHA-256 before exposing source.
+  Complete windows also match their mandatory span hash. Visit receipts must
+  match the exact frozen nonce, delivery and window, including valid recording
+  time. Invalid, absent-side and non-text selections supply no recording intent.
+  Twenty-three new evidence cases cover scope mismatch, shortened/non-progressing
+  windows, Unicode safety, hashes, empty spans and receipt binding. This evidence
+  layer supplies neither whole-unit coverage nor section approval authority.

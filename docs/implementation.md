@@ -2446,3 +2446,15 @@ Checkboxes represent verified work only.
   excluded. All backend binary builds and workspace Clippy/formatting pass. The
   local API is rebuilt and ready; anonymous approval-status reads return no-store
   authentication failures. No migration is added in this HTTP/client stage.
+
+- Client individual-approval evidence: status pages and receipts now validate the
+  captured actor, proposal, snapshot, fingerprint, head/target, policy/configuration
+  and assigned domain. Ordered manifest IDs, paired approval IDs/UTC timestamps,
+  distinct receipts and possible global counts prevent fabricated completion.
+  Unsupported work stays unapproved; unavailable legacy and historical facts stay
+  explicit. Receipt validation binds the exact frozen nonce and unit intent.
+  Thirty-four evidence cases cover scope, ordering, counts, malformed receipts,
+  known author/assignment mismatch, off-page totals and unsupported work. All 636
+  frontend tests in 60 files and the production build pass. These validators are
+  ready for the separate review-panel control and pending-intent stage; required
+  checks and the rest of the full specification remain open.

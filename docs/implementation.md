@@ -2382,3 +2382,19 @@ Checkboxes represent verified work only.
   reviewer warnings. OpenAPI and generated client types include the domain list;
   client evidence rejects missing, duplicate, foreign-domain and inconsistent
   warning data. Section approval and merge authority remain separate work.
+
+- Domain-specific approve-all warning UI: the decision form now warns only when
+  the selected domain has unread or unknown server evidence. Complete read facts
+  are labelled as of the last history read and remain separate from approval and
+  merge authority. Manual history refresh replaces warning evidence without
+  changing an explanation draft or posting a decision; failed refreshes hide old
+  completion claims. An uncertain decision retains its captured domain after
+  eligibility changes and shows unknown coverage for that domain. Eight client
+  evidence cases and three UI cases cover the new contract, domain switching,
+  validated refresh, unavailable reads and uncertain intent. All 718 backend tests
+  pass with the same two performance measurements excluded; all 601 frontend
+  tests and the production build pass. Workspace Clippy and formatting, and
+  backend binary builds pass. The rebuilt local API is ready and anonymous
+  decision-history reads return no-store authentication failures. Browser visual
+  acceptance remains pending; section approvals, media acknowledgement support,
+  required-check assembly and the rest of the full specification remain open.

@@ -214,10 +214,23 @@ Only a verified acknowledgement receipt triggers a fresh coverage GET; counts
 are never incremented optimistically. Refreshes preserve captured source windows
 and uncertain acknowledgement nonces. Access denial clears the source and parent
 requirement evidence, while account, snapshot, domain and page changes discard
-stale responses. Transport failures offer explicit retry without automatic reads.
-Section decisions and policy-check assembly remain separate integration stages.
-Approve-all still warns about
-unviewed content until real visit evidence is connected.
+stale responses. Transport failures offer explicit retry without timer retries.
+
+Official-review history also reads acknowledged coverage in its existing repeatable
+read transaction, using the same original-range union as the coverage endpoint.
+`unviewed_domains` lists eligible caller domains with incomplete or unavailable
+coverage. `unviewed_content_warning` is the aggregate warning; it also stays true
+when the caller has no eligible domain. Legacy evidence, unread gaps, missing
+present-side acknowledgements and unsupported media keep the warning active.
+The approve-all form uses the selected domain's warning and labels complete read
+evidence as of the last history read. Refreshing decision history obtains fresh
+coverage without changing a draft or submitting a decision. Read completion does
+not enable an otherwise unavailable approval. If an uncertain decision retains a
+domain that is no longer eligible, the form shows its read evidence as unknown
+and preserves the original request. Explanation, current authority and
+provider freshness are checked independently on submission; read evidence neither
+creates a section approval nor publishes content. Section decisions and
+policy-check assembly remain separate integration stages.
 
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks

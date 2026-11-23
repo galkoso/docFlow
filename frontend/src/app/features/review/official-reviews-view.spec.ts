@@ -9,9 +9,10 @@ import { OfficialReviewsView } from './official-reviews-view';
 
 describe('Official snapshot review controls', () => {
   const url = `/api/v1/proposals/${proposal}/review/snapshots/${snapshot}/decisions`;
-  function create(updated = false) {
+  function create(updated = false, dualDomain = false) {
     const profile = signal<{ user_id: string } | null>({ user_id: product }), logoutEpoch = signal(0), source = metadata();
     if (updated) { source.metadata.summary.recorded_base_sha = source.metadata.summary.target_sha; source.metadata.summary.merge_base_sha = source.metadata.summary.target_sha; source.metadata.summary.base_outdated = false; }
+    if (dualDomain) source.metadata.assignments.push({ reviewer_id: product, domain: 'DESIGN', required: true });
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), { provide: SessionState, useValue: { profile, logoutEpoch } }] });
     const fixture = TestBed.createComponent(OfficialReviewsView), view = fixture.componentInstance, http = TestBed.inject(HttpTestingController);
     fixture.componentRef.setInput('actor', product); fixture.componentRef.setInput('proposal', proposal); fixture.componentRef.setInput('snapshot', source);
@@ -42,6 +43,35 @@ describe('Official snapshot review controls', () => {
     view.refresh(); http.expectOne(url).flush(history()); http.expectNone(req => req.method === 'POST');
     view.retry(); const replay = http.expectOne(url); expect(replay.request.body).toEqual(body); replay.flush({ ...receipt(body), replayed: true });
     http.expectOne(url).flush(history()); fixture.destroy(); http.verify();
+  });
+  it('warns only for the selected unread domain without creating any decision', () => {
+    const { fixture, view, http, history } = create(true, true);
+    http.expectOne(url).flush({ ...history(), domains: ['PRODUCT', 'DESIGN'], unviewed_domains: ['DESIGN'] });
+    view.decision.set('APPROVE_ALL'); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('ייתכן שיש תוכן שטרם צפית בו');
+    expect(fixture.nativeElement.textContent).toContain('קריאת כל הפריטים בתחום זה תועדה בבדיקה האחרונה');
+    view.domain.set('DESIGN'); fixture.detectChanges(); expect(fixture.nativeElement.textContent).toContain('ייתכן שיש תוכן שטרם צפית בו');
+    expect(fixture.nativeElement.textContent).not.toContain('קריאת כל הפריטים בתחום זה תועדה בבדיקה האחרונה');
+    http.expectNone(req => req.method === 'POST'); fixture.destroy(); http.verify();
+  });
+  it('removes an old warning only after a validated fresh history read and keeps explanation drafts', () => {
+    const { fixture, view, http, history, load } = create(true); load(); view.decision.set('APPROVE_ALL'); view.explanation.set('Draft decision');
+    view.refresh(); fixture.detectChanges(); expect(view.view()).toBeNull();
+    http.expectOne(url).flush({ ...history(), unviewed_domains: [], unviewed_content_warning: false }); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('ייתכן שיש תוכן שטרם צפית בו'); expect(view.explanation()).toBe('Draft decision');
+    view.refresh(); http.expectOne(url).flush({}, { status: 503, statusText: 'Unavailable' }); fixture.detectChanges();
+    expect(view.view()).toBeNull(); expect(fixture.nativeElement.textContent).not.toContain('קריאת כל הפריטים בתחום זה תועדה בבדיקה האחרונה');
+    http.expectNone(req => req.method === 'POST'); fixture.destroy(); http.verify();
+  });
+  it('keeps an uncertain decision domain unknown after eligibility changes instead of claiming complete coverage', () => {
+    const { fixture, view, http, history, load } = create(true, true); load();
+    view.decision.set('APPROVE_ALL'); view.explanation.set('Captured decision'); view.send();
+    const post = http.expectOne(url), body = post.request.body; post.error(new ProgressEvent('error'));
+    view.refresh(); http.expectOne(url).flush({ ...history(), domains: ['DESIGN'], unviewed_domains: [], unviewed_content_warning: false });
+    fixture.detectChanges(); expect(view.pending()?.body).toBe(body); expect(view.domain()).toBe('PRODUCT'); expect(view.canSend()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('אין נתוני קריאה מאומתים לתחום זה בבדיקה הנוכחית');
+    expect(fixture.nativeElement.textContent).not.toContain('קריאת כל הפריטים בתחום זה תועדה בבדיקה האחרונה');
+    http.expectNone(req => req.method === 'POST'); fixture.destroy(); http.verify();
   });
   it('honors Retry-After without an automatic POST and retries the same body only after the wait', () => {
     vi.useFakeTimers(); const { fixture, view, http, load } = create(); load(); view.explanation.set('A review note'); view.send();

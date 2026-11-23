@@ -2342,3 +2342,12 @@ Checkboxes represent verified work only.
   excluded. All 552 frontend tests, workspace Clippy/formatting and both builds
   pass. Migration 027 and its scope index are applied locally; the rebuilt API is
   ready and coverage reads require authentication with no-store responses.
+
+- Client review coverage evidence: returned counts must match the captured
+  actor, proposal, snapshot, fingerprint, head, assigned domain and exact ordered
+  manifest page. Per-side absent, unsupported, unviewed, partial and viewed states
+  are checked against the sealed source descriptors. Whole-unit completion must
+  include every present side; global counts must remain possible given the
+  displayed subset. Legacy unavailable coverage cannot become zero-of-zero
+  completion. Nineteen evidence cases cover context, ordering, counts, assignment,
+  unsupported work and historical/legacy reads. This layer grants no approval.

@@ -1,4 +1,6 @@
 use super::*;
+#[path = "visits/coverage.rs"]
+mod coverage;
 use serde_json::Value;
 use specspace_application::{
     comparison_file::{
@@ -19,7 +21,7 @@ struct Ready {
     request: ReviewSourceRequest,
     store: PgReviewVisits,
 }
-fn store(pool: &PgPool, factory: Arc<dyn BoundProviderFactory>) -> PgReviewVisits {
+pub(super) fn store(pool: &PgPool, factory: Arc<dyn BoundProviderFactory>) -> PgReviewVisits {
     let files = Arc::new(
         ComparisonFileReader::new(
             Arc::new(PgReviewFileAuthorization::new(pool.clone())),

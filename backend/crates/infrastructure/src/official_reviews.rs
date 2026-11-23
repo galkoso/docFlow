@@ -116,8 +116,41 @@ pub(crate) async fn reviewer_scope(
     snapshot: Uuid,
     domain: specspace_application::review_configuration::ReviewArea,
 ) -> Result<Scope, OfficialReviewError> {
-    let mut row=sqlx::query_as::<_,Scope>("SELECT p.organization_id,h.repository_id,h.remote_id,h.installation_id,h.branch,h.fingerprint,h.head_sha,h.target_sha,h.recorded_base_sha,h.merge_base_sha,h.policy_version,h.configuration_version,false AS current,m.role,m.review_domains,p.author_id,h.metadata FROM proposals p JOIN review_snapshots h ON h.organization_id=p.organization_id AND h.proposal_id=p.id JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id JOIN organizations o ON o.id=p.organization_id JOIN memberships m ON m.organization_id=p.organization_id JOIN users u ON u.id=m.user_id WHERE p.id=$1 AND h.id=$2 AND h.state='READY' AND u.id=$3 AND u.status='ACTIVE' FOR UPDATE OF p FOR SHARE OF h,r,o,m,u")
-        .bind(proposal).bind(snapshot).bind(actor).fetch_optional(&mut *conn).await?.ok_or(OfficialReviewError::NotFound)?;
+    qualified_scope(conn, actor, proposal, snapshot, domain, true).await
+}
+pub(crate) async fn reviewer_read_scope(
+    conn: &mut PgConnection,
+    actor: Uuid,
+    proposal: Uuid,
+    snapshot: Uuid,
+    domain: specspace_application::review_configuration::ReviewArea,
+) -> Result<Scope, OfficialReviewError> {
+    qualified_scope(conn, actor, proposal, snapshot, domain, false).await
+}
+async fn qualified_scope(
+    conn: &mut PgConnection,
+    actor: Uuid,
+    proposal: Uuid,
+    snapshot: Uuid,
+    domain: specspace_application::review_configuration::ReviewArea,
+    write: bool,
+) -> Result<Scope, OfficialReviewError> {
+    let query = "SELECT p.organization_id,h.repository_id,h.remote_id,h.installation_id,h.branch,h.fingerprint,h.head_sha,h.target_sha,h.recorded_base_sha,h.merge_base_sha,h.policy_version,h.configuration_version,false AS current,m.role,m.review_domains,p.author_id,h.metadata FROM proposals p JOIN review_snapshots h ON h.organization_id=p.organization_id AND h.proposal_id=p.id JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id JOIN organizations o ON o.id=p.organization_id JOIN memberships m ON m.organization_id=p.organization_id JOIN users u ON u.id=m.user_id WHERE p.id=$1 AND h.id=$2 AND h.state='READY' AND u.id=$3 AND u.status='ACTIVE' ";
+    let query = format!(
+        "{query} {}",
+        if write {
+            "FOR UPDATE OF p FOR SHARE OF h,r,o,m,u"
+        } else {
+            "FOR SHARE OF p,h,r,o,m,u"
+        }
+    );
+    let mut row = sqlx::query_as::<_, Scope>(&query)
+        .bind(proposal)
+        .bind(snapshot)
+        .bind(actor)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(OfficialReviewError::NotFound)?;
     if !matches!(row.role.as_str(), "REVIEWER" | "MAINTAINER" | "ADMIN")
         || !row.review_domains.iter().any(|d| d == domain.as_str())
         || row.author_id == actor

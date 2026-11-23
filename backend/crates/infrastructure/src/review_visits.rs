@@ -1,5 +1,6 @@
 //! Qualified, quota-charged source reads and immutable explicit acknowledgements.
 //! No database transaction spans source IO; final writes recheck locked authority.
+mod coverage;
 use crate::{
     comparison_authorization,
     official_reviews::{self, OfficialReviewError, Scope},

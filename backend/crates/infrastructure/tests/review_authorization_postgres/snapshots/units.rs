@@ -118,12 +118,12 @@ async fn unit_guards_reject_missing_source_ranges_and_incomplete_requirement_set
 async fn unit_migration_preserves_legacy_evidence_and_requires_new_complete_publication(
     pool: PgPool,
 ) {
-    let (f, _, preparer) = setup_media(&pool, false).await;
+    let (f, source, preparer) = setup_media(&pool, false).await;
     let (lease, verified) = prepared(&pool, &f, &preparer, 2).await;
     let store = PgReviewSnapshots::new(pool.clone());
     let old = store.publish(&lease, &verified, &preparer).await.unwrap();
     let before:Value=sqlx::query_scalar("SELECT to_jsonb(h)-ARRAY['review_units_version','unit_count','unit_ids'] FROM review_snapshots h WHERE id=$1").bind(old.snapshot_id).fetch_one(&pool).await.unwrap();
-    sqlx::raw_sql("DROP TRIGGER review_visit_event_guard ON outbox; DROP TABLE review_source_visits,review_source_deliveries,review_source_attempts; DROP FUNCTION review_visit_event_guard(),review_source_visit_complete(),review_source_visit_guard(),review_source_delivery_guard(),review_source_attempt_guard(),review_visit_scope_current(uuid,uuid,uuid,uuid,text,text); DELETE FROM _sqlx_migrations WHERE version=202611190026;").execute(&pool).await.unwrap();
+    sqlx::raw_sql("DROP TRIGGER review_visit_event_guard ON outbox; DROP TABLE review_source_visits,review_source_deliveries,review_source_attempts; DROP FUNCTION review_visit_event_guard(),review_source_visit_complete(),review_source_visit_guard(),review_source_delivery_guard(),review_source_attempt_guard(),review_visit_scope_current(uuid,uuid,uuid,uuid,text,text); DELETE FROM _sqlx_migrations WHERE version IN (202611190026,202611230027);").execute(&pool).await.unwrap();
     sqlx::raw_sql("DROP TRIGGER review_unit_snapshot_guard ON review_snapshots; DROP TABLE review_snapshot_units; DROP FUNCTION review_unit_evidence_guard(); DROP FUNCTION review_unit_snapshot_guard(); ALTER TABLE review_snapshots DROP COLUMN review_units_version,DROP COLUMN unit_count,DROP COLUMN unit_ids; DELETE FROM _sqlx_migrations WHERE version=202611190025;").execute(&pool).await.unwrap();
     specspace_infrastructure::MIGRATOR.run(&pool).await.unwrap();
     let (after,version,count,ids):(Value,i32,i32,Value)=sqlx::query_as("SELECT to_jsonb(h)-ARRAY['review_units_version','unit_count','unit_ids'],review_units_version,unit_count,unit_ids FROM review_snapshots h WHERE id=$1").bind(old.snapshot_id).fetch_one(&pool).await.unwrap();
@@ -137,6 +137,38 @@ async fn unit_migration_preserves_legacy_evidence_and_requires_new_complete_publ
     assert!(legacy.units.is_empty());
     assert_eq!((legacy.total, legacy.next_offset), (0, None));
     assert_eq!(legacy.fingerprint, old.fingerprint);
+    let visits = super::visits::store(
+        &pool,
+        Arc::new(Factory {
+            source,
+            repository: f.repository,
+        }),
+    );
+    let coverage = visits
+        .coverage(
+            f.product,
+            f.proposal,
+            old.snapshot_id,
+            specspace_application::review_visits::ReviewCoverageRequest {
+                expected_fingerprint: old.fingerprint.clone(),
+                domain: specspace_application::review_configuration::ReviewArea::Product,
+                offset: 0,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+    assert!(!coverage.available);
+    assert_eq!(
+        (
+            coverage.total_units,
+            coverage.viewed_units,
+            coverage.unviewed_units
+        ),
+        (0, 0, 0)
+    );
+    assert!(coverage.units.is_empty());
+
     {
         use specspace_application::comparison_file::{
             FileReadError, review_unit::ReviewUnitAuthorization,

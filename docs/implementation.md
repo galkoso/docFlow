@@ -2406,3 +2406,26 @@ Checkboxes represent verified work only.
   rejects malformed identities and caller-supplied actor/viewed/approved/source
   claims. These DTOs confer no eligibility or publication authority. Persistence,
   HTTP/UI integration and final-check assembly are separate stages.
+
+- Guarded individual section/file approvals: migration 028 shares one original
+  range-union function among coverage, warnings and individual approval guards.
+  Immutable approval rows require a current qualified independent assignment,
+  exact sealed unit/context and acknowledged coverage of every present side.
+  Audit and outbox scope must match atomically; malformed closure evidence rolls
+  back and durable event scope cannot be rewritten. The internal approval service
+  serializes admission, applies per-reviewer/organization quotas and replays exact
+  successful nonces without admitting changed intents. Bounded pages count distinct
+  approved units across the full manifest, independently of page size and repeat
+  actions. Historical records stay pinned; new policy snapshots inherit nothing
+  even when unit IDs match, and legacy evidence stays unavailable. Nine database
+  cases cover side completeness, added stable sections, unread gaps, replay races,
+  domain/actor isolation, revocation, historical policy changes, paging, unsupported
+  media, quotas and database/audit/event integrity. Existing legacy-migration tests
+  also verify unknown approval state. This stage performs no provider IO, Git or
+  proposal-state changes and creates no official decision. HTTP/UI controls and
+  final required-check assembly remain unfinished; the full goal stays active.
+  The full backend run passes 728 tests with the same two performance measurements
+  excluded. Workspace Clippy/formatting and all backend binary builds pass. The
+  public OpenAPI export remains unchanged at this internal stage. Migration 028
+  is applied locally and the standard migrator reruns cleanly; the rebuilt API is
+  ready and anonymous coverage reads remain authenticated no-store responses.

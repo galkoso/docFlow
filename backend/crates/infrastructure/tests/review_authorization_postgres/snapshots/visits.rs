@@ -1,4 +1,6 @@
 use super::*;
+#[path = "visits/approvals.rs"]
+mod approvals;
 #[path = "visits/coverage.rs"]
 mod coverage;
 use serde_json::Value;

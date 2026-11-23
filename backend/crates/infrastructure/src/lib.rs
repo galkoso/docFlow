@@ -31,6 +31,7 @@ pub mod saves;
 pub mod search_index;
 pub mod secrets;
 pub mod sessions;
+pub mod unit_approvals;
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 

@@ -232,6 +232,30 @@ provider freshness are checked independently on submission; read evidence neithe
 creates a section approval nor publishes content. Section decisions and
 policy-check assembly remain separate integration stages.
 
+Migration 028 moves the original-range union into `review_unit_coverage`, shared
+by coverage reads, approve-all warning reads and the individual approval guard.
+An optional exact unit selector bounds an individual check without changing the
+global-count behavior of paged reads. `review_unit_approvals` stores immutable
+explicit actions against a sealed unit and snapshot/fingerprint, caller and
+domain. The database requires current qualified assignment and complete
+acknowledged coverage of every present source side; absent sides need no visit,
+while unread gaps and unsupported binary/media work cannot pass this guard.
+Approvals require matching audit and outbox evidence in the same transaction.
+Approval rows and event scope cannot be rewritten or removed.
+
+The internal `PgUnitApprovals` service provides explicit approval and scoped
+paged status. It locks current authority, validates the nonce and captured scope,
+serializes organization admission and enforces successful-write quotas of 600 per
+reviewer and 6,000 per organization in ten minutes. An identical nonce replays the
+original receipt; a changed intent cannot retarget it. A separate explicit action
+adds history but still counts only one approved unit. Exact historical replay is
+observation of the stored receipt and still requires current eligibility; a new
+action requires the current snapshot context. Historical counts remain labelled
+not current, and matching unit IDs in a new snapshot inherit no approvals. Legacy
+manifests remain unavailable. The service reads no provider data, changes no refs
+or proposal state, and creates no official snapshot decision. HTTP/UI controls
+and assembly of final approval requirements remain unfinished.
+
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks
 current edit authority, then replays an identical actor-bound idempotency key or

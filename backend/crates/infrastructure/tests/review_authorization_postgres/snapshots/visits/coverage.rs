@@ -49,7 +49,7 @@ async fn acknowledge(r: &Ready, side: AnchorSide, offset: usize) -> ReviewSource
         .unwrap();
     w
 }
-async fn publish_context(
+pub(super) async fn publish_context(
     pool: &PgPool,
     f: &Fixture,
     preparer: &ReviewPreparer,
@@ -103,7 +103,12 @@ async fn publish_context(
         .unwrap();
     (saved.snapshot_id, saved.fingerprint, unit)
 }
-async fn custom(pool: &PgPool, body: Option<&str>, media: bool, dual_domain: bool) -> Ready {
+pub(super) async fn custom(
+    pool: &PgPool,
+    body: Option<&str>,
+    media: bool,
+    dual_domain: bool,
+) -> Ready {
     let (f, source, preparer) = setup_body(pool, media, body).await;
     let (version, configuration) = if dual_domain {
         sqlx::query(

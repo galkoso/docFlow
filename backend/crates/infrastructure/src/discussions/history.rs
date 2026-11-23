@@ -236,7 +236,9 @@ impl PgDiscussions {
         } else {
             None
         };
-        let unresolved_blockers:i64=sqlx::query_scalar("SELECT count(*) FROM discussion_threads t JOIN LATERAL (SELECT blocking,resolved FROM discussion_revisions WHERE organization_id=t.organization_id AND proposal_id=t.proposal_id AND thread_id=t.id ORDER BY version DESC LIMIT 1) r ON true WHERE t.organization_id=$1 AND t.proposal_id=$2 AND r.blocking AND NOT r.resolved").bind(org).bind(proposal).fetch_one(&mut *tx).await?;
+        let unresolved_blockers = crate::review_readiness::discussions(&mut tx, org, proposal)
+            .await?
+            .verified_unresolved()?;
         let threads = headers
             .into_iter()
             .map(|r| r.dto(&access, actor))

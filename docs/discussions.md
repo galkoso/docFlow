@@ -351,3 +351,15 @@ access loss cancel document reads and purge captured private context. Pinned boo
 links and labelled native controls preserve access to the original content while
 writing. Physical keyboard, RTL and 320px browser review remains pending because
 browser discovery reports no available connection.
+
+Discussion history now uses the stored blocker reader in
+`infrastructure::review_readiness`, reusable by required-check assembly. It reads
+every thread on the exact organization/proposal, independently of pagination,
+original snapshot and current
+creator membership. The latest revision supplies blocking and resolution state;
+editing or deleting comment text does not resolve a thread. Empty or fully
+resolved sets pass the discussion gate; an unresolved blocker keeps it pending.
+The reader also checks that every thread has state. Missing state is unknown,
+and history returns unavailable instead of reporting zero blockers. These are
+stored discussion inputs only: they do not publish a provider check, prove fresh
+Git refs, evaluate product questions, approve the proposal or authorize merge.

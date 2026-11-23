@@ -2529,3 +2529,17 @@ Checkboxes represent verified work only.
   pending. Required-check assembly/publication, blocker/question integration,
   merge and the rest of the full specification remain unfinished; the goal stays
   active.
+
+- Stored discussion readiness evidence: extracted a shared organization/proposal
+  reader that takes the latest state of every thread, independently of paging,
+  original snapshot and current creator membership. Unresolved blockers remain
+  pending; a complete empty/resolved set passes this gate. The reader detects
+  missing state as unknown, and discussion history now returns unavailable
+  rather than a misleading zero. Regression cases exercise comment edits and
+  tombstones, resolve/reopen, blocking toggles, revoked/disabled creators, foreign
+  scope and an isolated incomplete-restore scenario. This is one readiness input;
+  full evidence assembly, product questions, provider-check publication and merge
+  remain open. The full backend run passes 744 tests, with the same two performance
+  measurements ignored. Workspace Clippy with warnings denied, formatting and all
+  backend binary builds pass. The rebuilt local API is ready; anonymous discussion
+  reads remain authenticated with no-store responses.

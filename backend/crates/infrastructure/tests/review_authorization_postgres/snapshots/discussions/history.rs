@@ -2,6 +2,135 @@ use super::*;
 use specspace_application::discussion::read::DiscussionAnchor;
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn missing_thread_state_is_unavailable_instead_of_an_empty_blocker_set(pool: PgPool) {
+    let f = fixture(&pool).await;
+    let store = PgDiscussions::new(pool.clone());
+    let mut request = proposal_request();
+    request.blocking = true;
+    let thread = open(&store, f.product, f.proposal, request).await;
+    // Simulate an incomplete restore in this test's isolated database. Normal
+    // writes cannot create this state because revisions and origins are sealed.
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query("ALTER TABLE discussion_revisions DISABLE TRIGGER ALL")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM discussion_revisions WHERE thread_id=$1")
+        .bind(thread.thread_id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("ALTER TABLE discussion_revisions ENABLE TRIGGER ALL")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        store.threads(f.owner, f.proposal, None).await.err(),
+        Some(Error::Unavailable)
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn blocker_evidence_uses_latest_state_without_resolving_on_comment_or_membership_changes(
+    pool: PgPool,
+) {
+    let f = fixture(&pool).await;
+    let other = fixture(&pool).await;
+    let store = PgDiscussions::new(pool.clone());
+    let mut foreign_request = proposal_request();
+    foreign_request.blocking = true;
+    open(&store, other.product, other.proposal, foreign_request).await;
+    assert_eq!(
+        store
+            .threads(f.owner, f.proposal, None)
+            .await
+            .unwrap()
+            .unresolved_blockers,
+        0
+    );
+    let mut request = proposal_request();
+    request.blocking = true;
+    let thread = open(&store, f.product, f.proposal, request).await;
+    let actions = [
+        (
+            ThreadMutation::Reply {
+                body: "Does not resolve the blocker".into(),
+                reply_to_id: None,
+            },
+            1,
+        ),
+        (
+            ThreadMutation::Edit {
+                comment_id: thread.comment_id.unwrap(),
+                expected_comment_version: 1,
+                body: "Edited blocker".into(),
+            },
+            1,
+        ),
+        (
+            ThreadMutation::Tombstone {
+                comment_id: thread.comment_id.unwrap(),
+                expected_comment_version: 2,
+            },
+            1,
+        ),
+        (ThreadMutation::Resolve {}, 0),
+        (
+            ThreadMutation::Reply {
+                body: "Reply after resolution".into(),
+                reply_to_id: None,
+            },
+            0,
+        ),
+        (ThreadMutation::Reopen {}, 1),
+        (ThreadMutation::SetBlocking { blocking: false }, 0),
+        (ThreadMutation::SetBlocking { blocking: true }, 1),
+    ];
+    for (index, (action, expected)) in actions.into_iter().enumerate() {
+        store
+            .mutate(
+                f.product,
+                f.proposal,
+                thread.thread_id,
+                mutation(index as i64 + 1, action),
+            )
+            .await
+            .unwrap();
+        let page = store.threads(f.owner, f.proposal, None).await.unwrap();
+        assert_eq!(page.unresolved_blockers, expected, "transition {index}");
+    }
+    // Removing the blocker creator from current authority must not remove the
+    // existing requirement from evidence read by another authorized member.
+    sqlx::query("DELETE FROM memberships WHERE organization_id=$1 AND user_id=$2")
+        .bind(f.org)
+        .bind(f.product)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE users SET status='DISABLED' WHERE id=$1")
+        .bind(f.product)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let page = store.threads(f.owner, f.proposal, None).await.unwrap();
+    assert_eq!(page.unresolved_blockers, 1);
+    assert_eq!(page.threads[0].creator.id, f.product);
+    assert_eq!(
+        store
+            .threads(other.owner, other.proposal, None)
+            .await
+            .unwrap()
+            .unresolved_blockers,
+        1
+    );
+    assert_eq!(
+        store.threads(other.owner, f.proposal, None).await.err(),
+        Some(Error::NotFound)
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn readers_get_discussion_content_but_capabilities_use_current_thread_policy(pool: PgPool) {
     let f = fixture(&pool).await;
     let store = PgDiscussions::new(pool.clone());

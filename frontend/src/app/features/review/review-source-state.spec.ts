@@ -17,7 +17,7 @@ describe('Verified review source and frozen acknowledgement state', () => {
     state.open(scope, () => live()); return { state, http, scope, profile, logoutEpoch, live };
   }
   async function settle() { for (let i = 0; i < 8; i++) await Promise.resolve(); }
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
   it('verifies a captured delivery, records only an explicit action, and accepts only its exact receipt', async () => {
     const { state, http, scope } = create(); const read = http.expectOne(req => req.url === getUrl);
     expect(read.request.headers.get('X-Expected-Actor')).toBe(product); read.flush(sourceWindow()); await settle();
@@ -43,6 +43,17 @@ describe('Verified review source and frozen acknowledgement state', () => {
     const { state, http } = create(); http.expectOne(req => req.url === getUrl).flush(sourceWindow()); await settle(); state.acknowledge();
     http.expectOne(`${root}/visits`).flush({}, { status, statusText: 'Denied' });
     expect(state.denied()).toBe(true); expect(state.view()).toBeNull(); expect(state.scope()).toBeNull(); expect(state.pending()).toBeNull(); http.verify();
+  });
+  it('purges an uncertain source acknowledgement on an explicit session-identity mismatch', async () => {
+    const { state, http } = create(); http.expectOne(req => req.url === getUrl).flush(sourceWindow()); await settle(); state.acknowledge();
+    http.expectOne(`${root}/visits`).flush({ error: { code: 'SESSION_IDENTITY_CHANGED' } }, { status: 409, statusText: 'Changed' });
+    expect(state.denied()).toBe(true); expect(state.scope()).toBeNull(); expect(state.pending()).toBeNull(); state.retry(); http.expectNone(req => req.method === 'POST'); http.verify();
+  });
+  it('uses one clock sample so transport failures do not invent a retry delay', async () => {
+    const { state, http } = create(); http.expectOne(req => req.url === getUrl).flush(sourceWindow()); await settle(); state.acknowledge();
+    const post = http.expectOne(`${root}/visits`), body = post.request.body; let clock = Date.now(); vi.spyOn(Date, 'now').mockImplementation(() => clock++);
+    post.error(new ProgressEvent('error')); expect(state.retryWait()).toBe(0); state.retry();
+    const retry = http.expectOne(`${root}/visits`); expect(retry.request.body).toBe(body); state.clear(); expect(retry.cancelled).toBe(true); http.verify();
   });
   it('hides stale source immediately while asynchronous digest verification is still running', async () => {
     let finish!: (value: string) => void; const { state, http, live } = create(() => new Promise(resolve => { finish = resolve; }));

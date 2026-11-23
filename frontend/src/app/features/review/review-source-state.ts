@@ -120,10 +120,10 @@ export class ReviewSourceState implements OnDestroy {
   private wait(error: { status?: number; headers?: { get(name: string): string | null } }): void {
     const value = error?.headers?.get('Retry-After') ?? '';
     const seconds = /^[1-9]\d{0,9}$/.test(value) && Number(value) <= 4294967295 ? Number(value) : error?.status === 429 ? 60 : 0;
-    this.now.set(Date.now()); this.retryUntil.set(Date.now() + seconds * 1000);
+    const now = Date.now(); this.now.set(now); this.retryUntil.set(now + seconds * 1000);
   }
-  private reject(error: { status?: number }): boolean {
-    if (![401, 403, 404].includes(error?.status ?? 0)) return false;
+  private reject(error: { status?: number; error?: { error?: { code?: string } } }): boolean {
+    if (![401, 403, 404].includes(error?.status ?? 0) && error?.error?.error?.code !== 'SESSION_IDENTITY_CHANGED') return false;
     this.clear(); this.denied.set(true); return true;
   }
   clear(): void {

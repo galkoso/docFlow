@@ -2458,3 +2458,18 @@ Checkboxes represent verified work only.
   frontend tests in 60 files and the production build pass. These validators are
   ready for the separate review-panel control and pending-intent stage; required
   checks and the rest of the full specification remain open.
+
+- Captured individual approval state: status reads and explicit writes now have
+  independent cancellation generations. A frozen actor/snapshot/domain/unit intent
+  and original nonce survive list removal, paging, read failures and malformed or
+  uncertain write outcomes. Only an explicit action posts; bounded timeouts and
+  Retry-After never retry automatically. Current complete server coverage and a
+  current unapproved status are required before preparing an intent. Verified
+  receipts refresh counts without optimistic increments; contradictory status
+  reads are rejected. Known rejections require fresh coverage before another
+  intent, while scoped denial and identity loss purge private state immediately.
+  Twenty-four controller cases cover races, intent preservation, evidence and
+  timeout/retry behavior. Two source regression cases cover session-identity
+  mismatch and a clock boundary that previously invented a delay for transport
+  errors. Both controllers now sample the clock once when setting retry waits.
+  Review-panel integration is a separate stage; the full goal remains active.

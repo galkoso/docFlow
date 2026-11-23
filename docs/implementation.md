@@ -2543,3 +2543,21 @@ Checkboxes represent verified work only.
   measurements ignored. Workspace Clippy with warnings denied, formatting and all
   backend binary builds pass. The rebuilt local API is ready; anonymous discussion
   reads remain authenticated with no-store responses.
+
+- Effective official-decision evidence: added a bounded unpaged reader for exact
+  snapshot pointers, separate from the twenty-entry history display. Frozen
+  fingerprint/head/target/policy/configuration must match; current membership,
+  qualification, assignment and independence are rechecked. Regular decisions
+  require real complete individual approvals; explicit all-changes decisions stay
+  distinct without fabricating item records. History uses this input in its
+  repeatable-read transaction. Missing/mismatched pointers fail unavailable even
+  outside the displayed page. The client accepts a server-invalid effective
+  regular decision without inferring validity from eligibility. Three unit cases,
+  two PostgreSQL scenarios and five client cases cover these distinctions. The
+  focused run passes all 196 snapshot scenarios; all 694 frontend tests and the
+  production build pass. OpenAPI and generated type documentation are synchronized.
+  Full evaluator assembly, product questions, required-check publication and merge
+  remain unfinished. Full backend regression passes 749 tests with the same two
+  performance measurements ignored. Clippy with warnings denied, formatting and
+  backend binary builds pass. The rebuilt API is ready, and anonymous decision
+  history remains authenticated with no-store responses.

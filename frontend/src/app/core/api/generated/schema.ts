@@ -1588,7 +1588,10 @@ export interface components {
             /** Format: uuid */
             reviewer_id: string;
             reviewer_name: string;
-            /** @description Database context and current eligibility only; provider refs are not read. */
+            /**
+             * @description Database context, current eligibility and positive-decision coverage only;
+             *     provider refs are not read. An eligible effective decision may be invalid.
+             */
             valid_for_stored_context: boolean;
         };
         OfficialReviewHistory: {

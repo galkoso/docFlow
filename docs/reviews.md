@@ -316,6 +316,22 @@ individual receipt refreshes official hints while retaining the selected source
 and explanation draft; formal submission stays disabled during that read. Failed
 hint reads clear eligibility instead of preserving an old readiness claim.
 
+History now validates effective decisions through an unpaged stored-evidence
+reader, separate from the twenty-entry display page. It binds every pointer to
+the exact organization, proposal, READY snapshot, fingerprint, head, target,
+policy and configuration, then rechecks current membership, qualified assignment
+and independence. Missing/mismatched decision rows or more than 200 pointers make
+the read unavailable. Comments never become effective decisions.
+
+Regular positive decisions additionally require their real individual evidence
+to remain complete. The explicit approve-all decision remains distinct and does
+not create individual approvals. A still-eligible, effective regular decision
+may therefore have `valid_for_stored_context=false`; the client accepts that
+server result without deriving a positive validity claim from eligibility alone.
+These checks run in history's authorized repeatable-read transaction without
+provider IO or writes. Fresh-ref evaluation, required-check publication and merge
+remain separate unfinished work.
+
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks
 current edit authority, then replays an identical actor-bound idempotency key or

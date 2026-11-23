@@ -44,6 +44,69 @@ fn request(fingerprint: &str, decision: ReviewDecision) -> OfficialReviewRequest
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn missing_effective_decision_outside_the_history_page_never_becomes_no_approvals(
+    pool: PgPool,
+) {
+    let (f, source, snapshot, fp, factory) = ready(&pool, true).await;
+    let store = PgOfficialReviews::new(pool.clone());
+    let approval = store
+        .submit(
+            f.product,
+            f.proposal,
+            snapshot,
+            request(&fp, ReviewDecision::ApproveAll),
+            &factory,
+        )
+        .await
+        .unwrap();
+    for _ in 0..21 {
+        store
+            .submit(
+                f.product,
+                f.proposal,
+                snapshot,
+                request(&fp, ReviewDecision::Comment),
+                &factory,
+            )
+            .await
+            .unwrap();
+    }
+    let before = store
+        .history(f.owner, f.proposal, snapshot, None)
+        .await
+        .unwrap();
+    assert_eq!(before.entries.len(), 20);
+    assert!(before.entries.iter().all(|e| !e.effective));
+    assert!(before.next_after.is_some());
+    let reads = source.reads.load(Ordering::SeqCst);
+    // Only this isolated test database is damaged, simulating an incomplete
+    // restore. Normal mutations cannot remove immutable effective evidence.
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query("ALTER TABLE official_reviews DISABLE TRIGGER ALL")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM official_reviews WHERE id=$1")
+        .bind(approval.id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("ALTER TABLE official_reviews ENABLE TRIGGER ALL")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        store
+            .history(f.owner, f.proposal, snapshot, None)
+            .await
+            .err(),
+        Some(OfficialReviewError::Unavailable)
+    );
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn failed_provider_reads_are_charged_but_recorded_replay_needs_no_io(pool: PgPool) {
     let (f, source, snapshot, fp, factory) = ready(&pool, true).await;
     let store = PgOfficialReviews::new(pool.clone());

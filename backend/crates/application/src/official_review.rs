@@ -81,7 +81,8 @@ pub struct OfficialReviewEntry {
     pub recorded_at: String,
     pub effective: bool,
     pub reviewer_eligible: bool,
-    /// Database context and current eligibility only; provider refs are not read.
+    /// Database context, current eligibility and positive-decision coverage only;
+    /// provider refs are not read. An eligible effective decision may be invalid.
     pub valid_for_stored_context: bool,
 }
 #[derive(Serialize)]

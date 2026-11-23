@@ -3,6 +3,7 @@
 use specspace_domain::review_check::Verification;
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
+pub(crate) mod decisions;
 
 #[derive(FromRow)]
 pub(crate) struct DiscussionEvidence {

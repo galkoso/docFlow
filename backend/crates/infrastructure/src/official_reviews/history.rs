@@ -140,6 +140,8 @@ impl PgOfficialReviews {
             }
         }
         let unviewed_content_warning = domains.is_empty() || !unviewed_domains.is_empty();
+        let effective =
+            crate::review_readiness::decisions::read(&mut tx, org, proposal, snapshot).await?;
         let before = if let Some(id) = after {
             sqlx::query_scalar::<_,i64>("SELECT revision FROM official_reviews WHERE id=$1 AND organization_id=$2 AND proposal_id=$3 AND snapshot_id=$4").bind(id).bind(org).bind(proposal).bind(snapshot).fetch_optional(&mut *tx).await?.ok_or(OfficialReviewError::Invalid)?
         } else {
@@ -157,23 +159,31 @@ impl PgOfficialReviews {
         let entries = rows
             .into_iter()
             .map(|r| {
+                let domain = area(&r.domain)?;
+                let decision = match r.decision.as_str() {
+                    "APPROVE" => ReviewDecision::Approve,
+                    "APPROVE_ALL" => ReviewDecision::ApproveAll,
+                    "REQUEST_CHANGES" => ReviewDecision::RequestChanges,
+                    "COMMENT" => ReviewDecision::Comment,
+                    _ => return Err(OfficialReviewError::Unavailable),
+                };
+                let valid_for_stored_context = current
+                    && r.effective
+                    && r.reviewer_eligible
+                    && effective
+                        .iter()
+                        .any(|e| e.validates_entry(r.id, r.reviewer_id, domain, decision));
                 Ok(OfficialReviewEntry {
                     id: r.id,
                     reviewer_id: r.reviewer_id,
                     reviewer_name: r.reviewer_name,
-                    domain: area(&r.domain)?,
-                    decision: match r.decision.as_str() {
-                        "APPROVE" => ReviewDecision::Approve,
-                        "APPROVE_ALL" => ReviewDecision::ApproveAll,
-                        "REQUEST_CHANGES" => ReviewDecision::RequestChanges,
-                        "COMMENT" => ReviewDecision::Comment,
-                        _ => return Err(OfficialReviewError::Unavailable),
-                    },
+                    domain,
+                    decision,
                     explanation: r.explanation,
                     recorded_at: r.created_at.to_rfc3339(),
                     effective: r.effective,
                     reviewer_eligible: r.reviewer_eligible,
-                    valid_for_stored_context: current && r.effective && r.reviewer_eligible,
+                    valid_for_stored_context,
                 })
             })
             .collect::<Result<Vec<_>, OfficialReviewError>>()?;

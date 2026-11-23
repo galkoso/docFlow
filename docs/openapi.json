@@ -10394,7 +10394,7 @@
           },
           "valid_for_stored_context": {
             "type": "boolean",
-            "description": "Database context and current eligibility only; provider refs are not read."
+            "description": "Database context, current eligibility and positive-decision coverage only;\nprovider refs are not read. An eligible effective decision may be invalid."
           }
         }
       },

@@ -32,6 +32,23 @@ describe('Official review evidence validation', () => {
     const value = officialHistory(product); value.unviewed_domains = []; value.unviewed_content_warning = false;
     expect(validOfficialHistory(value, product, proposal, metadata())).toBe(true); expect(value.approve_all_available).toBe(false);
   });
+  it('accepts an eligible effective regular decision whose individual evidence no longer verifies', () => {
+    const value = officialHistory(product);
+    value.entries = [{ id: other, reviewer_id: product, reviewer_name: 'Reviewer', domain: 'PRODUCT', decision: 'APPROVE', explanation: '',
+      recorded_at: '2026-11-19T00:00:00Z', effective: true, reviewer_eligible: true, valid_for_stored_context: false }];
+    expect(value.current_for_metadata).toBe(true);
+    expect(validOfficialHistory(value, product, proposal, metadata())).toBe(true);
+  });
+  it.each(['missing', 'string', 'stale', 'ineffective'])('rejects %s stored decision validity', fault => {
+    const value = officialHistory(product);
+    value.entries = [{ id: other, reviewer_id: product, reviewer_name: 'Reviewer', domain: 'PRODUCT', decision: 'APPROVE', explanation: '',
+      recorded_at: '2026-11-19T00:00:00Z', effective: true, reviewer_eligible: true, valid_for_stored_context: true }];
+    if (fault === 'missing') delete (value.entries[0] as Partial<typeof value.entries[0]>).valid_for_stored_context;
+    if (fault === 'string') value.entries[0].valid_for_stored_context = 'false' as never;
+    if (fault === 'stale') { value.current_for_metadata = false; value.domains = []; value.unviewed_domains = []; }
+    if (fault === 'ineffective') value.entries[0].effective = false;
+    expect(validOfficialHistory(value, product, proposal, metadata())).toBe(false);
+  });
   it.each(['missing', 'duplicate', 'unassigned', 'unknown', 'nonboolean', 'ineligible', 'empty'])('rejects inconsistent %s warning evidence', fault => {
     const value = officialHistory(product);
     if (fault === 'missing') delete (value as Partial<typeof value>).unviewed_domains;

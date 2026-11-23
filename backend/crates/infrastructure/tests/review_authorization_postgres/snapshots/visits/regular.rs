@@ -157,6 +157,81 @@ async fn approve_unit(r: &Ready, pool: &PgPool, domain: ReviewArea, id: &str) {
         .await
         .unwrap();
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn stored_validity_rechecks_regular_evidence_without_fabricating_all_approval_items(
+    pool: PgPool,
+) {
+    let r = ready(&pool, false).await;
+    let service = PgOfficialReviews::new(pool.clone());
+    let page = units(&r, &pool).await;
+    for unit in &page {
+        view(&r, ReviewArea::Product, unit).await;
+        approve_unit(&r, &pool, ReviewArea::Product, &unit.id).await;
+    }
+    let regular = service
+        .submit(
+            r.f.product,
+            r.f.proposal,
+            r.snapshot,
+            intent(&r, ReviewArea::Product, ReviewDecision::Approve),
+            &factory(&r),
+        )
+        .await
+        .unwrap();
+    let all = service
+        .submit(
+            r.f.development,
+            r.f.proposal,
+            r.snapshot,
+            intent(&r, ReviewArea::Development, ReviewDecision::ApproveAll),
+            &factory(&r),
+        )
+        .await
+        .unwrap();
+    let before = service
+        .history(r.f.owner, r.f.proposal, r.snapshot, None)
+        .await
+        .unwrap();
+    assert!(before.current_for_metadata);
+    assert!(
+        before
+            .entries
+            .iter()
+            .all(|e| e.effective && e.valid_for_stored_context)
+    );
+    let reads = r.source.reads.load(Ordering::SeqCst);
+    let mut tx = pool.begin().await.unwrap();
+    // Restore damage must not silently promote a regular decision to All.
+    sqlx::query("ALTER TABLE review_unit_approvals DISABLE TRIGGER ALL")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM review_unit_approvals WHERE organization_id=$1 AND proposal_id=$2 AND snapshot_id=$3 AND reviewer_id=$4 AND domain='PRODUCT' AND unit_id=$5")
+        .bind(r.f.org).bind(r.f.proposal).bind(r.snapshot).bind(r.f.product).bind(&page[0].id).execute(&mut *tx).await.unwrap();
+    sqlx::query("ALTER TABLE review_unit_approvals ENABLE TRIGGER ALL")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let after = service
+        .history(r.f.owner, r.f.proposal, r.snapshot, None)
+        .await
+        .unwrap();
+    let regular = after.entries.iter().find(|e| e.id == regular.id).unwrap();
+    assert!(regular.effective && regular.reviewer_eligible && !regular.valid_for_stored_context);
+    let all = after.entries.iter().find(|e| e.id == all.id).unwrap();
+    assert!(all.effective && all.reviewer_eligible && all.valid_for_stored_context);
+    let fabricated: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM review_unit_approvals WHERE reviewer_id=$1")
+            .bind(r.f.development)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(fabricated, 0);
+    assert_eq!(r.source.reads.load(Ordering::SeqCst), reads);
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn regular_approval_requires_actual_individual_actions_for_every_unit_and_preserves_explicit_all_override(
     pool: PgPool,

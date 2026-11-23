@@ -26,7 +26,8 @@ export function validOfficialHistory(v: OfficialHistory, actor: string, proposal
       || !reviewAreas.includes(item.domain) || !reviewDecisions.includes(item.decision) || !text(item.explanation, 10000, item.decision === 'APPROVE' ? 0 : 1)
       || !utc(item.recorded_at) || order(item.recorded_at) > order(v.read_at) || typeof item.effective !== 'boolean'
       || typeof item.reviewer_eligible !== 'boolean' || item.decision === 'COMMENT' && item.effective
-      || item.valid_for_stored_context !== (v.current_for_metadata && item.effective && item.reviewer_eligible)) return false;
+      || typeof item.valid_for_stored_context !== 'boolean'
+      || item.valid_for_stored_context && !(v.current_for_metadata && item.effective && item.reviewer_eligible)) return false;
     ids.add(item.id);
   }
   return v.next_after == null || v.entries.length === 20 && v.next_after === v.entries.at(-1)?.id;

@@ -1,14 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, OnDestroy, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, OnDestroy, output, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subscription, timeout } from 'rxjs';
 import { ReviewApi, type ReviewUnits, type ReviewSnapshot } from '../../core/api/review-api';
 import { SessionState } from '../../core/auth/session-state';
 import { digest, integer, sha, uuid } from '../comparison/comparison-evidence';
+import { ReviewCoverageView } from './review-coverage-view';
 import { ReviewSourceState } from './review-source-state';
 import { validReviewUnits, type ReviewUnit } from './review-units-evidence';
 
 @Component({
-  selector: 'app-review-units', imports: [FormsModule], providers: [ReviewSourceState], changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-review-units', imports: [FormsModule, ReviewCoverageView], providers: [ReviewSourceState], changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './review-units-view.html', styleUrl: './review-units-view.css',
 })
 export class ReviewUnitsView implements OnDestroy {
@@ -18,6 +19,8 @@ export class ReviewUnitsView implements OnDestroy {
   readonly offset = input(0);
   readonly domains = input<('PRODUCT' | 'DEVELOPMENT' | 'DESIGN')[]>([]);
   readonly source = inject(ReviewSourceState);
+  readonly coveragePanel = viewChild(ReviewCoverageView);
+  readonly coverageOpened = signal(false);
   readonly hasPending = this.source.hasPending;
   readonly domain = signal<'PRODUCT' | 'DEVELOPMENT' | 'DESIGN'>('PRODUCT');
   private capturedRoot: string | null = null;
@@ -55,8 +58,8 @@ export class ReviewUnitsView implements OnDestroy {
     effect(() => { const root = this.rootKey(); untracked(() => { if (root !== this.capturedRoot) this.source.clear(); }); });
     effect(() => { if (this.source.denied()) untracked(() => this.accessDenied.emit()); });
     effect(() => {
-      const domains = this.domains();
-      untracked(() => { if (!this.source.hasPending() && domains.length && !domains.includes(this.domain())) this.domain.set(domains[0]); });
+      const domains = this.domains(), pending = this.source.hasPending();
+      untracked(() => { if (!pending && domains.length && !domains.includes(this.domain())) { this.source.clear(); this.domain.set(domains[0]); } });
     });
     effect(() => {
       const key = this.key(), offset = this.offset();
@@ -121,6 +124,9 @@ export class ReviewUnitsView implements OnDestroy {
   chooseDomain(value: string): void {
     if (!this.domains().includes(value as 'PRODUCT' | 'DEVELOPMENT' | 'DESIGN') || this.source.hasPending()) return;
     this.source.clear(); this.domain.set(value as 'PRODUCT' | 'DEVELOPMENT' | 'DESIGN');
+  }
+  coverageDenied(): void {
+    this.source.clear(); this.cancel(); this.page.set(null); this.deniedKey.set(this.key()); this.accessDenied.emit();
   }
   closeSource(): void {
     if (this.source.hasPending() && !window.confirm('יש בקשת תיעוד ממתינה או שתוצאתה אינה ידועה. לסגור בלי לבדוק שוב את אותה בקשה?')) return;

@@ -1,0 +1,16 @@
+<section aria-labelledby="review-coverage-title">
+  <h4 id="review-coverage-title">מצב הקריאה שלי בתחום הנבחר</h4>
+  <p>אלה נתוני קריאה בלבד. אישור סעיף, אישור הצעה ומיזוג נבדקים בנפרד.</p>
+  @if (busy()) {<p role="status">בודקים נתוני קריאה…</p>}
+  @if (error(); as message) {<p role="alert">{{ message }}</p>}
+  @if (view(); as coverage) {
+    @if (!coverage.available) {<p>אין נתוני קריאה מאומתים לגרסה זו.</p>}
+    @else {
+      <p>קריאה מלאה תועדה ב־{{ coverage.viewed_units }} מתוך {{ coverage.total_units }} פריטים בגרסה זו.</p>
+      <p>{{ coverage.unviewed_units }} פריטים עדיין ללא תיעוד קריאה מלא. הספירה כוללת גם פריטים שאינם בעמוד המוצג.</p>
+      @if (coverage.unsupported_units) {<p>ב־{{ coverage.unsupported_units }} פריטים תיעוד הצפייה טרם זמין; הם נשארים ללא תיעוד קריאה מלא.</p>}
+    }
+    @if (!coverage.current_for_metadata) {<p>אלה נתוני גרסה היסטורית או הקשר קודם, שאינם מייצגים את מצב ההצעה העדכני.</p>}
+  }
+  <button type="button" (click)="refresh()" [disabled]="busy()">בדיקה נוספת של מצב הקריאה</button>
+</section>

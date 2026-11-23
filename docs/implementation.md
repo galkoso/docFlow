@@ -2351,3 +2351,19 @@ Checkboxes represent verified work only.
   displayed subset. Legacy unavailable coverage cannot become zero-of-zero
   completion. Nineteen evidence cases cover context, ordering, counts, assignment,
   unsupported work and historical/legacy reads. This layer grants no approval.
+
+- Review coverage UI: an explicit control loads the caller's selected-domain
+  server counts, per-side read states and whole-item completion. Global totals
+  include off-page requirements; unsupported work stays unviewed. Captured source
+  windows and uncertain acknowledgement bodies survive coverage refreshes. A
+  verified receipt requests fresh counts without optimistic increments; closing
+  the source pane does not trigger another read. Scope changes cancel stale
+  requests, and access denial clears private source and parent evidence. An
+  uncertain write retains its domain even when eligibility hints change; after
+  resolution the selector returns to an eligible domain. All 590 frontend tests
+  in 59 files and the production build pass, including 14 panel cases and five
+  source/coverage integration cases. Browser discovery reports no connection, so
+  physical keyboard/RTL/320px verification remains pending. Section approval,
+  media acknowledgements and required-check assembly remain unfinished, and
+  approve-all warnings stay conservative. The full specification goal remains
+  active.

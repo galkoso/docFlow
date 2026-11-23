@@ -14,13 +14,20 @@
           <label>תחום לקריאת מקור ותיעוד קריאה <select [ngModel]="domain()" (ngModelChange)="chooseDomain($event)" [disabled]="source.hasPending()">
             @for (choice of domains(); track choice) {<option [value]="choice">{{ domainLabel(choice) }}</option>}
           </select></label>
+          @if (!coverageOpened()) {<button type="button" (click)="coverageOpened.set(true)">בדיקת מצב הקריאה שלי</button>}
+          @else if (domains().includes(domain())) {
+            <app-review-coverage [actor]="actor()" [proposal]="proposal()" [snapshot]="snapshot()" [page]="page" [domain]="domain()"
+              [refreshToken]="source.receipt()?.id ?? null" (accessDenied)="coverageDenied()" />
+          }
         }
         <ol [start]="page.offset + 1">@for (unit of page.units; track unit.id) {
           <li><strong>{{ label(unit) }}</strong>
+            @if (coveragePanel()?.item(unit.id)?.viewed) {<p>קריאת הפריט תועדה במלואה.</p>}
             @if (unit.requirement.kind === 'section') {<p>מסמך <bdi>{{ unit.requirement.document_id }}</bdi> · סעיף <bdi>{{ unit.requirement.section_id }}</bdi></p>}
             @for (side of sides; track side) {
               <div class="source"><span>{{ side === 'before' ? 'לפני — לקריאה בלבד' : 'אחרי' }}</span>
                 @if (unit[side]; as evidence) {
+                  @if (coveragePanel()?.item(unit.id); as progress) {<p>{{ coveragePanel()!.statusLabel(progress[side]) }}</p>}
                   <p><bdi>{{ evidence.source.path }}</bdi></p>
                   @if (evidence.source.document_id) {<p>מסמך: <bdi>{{ evidence.source.document_id }}</bdi></p>}
                   @if (evidence.source.catalog_position != null) {<p>מיקום בספר: {{ evidence.source.catalog_position! + 1 }}</p>}

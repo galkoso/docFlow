@@ -187,7 +187,9 @@ or uncertain acknowledgements retain their original nonce and delivery for
 explicit retry, including after client-side delivery expiry. Retry-After causes
 a visible wait, never an automatic POST. Reload, logout, route exit and unload
 guards protect uncertain writes; list refresh/paging does not retarget a captured
-source window. These controls expose no whole-unit completion or approval count.
+source window. A separate explicit read below exposes server coverage; source
+window acknowledgement alone supplies no whole-unit completion or approval.
+
 `GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/coverage` returns
 the qualified caller's own domain-specific coverage, with captured fingerprint,
 actor and snapshot binding. Query fields are strict; offsets are bounded to
@@ -202,8 +204,19 @@ IO and write no review evidence; migration 027 adds an index for this scoped rea
 Historical counts remain pinned and are marked not current after a new snapshot
 or policy context. Matching unit IDs do not transfer visits across snapshots or
 domains. Legacy manifests return unavailable coverage, never synthesized completion.
-Section decisions, coverage UI and policy-check
-assembly remain separate integration stages. Approve-all still warns about
+The required-item panel now offers an explicit read of the caller's coverage in
+the selected eligible domain. It shows complete, partial and unviewed source
+sides, unsupported work and whole-unit completion, with totals for the complete
+snapshot rather than just the page. Context and manifest evidence are validated
+before display. Historical results are labelled; unavailable legacy evidence
+never implies completion. Loading the panel or changing domains records nothing.
+Only a verified acknowledgement receipt triggers a fresh coverage GET; counts
+are never incremented optimistically. Refreshes preserve captured source windows
+and uncertain acknowledgement nonces. Access denial clears the source and parent
+requirement evidence, while account, snapshot, domain and page changes discard
+stale responses. Transport failures offer explicit retry without automatic reads.
+Section decisions and policy-check assembly remain separate integration stages.
+Approve-all still warns about
 unviewed content until real visit evidence is connected.
 
 Migration 010 stores immutable submission expectations, the actor/proposal/repo

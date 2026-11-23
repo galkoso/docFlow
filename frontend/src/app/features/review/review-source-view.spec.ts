@@ -7,6 +7,7 @@ import { ReviewUnitsView } from './review-units-view';
 import { REVIEW_SOURCE_DIGEST } from './review-source-state';
 import { abcHash, sourceScope, sourceWindow, visitReceipt } from '../../../testing/review-source-fixtures';
 import { product, proposal, snapshot, metadata, reviewUnits } from '../../../testing/review-fixtures';
+import { reviewCoverage } from '../../../testing/review-coverage-fixtures';
 
 describe('Required-source reading controls', () => {
   const root = `/api/v1/proposals/${proposal}/review/snapshots/${snapshot}`;
@@ -65,6 +66,49 @@ describe('Required-source reading controls', () => {
     http.expectOne(req => req.url.endsWith('/source')).flush(w); await settle(); fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.source-reader pre').textContent).toBe(text);
     expect(fixture.nativeElement.querySelector('.source-reader img, .source-reader script')).toBeNull();
+    fixture.destroy(); http.verify();
+  });
+  it('loads coverage explicitly and preserves an uncertain acknowledgement while refreshing server counts', async () => {
+    const { fixture, view, http } = create(), page = view.view()!;
+    http.expectNone(req => req.url.endsWith('/coverage'));
+    const open = [...fixture.nativeElement.querySelectorAll('button')].find((b: any) => b.textContent.includes('בדיקת מצב הקריאה שלי')) as HTMLButtonElement;
+    open.click(); fixture.detectChanges(); const partial = reviewCoverage(page); partial.units[0].after = 'partial';
+    http.expectOne(`${root}/coverage?expected_fingerprint=${page.fingerprint}&domain=PRODUCT&offset=0&limit=20`).flush(partial);
+    fixture.detectChanges(); expect(fixture.nativeElement.textContent).toContain('תועדה קריאה חלקית');
+    expect(fixture.nativeElement.textContent).not.toContain('קריאת הפריט תועדה במלואה');
+    view.readSource(page.units[0], 'after'); http.expectOne(req => req.url.endsWith('/source')).flush(sourceWindow()); await settle(); fixture.detectChanges();
+    view.source.acknowledge(); const post = http.expectOne(`${root}/visits`), body = post.request.body;
+    post.error(new ProgressEvent('error')); fixture.detectChanges(); http.expectNone(req => req.url.endsWith('/coverage'));
+    view.coveragePanel()!.refresh(); http.expectOne(req => req.url.endsWith('/coverage')).flush(partial); fixture.detectChanges();
+    expect(view.source.pending()!.body).toBe(body); expect(view.source.view()?.text).toBe('abc');
+    view.source.retry(); const retry = http.expectOne(`${root}/visits`); expect(retry.request.body).toBe(body);
+    retry.flush({ ...visitReceipt(body), replayed: true }); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('קריאת הפריט תועדה במלואה');
+    const complete = reviewCoverage(page); complete.units[0] = { ...complete.units[0], before: 'viewed', after: 'viewed', viewed: true };
+    complete.viewed_units = 1; complete.unviewed_units = 0;
+    http.expectOne(req => req.url.endsWith('/coverage')).flush(complete); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('קריאת הפריט תועדה במלואה');
+    view.closeSource(); fixture.detectChanges(); http.expectNone(req => req.url.endsWith('/coverage'));
+    expect(view.coveragePanel()!.view()?.viewed_units).toBe(1); fixture.destroy(); http.verify();
+  });
+  it.each([401, 403, 404])('clears source and requirement evidence when coverage reports %s', async status => {
+    const { fixture, view, http, denied } = create(); view.readSource(view.view()!.units[0], 'after');
+    http.expectOne(req => req.url.endsWith('/source')).flush(sourceWindow()); await settle(); fixture.detectChanges();
+    view.source.acknowledge(); http.expectOne(`${root}/visits`).error(new ProgressEvent('error')); expect(view.hasPending()).toBe(true);
+    view.coverageOpened.set(true); fixture.detectChanges();
+    http.expectOne(req => req.url.endsWith('/coverage')).flush({}, { status, statusText: 'Denied' }); fixture.detectChanges();
+    expect(denied).toHaveBeenCalledOnce(); expect(view.source.scope()).toBeNull(); expect(view.view()).toBeNull();
+    expect(view.hasPending()).toBe(false); view.refresh(); http.expectNone(req => req.url.endsWith('/units'));
+    fixture.destroy(); http.verify();
+  });
+  it('keeps the captured domain during an uncertain write and selects an eligible domain after resolution', async () => {
+    const { fixture, view, http } = create(); view.readSource(view.view()!.units[0], 'after');
+    http.expectOne(req => req.url.endsWith('/source')).flush(sourceWindow()); await settle(); fixture.detectChanges();
+    view.source.acknowledge(); const post = http.expectOne(`${root}/visits`), body = post.request.body; post.error(new ProgressEvent('error'));
+    fixture.componentRef.setInput('domains', ['DEVELOPMENT']); fixture.detectChanges();
+    expect(view.domain()).toBe('PRODUCT'); expect(view.source.pending()!.body).toBe(body);
+    view.source.retry(); http.expectOne(`${root}/visits`).flush(visitReceipt(body)); fixture.detectChanges();
+    expect(view.domain()).toBe('DEVELOPMENT'); expect(view.source.scope()).toBeNull(); http.expectNone(req => req.url.endsWith('/coverage'));
     fixture.destroy(); http.verify();
   });
 });

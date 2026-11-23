@@ -2322,3 +2322,23 @@ Checkboxes represent verified work only.
   keyboard/RTL/320px verification remains pending. Whole-unit coverage, media
   acknowledgements, section approvals and required-check/merge assembly remain
   unfinished; window acknowledgement alone supplies no approval authority.
+
+- Exact server review coverage: acknowledged original byte ranges are now
+  unioned per caller/domain/snapshot/fingerprint and mandatory source side.
+  Duplicate, overlapping and empty-tail visits cannot hide unread gaps; all
+  present sides must be viewed, while absent sides and unsupported media remain
+  distinct. Summary counts cover the complete sealed set independently of bounded
+  paging. Historical contexts stay pinned and legacy evidence stays unavailable.
+  A scoped no-store GET and typed Angular client expose these read-only facts
+  without Git IO or new visit/approval writes. Shared read eligibility preserves
+  current membership and assignment checks without taking proposal update locks.
+  Migration 027 adds the matching scope index. Five database cases cover union,
+  sides, duplicates/gaps, domain/policy isolation and unsupported work; legacy
+  migration checks also verify unknown coverage. Two HTTP cases cover real visit
+  reads, strict bounds, session/actor/role/scope checks and revocation. Coverage UI,
+  section approvals and required-check assembly remain unfinished; approve-all
+  warnings remain conservative until decision integration is complete.
+  The full backend run passes 716 tests with the same two performance measurements
+  excluded. All 552 frontend tests, workspace Clippy/formatting and both builds
+  pass. Migration 027 and its scope index are applied locally; the rebuilt API is
+  ready and coverage reads require authentication with no-store responses.

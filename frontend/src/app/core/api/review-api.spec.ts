@@ -50,4 +50,16 @@ describe('Review API request scope', () => {
     expect(ack.request.body).toBe(intent); expect(ack.request.params.keys()).toEqual([]); ack.flush({}); http.verify();
   });
 
+  it('reads caller/domain coverage with captured fingerprint and bounded page coordinates', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ReviewApi), http = TestBed.inject(HttpTestingController);
+    const intent = Object.freeze({ expected_fingerprint: 'a'.repeat(64), domain: 'PRODUCT' as const, offset: 20, limit: 20 });
+    api.coverage(actor, 'p/other', 'h/other', intent).subscribe();
+    const read = http.expectOne(req => req.url === '/api/v1/proposals/p%2Fother/review/snapshots/h%2Fother/coverage');
+    expect(read.request.method).toBe('GET'); expect(read.request.headers.get('X-Expected-Actor')).toBe(actor);
+    expect(read.request.params.get('expected_fingerprint')).toBe(intent.expected_fingerprint);
+    expect(read.request.params.get('domain')).toBe('PRODUCT'); expect(read.request.params.get('offset')).toBe('20');
+    expect(read.request.params.get('limit')).toBe('20'); read.flush({}); http.expectNone(req => req.method === 'POST'); http.verify();
+  });
+
 });

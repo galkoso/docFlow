@@ -2,6 +2,9 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { components } from './generated/schema';
 
+export type ReviewCoverage = components['schemas']['ReviewCoverage'];
+export type ReviewCoverageRequest = components['schemas']['ReviewCoverageRequest'];
+export type ReviewUnitCoverage = components['schemas']['ReviewUnitCoverage'];
 export type ReviewSourceRequest = components['schemas']['ReviewSourceRequest'];
 export type ReviewSourceWindow = components['schemas']['ReviewSourceWindow'];
 export type ReviewVisitRequest = components['schemas']['ReviewVisitRequest'];
@@ -55,6 +58,11 @@ export class ReviewApi {
   units(actor: string, proposal: string, snapshot: string, offset = 0) {
     return this.http.get<ReviewUnits>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/units`, {
       headers: this.actor(actor), params: { offset, limit: 20 },
+    });
+  }
+  coverage(actor: string, proposal: string, snapshot: string, request: Readonly<ReviewCoverageRequest>) {
+    return this.http.get<ReviewCoverage>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/coverage`, {
+      headers: this.actor(actor), params: { expected_fingerprint: request.expected_fingerprint, domain: request.domain, offset: request.offset, limit: request.limit },
     });
   }
   source(actor: string, proposal: string, snapshot: string, request: Readonly<ReviewSourceRequest>) {

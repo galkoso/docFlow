@@ -337,3 +337,152 @@ async fn http_access_loss_during_source_read_discards_delivery_and_returns_scope
         0
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn http_coverage_reads_exact_acknowledged_ranges_without_provider_io_or_approval(
+    pool: PgPool,
+) {
+    let r = ready(&pool).await;
+    let path = format!(
+        "{}/coverage?expected_fingerprint={}&domain=PRODUCT",
+        r.root, r.fp
+    );
+    let initial = get(&r.f.app, &r.product, &path, true).await;
+    assert_eq!(initial.0, StatusCode::OK, "{}", initial.1);
+    assert_eq!(initial.1["actor_id"], r.product.id.to_string());
+    assert_eq!(initial.1["fingerprint"], r.fp);
+    assert_eq!(initial.1["viewed_units"], 0);
+    assert_eq!(initial.1["available"], true);
+    let w = get(&r.f.app, &r.product, &r.source, true).await;
+    post(&r, body(&w.1)).await;
+    if !r.unit["before"].is_null() {
+        let before = get(
+            &r.f.app,
+            &r.product,
+            &r.source.replace("side=after", "side=before"),
+            true,
+        )
+        .await;
+        assert_eq!(before.0, StatusCode::OK, "{}", before.1);
+        assert_eq!(post(&r, body(&before.1)).await.0, StatusCode::CREATED);
+    }
+    let reads = r.f.provider.reads.load(Ordering::SeqCst);
+    let result = get(&r.f.app, &r.product, &path, true).await;
+    assert_eq!(result.0, StatusCode::OK);
+    assert_eq!(result.1["viewed_units"], 1);
+    assert_eq!(result.1["current_for_metadata"], true);
+    let item = result.1["units"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["unit_id"] == r.unit["id"])
+        .unwrap();
+    assert_eq!(item["viewed"], true);
+    assert_eq!(item["after"], "viewed");
+    let other = get(
+        &r.f.app,
+        &r.development,
+        &path.replace("domain=PRODUCT", "domain=DEVELOPMENT"),
+        true,
+    )
+    .await;
+    assert_eq!(other.0, StatusCode::OK);
+    assert_eq!(other.1["viewed_units"], 0);
+    assert_eq!(r.f.provider.reads.load(Ordering::SeqCst), reads);
+    assert!(!result.1.to_string().contains("PRIVATE SOURCE SENTINEL"));
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM official_reviews")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn http_coverage_queries_require_current_scoped_identity_and_strict_bounded_coordinates(
+    pool: PgPool,
+) {
+    let r = ready(&pool).await;
+    let path = format!(
+        "{}/coverage?expected_fingerprint={}&domain=PRODUCT",
+        r.root, r.fp
+    );
+    let reads = r.f.provider.reads.load(Ordering::SeqCst);
+    for query in [
+        "offset=-1",
+        "offset=40001",
+        "limit=0",
+        "limit=101",
+        "offset=0&offset=1",
+        "reviewer_id=other",
+    ] {
+        assert_eq!(
+            get(&r.f.app, &r.product, &format!("{path}&{query}"), true)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    assert_eq!(
+        get(
+            &r.f.app,
+            &r.product,
+            &path.replace("&domain=PRODUCT", ""),
+            true
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(
+            &r.f.app,
+            &r.product,
+            &path.replace(&r.fp, &"0".repeat(64)),
+            true
+        )
+        .await
+        .0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        get(&r.f.app, &r.product, &path, false).await.0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        get(&r.f.app, &r.f.owner, &path, true).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        get(&r.f.app, &r.development, &path, true).await.0,
+        StatusCode::FORBIDDEN
+    );
+    let foreign = fixture(&pool, true).await;
+    assert_eq!(
+        get(&r.f.app, &foreign.owner, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let anonymous =
+        r.f.app
+            .clone()
+            .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(anonymous.headers()["cache-control"], "no-store");
+    let end = get(&r.f.app, &r.product, &format!("{path}&offset=40000"), true).await;
+    assert_eq!(end.0, StatusCode::OK);
+    assert_eq!(end.1["units"], json!([]));
+    assert!(end.1["next_offset"].is_null());
+    sqlx::query("DELETE FROM memberships WHERE user_id=$1")
+        .bind(r.product.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&r.f.app, &r.product, &path, true).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(r.f.provider.reads.load(Ordering::SeqCst), reads);
+    assert_eq!(visits(&pool).await, 0);
+}

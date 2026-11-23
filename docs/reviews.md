@@ -164,8 +164,8 @@ source bodies. Only an explicit actor/domain/snapshot-bound acknowledgement crea
 a visit, atomically with audit and event records. An exact recorded retry remains
 replayable after delivery expiry, subject to current authority; nonce reuse for
 another intent is rejected. Neither a delivery nor one window acknowledgement
-asserts whole-unit coverage or approval. Whole-unit coverage assembly and section
-approval controls remain to be connected.
+asserts whole-unit coverage or approval by itself. Server coverage assembles the
+acknowledged ranges as described below; section approval remains a separate action.
 
 The guarded HTTP boundary exposes
 `GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units/{unit}/source`
@@ -188,7 +188,21 @@ explicit retry, including after client-side delivery expiry. Retry-After causes
 a visible wait, never an automatic POST. Reload, logout, route exit and unload
 guards protect uncertain writes; list refresh/paging does not retarget a captured
 source window. These controls expose no whole-unit completion or approval count.
-Section decisions, coverage reads/UI and policy-check
+`GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/coverage` returns
+the qualified caller's own domain-specific coverage, with captured fingerprint,
+actor and snapshot binding. Query fields are strict; offsets are bounded to
+0–40,000 and pages to 1–100 (default 20). The server unions acknowledged original
+byte ranges per required side. Overlap, duplicate visits and empty tail reads
+cannot hide a gap; an empty required span still needs an explicit acknowledgement.
+A unit is viewed only when every present side is viewed. Binary/media sides
+without a supported acknowledgement remain unsupported and unviewed. Summary
+counts include the entire sealed requirement set, independently of the returned
+page. Delivery without acknowledgement contributes nothing. Reads need no provider
+IO and write no review evidence; migration 027 adds an index for this scoped read.
+Historical counts remain pinned and are marked not current after a new snapshot
+or policy context. Matching unit IDs do not transfer visits across snapshots or
+domains. Legacy manifests return unavailable coverage, never synthesized completion.
+Section decisions, coverage UI and policy-check
 assembly remain separate integration stages. Approve-all still warns about
 unviewed content until real visit evidence is connected.
 

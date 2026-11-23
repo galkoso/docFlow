@@ -12,7 +12,8 @@ use specspace_application::{
     comparison_reader::ComparisonReadError,
     review_configuration::ReviewArea,
     review_visits::{
-        ReviewSourceRequest, ReviewSourceWindow, ReviewVisitRecorded, ReviewVisitRequest,
+        ReviewCoverage, ReviewCoverageRequest, ReviewSourceRequest, ReviewSourceWindow,
+        ReviewVisitRecorded, ReviewVisitRequest,
     },
 };
 use specspace_infrastructure::{official_reviews::OfficialReviewError, review_visits::VisitError};
@@ -22,6 +23,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/units/{unit}/source",
             get(source),
+        )
+        .route(
+            "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/coverage",
+            get(coverage),
         )
         .route(
             "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/visits",
@@ -36,6 +41,46 @@ pub struct SourceQuery {
     domain: ReviewArea,
     side: AnchorSide,
     offset: usize,
+}
+#[derive(Deserialize, utoipa::IntoParams)]
+#[serde(deny_unknown_fields)]
+#[into_params(parameter_in=Query)]
+pub struct CoverageQuery {
+    expected_fingerprint: String,
+    domain: ReviewArea,
+    offset: Option<i32>,
+    limit: Option<i32>,
+}
+#[utoipa::path(get,path="/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/coverage",operation_id="proposalReviewCoverage",security(("sessionCookie"=[])),
+ params(("proposal"=Uuid,Path),("snapshot"=Uuid,Path),("X-Expected-Actor"=Uuid,Header),CoverageQuery),
+ responses((status=200,body=ReviewCoverage,description="Caller/domain acknowledged-byte coverage only; no approval or merge authority"),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=403,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=503,body=ErrorBody)))]
+pub(crate) async fn coverage(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<(Uuid, Uuid)>, axum::extract::rejection::PathRejection>,
+    query: Result<Query<CoverageQuery>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let actor = match identity(&state, &headers, false).await {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    let (Ok(Path((proposal, snapshot))), Ok(Query(q))) = (path, query) else {
+        return proposals::invalid_query();
+    };
+    let request = ReviewCoverageRequest {
+        expected_fingerprint: q.expected_fingerprint,
+        domain: q.domain,
+        offset: q.offset.unwrap_or(0),
+        limit: q.limit.unwrap_or(20),
+    };
+    match state
+        .review_visits
+        .coverage(actor, proposal, snapshot, request)
+        .await
+    {
+        Ok(v) => Json(v).into_response(),
+        Err(e) => failure(e),
+    }
 }
 async fn identity(
     state: &AppState,

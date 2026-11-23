@@ -3825,6 +3825,148 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/coverage": {
+      "get": {
+        "tags": [
+          "crate::review_visits"
+        ],
+        "operationId": "proposalReviewCoverage",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "expected_fingerprint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ReviewArea"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Caller/domain acknowledged-byte coverage only; no approval or merge authority",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewCoverage"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/decisions": {
       "get": {
         "tags": [
@@ -11550,6 +11692,116 @@
         },
         "additionalProperties": false
       },
+      "ReviewCoverage": {
+        "type": "object",
+        "description": "Current caller's exact snapshot/domain read evidence, never approval authority.",
+        "required": [
+          "actor_id",
+          "proposal_id",
+          "snapshot_id",
+          "fingerprint",
+          "head_sha",
+          "domain",
+          "current_for_metadata",
+          "available",
+          "total_units",
+          "viewed_units",
+          "unviewed_units",
+          "unsupported_units",
+          "offset",
+          "units"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "False for legacy snapshots without a complete sealed requirement set."
+          },
+          "current_for_metadata": {
+            "type": "boolean"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ReviewArea"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "total_units": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewUnitCoverage"
+            }
+          },
+          "unsupported_units": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unviewed_units": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Includes partial and unsupported items, without treating them as viewed."
+          },
+          "viewed_units": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ReviewCoverageRequest": {
+        "type": "object",
+        "required": [
+          "expected_fingerprint",
+          "domain",
+          "offset",
+          "limit"
+        ],
+        "properties": {
+          "domain": {
+            "$ref": "#/components/schemas/ReviewArea"
+          },
+          "expected_fingerprint": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReviewDecision": {
         "type": "string",
         "enum": [
@@ -11925,6 +12177,16 @@
           }
         },
         "additionalProperties": false
+      },
+      "ReviewSideCoverage": {
+        "type": "string",
+        "enum": [
+          "absent",
+          "unsupported",
+          "unviewed",
+          "partial",
+          "viewed"
+        ]
       },
       "ReviewSnapshot": {
         "type": "object",
@@ -12716,6 +12978,30 @@
           },
           "expected_target_sha": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewUnitCoverage": {
+        "type": "object",
+        "required": [
+          "unit_id",
+          "before",
+          "after",
+          "viewed"
+        ],
+        "properties": {
+          "after": {
+            "$ref": "#/components/schemas/ReviewSideCoverage"
+          },
+          "before": {
+            "$ref": "#/components/schemas/ReviewSideCoverage"
+          },
+          "unit_id": {
+            "type": "string"
+          },
+          "viewed": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

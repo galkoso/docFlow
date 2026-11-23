@@ -504,6 +504,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalReviewCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/decisions": {
         parameters: {
             query?: never;
@@ -1974,6 +1990,45 @@ export interface components {
             request_id: string;
             settings: components["schemas"]["ReviewSettings"];
         };
+        /** @description Current caller's exact snapshot/domain read evidence, never approval authority. */
+        ReviewCoverage: {
+            /** Format: uuid */
+            actor_id: string;
+            /** @description False for legacy snapshots without a complete sealed requirement set. */
+            available: boolean;
+            current_for_metadata: boolean;
+            domain: components["schemas"]["ReviewArea"];
+            fingerprint: string;
+            head_sha: string;
+            /** Format: int32 */
+            next_offset?: number | null;
+            /** Format: int32 */
+            offset: number;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: int32 */
+            total_units: number;
+            units: components["schemas"]["ReviewUnitCoverage"][];
+            /** Format: int32 */
+            unsupported_units: number;
+            /**
+             * Format: int32
+             * @description Includes partial and unsupported items, without treating them as viewed.
+             */
+            unviewed_units: number;
+            /** Format: int32 */
+            viewed_units: number;
+        };
+        ReviewCoverageRequest: {
+            domain: components["schemas"]["ReviewArea"];
+            expected_fingerprint: string;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
         /** @enum {string} */
         ReviewDecision: "APPROVE_ALL" | "REQUEST_CHANGES" | "COMMENT";
         /** @enum {string} */
@@ -2071,6 +2126,8 @@ export interface components {
             ui_impact: components["schemas"]["UiImpact"];
             ui_impact_reason?: string | null;
         };
+        /** @enum {string} */
+        ReviewSideCoverage: "absent" | "unsupported" | "unviewed" | "partial" | "viewed";
         ReviewSnapshot: {
             created_at: string;
             /** Format: uuid */
@@ -2303,6 +2360,12 @@ export interface components {
             /** Format: int64 */
             expected_proposal_version: number;
             expected_target_sha: string;
+        };
+        ReviewUnitCoverage: {
+            after: components["schemas"]["ReviewSideCoverage"];
+            before: components["schemas"]["ReviewSideCoverage"];
+            unit_id: string;
+            viewed: boolean;
         };
         ReviewVisitRecorded: {
             /** Format: uuid */
@@ -5144,6 +5207,84 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalReviewCoverage: {
+        parameters: {
+            query: {
+                expected_fingerprint: string;
+                domain: components["schemas"]["ReviewArea"];
+                offset?: number;
+                limit?: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Caller/domain acknowledged-byte coverage only; no approval or merge authority */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCoverage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

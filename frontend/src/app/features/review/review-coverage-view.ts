@@ -75,7 +75,9 @@ export class ReviewCoverageView implements OnDestroy {
         error: error => {
           if (generation !== this.generation || key !== this.key()) return;
           this.busy.set(false);
-          if ([401, 403, 404].includes(error?.status)) { this.deniedKey = key; this.data.set(null); this.accessDenied.emit(); return; }
+          if ([401, 403, 404].includes(error?.status) || error?.error?.error?.code === 'SESSION_IDENTITY_CHANGED') {
+            this.deniedKey = key; this.data.set(null); this.accessDenied.emit(); return;
+          }
           this.failure.set({ key, message: 'לא ניתן לבדוק את מצב הקריאה כרגע. אפשר לנסות שוב במפורש.' });
         },
       });

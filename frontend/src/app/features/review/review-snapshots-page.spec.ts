@@ -11,6 +11,8 @@ import { REVIEW_SOURCE_DIGEST } from './review-source-state';
 import { abcHash, sourceScope, sourceWindow, visitReceipt } from '../../../testing/review-source-fixtures';
 import { ReviewUnitsView } from './review-units-view';
 import { DiscussionsView } from './discussions-view';
+import { reviewCoverage } from '../../../testing/review-coverage-fixtures';
+import { unitApprovalPage, unitApprovalReceipt } from '../../../testing/unit-approval-fixtures';
 import { discussionThreads } from '../../../testing/discussion-fixtures';
 import { reviewSnapshotExit } from './review-snapshot-exit';
 import { actor, proposal, snapshot, other, configuration, detail, history, metadata, files, media,
@@ -121,6 +123,38 @@ describe('Review snapshots page', () => {
     requirements.source.retry(); const retry = http.expectOne(`${snapshots}/${snapshot}/visits`); expect(retry.request.body).toBe(body);
     retry.flush({ ...visitReceipt(body), replayed: true }); expect(requirements.hasPending()).toBe(false);
     expect(page.canLeave()).toBe(true); http.verify();
+  });
+  it('guards an uncertain individual approval across reload, logout, exit and unload without blocking requirement paging', async () => {
+    const { harness, page, http, router, load, settle, guard } = await create(`?snapshot=${snapshot}`, product); load(); await settle();
+    const requirements = harness.routeDebugElement!.query(By.directive(ReviewUnitsView)).componentInstance as ReviewUnitsView;
+    requirements.show(); harness.detectChanges(); const units = reviewUnits(product, 0, 1);
+    http.expectOne(req => req.url === `${snapshots}/${snapshot}/units`).flush(units); await settle(); requirements.showApprovals(); harness.detectChanges();
+    const coverage = reviewCoverage(units); coverage.units[0] = { ...coverage.units[0], before: 'viewed', after: 'viewed', viewed: true };
+    coverage.viewed_units = 1; coverage.unviewed_units = 0;
+    http.expectOne(req => req.url.endsWith('/coverage')).flush(coverage);
+    http.expectOne(req => req.method === 'GET' && req.url.endsWith('/unit-approvals')).flush(unitApprovalPage(units)); await settle();
+    requirements.approveUnit(requirements.view()!.units[0]); const post = http.expectOne(`${snapshots}/${snapshot}/unit-approvals`), body = post.request.body;
+    post.error(new ProgressEvent('error')); const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    expect(await router.navigateByUrl('/away')).toBe(false); expect(guard()).toBe(false); page.reload(); http.expectNone(req => req.url === snapshots);
+    const unload = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent; page.beforeUnload(unload); expect(unload.defaultPrevented).toBe(true);
+    page.requirementPage(20); await settle(); expect(router.url).toContain('requirements=20');
+    const later = reviewUnits(product, 20, 22); http.expectOne(req => req.url.endsWith('/units')).flush(later); await settle();
+    http.expectOne(req => req.url.endsWith('/coverage')).flush(reviewCoverage(later));
+    http.expectOne(req => req.method === 'GET' && req.url.endsWith('/unit-approvals')).flush(unitApprovalPage(later)); await settle();
+    expect(requirements.approvals.pending()!.body).toBe(body); expect(confirm).toHaveBeenCalled();
+    requirements.approvals.retry(); const retry = http.expectOne(`${snapshots}/${snapshot}/unit-approvals`); expect(retry.request.body).toBe(body);
+    retry.flush({ ...unitApprovalReceipt(body), replayed: true }); const summary = unitApprovalPage(later); summary.approved_units = 1; summary.unapproved_units = 21;
+    http.expectOne(req => req.method === 'GET' && req.url.endsWith('/unit-approvals')).flush(summary); await settle();
+    expect(requirements.hasPending()).toBe(false); expect(page.canLeave()).toBe(true); http.verify();
+  });
+  it('purges the parent snapshot and source when an individual approval status read loses access', async () => {
+    const { harness, page, http, load, settle } = await create(`?snapshot=${snapshot}`, product); load(); await settle();
+    const requirements = harness.routeDebugElement!.query(By.directive(ReviewUnitsView)).componentInstance as ReviewUnitsView;
+    requirements.show(); harness.detectChanges(); const units = reviewUnits(product, 0, 1);
+    http.expectOne(req => req.url.endsWith('/units')).flush(units); await settle(); requirements.showApprovals(); harness.detectChanges();
+    const coverage = http.expectOne(req => req.url.endsWith('/coverage'));
+    http.expectOne(req => req.url.endsWith('/unit-approvals')).flush({}, { status: 403, statusText: 'Forbidden' }); await settle();
+    expect(page.blocked()).toBe(true); expect(page.state.snapshot()).toBeNull(); expect(coverage.cancelled).toBe(true); http.verify();
   });
   it('refreshes proposal metadata after a decision without replacing the displayed snapshot', async () => {
     const { page, http, load, settle } = await create(); load(); await settle(); const displayed = page.state.snapshot();

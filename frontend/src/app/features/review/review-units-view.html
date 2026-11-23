@@ -11,7 +11,8 @@
         <p>{{ page.total }} פריטים בגרסה זו.@if (page.units.length) { מוצגים {{ page.units.length }} פריטים, החל מפריט {{ page.offset + 1 }}.}</p>
         @if (!page.units.length) {<p>אין פריטים בעמוד זה.</p>}
         @if (domains().length) {
-          <label>תחום לקריאת מקור ותיעוד קריאה <select [ngModel]="domain()" (ngModelChange)="chooseDomain($event)" [disabled]="source.hasPending()">
+          <label>תחום לקריאה ואישור פריטים <select [ngModel]="domain()" (ngModelChange)="chooseDomain($event)" [disabled]="hasPending()">
+            @if (hasPending() && !domains().includes(domain())) {<option [value]="domain()">{{ domainLabel(domain()) }} — בקשה ממתינה</option>}
             @for (choice of domains(); track choice) {<option [value]="choice">{{ domainLabel(choice) }}</option>}
           </select></label>
           @if (!coverageOpened()) {<button type="button" (click)="coverageOpened.set(true)">בדיקת מצב הקריאה שלי</button>}
@@ -19,11 +20,38 @@
             <app-review-coverage [actor]="actor()" [proposal]="proposal()" [snapshot]="snapshot()" [page]="page" [domain]="domain()"
               [refreshToken]="source.receipt()?.id ?? null" (accessDenied)="coverageDenied()" />
           }
+          @if (!approvalsOpened()) {<button type="button" (click)="showApprovals()">בדיקת האישורים שלי ואישור פריטים</button>}
+          @else {
+            <section aria-labelledby="unit-approval-title">
+              <h4 id="unit-approval-title">אישורי הפריטים האישיים שלי</h4>
+              <p>האישור מתייחס לפריט בגרסה ובתחום המוצגים. פרסום באפיון המאושר דורש מיזוג נפרד.</p>
+              @if (approvals.busy()) {<p role="status">בודקים את אישורי הפריטים…</p>}
+              @if (approvals.readError(); as message) {<p role="alert">{{ message }}</p>}
+              @if (approvals.view(); as summary) {
+                @if (!summary.available) {<p>אין נתוני אישור מלאים לגרסה זו.</p>}
+                @else {
+                  <p>נשמר אישור אישי ל־{{ summary.approved_units }} מתוך {{ summary.total_units }} פריטים בתחום {{ domainLabel(summary.domain) }}.</p>
+                  <p>{{ summary.unapproved_units }} פריטים עדיין ללא אישור אישי. הספירה כוללת גם פריטים שאינם בעמוד המוצג.</p>
+                }
+                @if (!summary.current_for_metadata) {<p>אלה אישורים לגרסה היסטורית או להקשר קודם. נדרשת סקירה מחדש בגרסה העדכנית.</p>}
+              }
+              <button type="button" (click)="approvals.refresh()" [disabled]="approvals.busy()">בדיקה נוספת של אישורי הפריטים</button>
+            </section>
+          }
         }
         <ol [start]="page.offset + 1">@for (unit of page.units; track unit.id) {
           <li><strong>{{ label(unit) }}</strong>
             @if (coveragePanel()?.item(unit.id)?.viewed) {<p>קריאת הפריט תועדה במלואה.</p>}
             @if (unit.requirement.kind === 'section') {<p>מסמך <bdi>{{ unit.requirement.document_id }}</bdi> · סעיף <bdi>{{ unit.requirement.section_id }}</bdi></p>}
+            @if (approvalsOpened()) {
+              @if (approvalFor(unit.id); as status) {
+                @if (status.approval_id) {<p>נשמר אישור אישי לפריט זה בגרסה זו: {{ status.approved_at | date:'dd/MM/yyyy HH:mm:ss' }}.</p>}
+                @else {
+                  <button type="button" (click)="approveUnit(unit)" [disabled]="!canApproveUnit(unit)">{{ unit.requirement.kind === 'section' ? 'אישור הסעיף בגרסה זו' : 'אישור הפריט בגרסה זו' }}</button>
+                  @if (!coveragePanel()?.item(unit.id)?.viewed) {<p>לפני אישור אישי נדרשת קריאה מתועדת של כל צד קיים בפריט.</p>}
+                }
+              }
+            }
             @for (side of sides; track side) {
               <div class="source"><span>{{ side === 'before' ? 'לפני — לקריאה בלבד' : 'אחרי' }}</span>
                 @if (unit[side]; as evidence) {
@@ -35,7 +63,7 @@
                   @if (evidence.range; as range) {<p>שורות {{ range.start_line }}–{{ range.end_line }} במקור</p>}
                   @else {<p>יש לבדוק את הקובץ בהשוואת הקבצים.</p>}
                   @if (evidence.range && domains().includes(domain())) {
-                    <button type="button" (click)="readSource(unit, side)" [disabled]="source.hasPending()">קריאת מקור ותיעוד קריאת מקטע</button>
+                    <button type="button" (click)="readSource(unit, side)" [disabled]="hasPending()">קריאת מקור ותיעוד קריאת מקטע</button>
                   }
                   @if (bookHref(unit, side); as href) {<a [href]="href" target="_blank" rel="noopener noreferrer">קריאת {{ side === 'before' ? 'הבסיס' : 'ההצעה' }} בגרסה זו בכרטיסייה חדשה</a>}
                 } @else {<p>הפריט אינו קיים בצד זה.</p>}
@@ -51,6 +79,24 @@
       <button type="button" (click)="refresh()" [disabled]="busy()">טעינת רשימת הפריטים מחדש</button>
     }
   }
+  @if (approvals.writeError(); as message) {<p role="alert">{{ message }}</p>}
+  @if (approvals.pending(); as pending) {
+    <section aria-labelledby="pending-unit-approval-title">
+      <h4 id="pending-unit-approval-title">בקשת אישור פריט</h4>
+      <p>תחום: {{ domainLabel(pending.body.domain) }} · <bdi>{{ (pending.unit.after ?? pending.unit.before)?.source?.path }}</bdi></p>
+      @if (pending.unit.requirement.kind === 'section') {<p>סעיף: <bdi>{{ pending.unit.requirement.section_id }}</bdi></p>}
+      <p>גרסה: <bdi>{{ pending.capture.scope.snapshot.metadata.summary.head_sha }}</bdi></p>
+      @if (approvals.sending()) {<p role="status">בודקים ושומרים את אישור הפריט…</p>}
+      @else {<p>תוצאת בקשת האישור טרם אומתה. הפריט והבקשה המקוריים נשמרים בעמוד לבדיקה חוזרת.</p>}
+      @if (approvals.retryWait()) {<p role="status">ניתן לבדוק שוב בעוד {{ approvals.retryWait() }} שניות.</p>}
+      <button type="button" (click)="approvals.retry()" [disabled]="approvals.sending() || !!approvals.retryWait()">בדיקת תוצאת אותה בקשת אישור</button>
+    </section>
+  }
+  @if (approvals.result(); as result) {
+    <p role="status">אישור אישי נשמר לפריט בתחום {{ domainLabel(result.receipt.domain) }}: <bdi>{{ (result.unit.after ?? result.unit.before)?.source?.path }}</bdi>.
+      האישור שייך לגרסה שנבדקה ואינו מפרסם אותה.</p>
+  }
+  @if (approvalsOpened() || approvals.pending()) {<button type="button" (click)="closeApprovals()">סגירת אישורי הפריטים</button>}
   @if (sourceVisible()) {
     @if (source.scope(); as capture) {
       <section class="source-reader" aria-labelledby="review-source-title">
@@ -67,7 +113,7 @@
           @if (!window.text.length) {<p>אין טקסט במקטע זה.</p>}
           @if (source.expired() && !source.pending()) {<p>תוקף מסירת המקור פג. כדי לתעד קריאה, יש לטעון את המקטע מחדש.</p>}
           @if (source.receipt()) {<p role="status">קריאת המקטע תועדה. אישור הסעיף או ההצעה נבדק בנפרד.</p>}
-          <button type="button" (click)="source.acknowledge()" [disabled]="!source.canAcknowledge()">קראתי את המקטע המוצג</button>
+          <button type="button" (click)="acknowledgeSource()" [disabled]="!source.canAcknowledge() || approvals.hasPending()">קראתי את המקטע המוצג</button>
           <div class="source-actions">
             <button type="button" (click)="source.back()" [disabled]="!source.canBack() || source.busy() || source.hasPending() || !!source.retryWait()">המקטע הקודם</button>
             <button type="button" (click)="source.next()" [disabled]="window.next_offset == null || source.busy() || source.hasPending() || !!source.retryWait()">המקטע הבא</button>

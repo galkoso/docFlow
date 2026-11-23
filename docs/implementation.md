@@ -2473,3 +2473,22 @@ Checkboxes represent verified work only.
   mismatch and a clock boundary that previously invented a delay for transport
   errors. Both controllers now sample the clock once when setting retry waits.
   Review-panel integration is a separate stage; the full goal remains active.
+
+- Explicit individual approval UI: the required-item panel now opens personal
+  status and coverage reads, then offers separate section/file approval actions
+  only for current, fully read and unapproved server evidence. Counts and badges
+  wait for validated status responses; read status alone never settles an uncertain
+  request nonce. Captured unit/domain/version and the original body remain outside
+  the paged list, alongside preserved source windows. Pending writes lock domain
+  changes and sibling writes; eligibility hints cannot retarget an uncertain
+  intent. Explicit close confirms abandonment. Reload/logout/exit/unload guards
+  now cover approval intent while same-snapshot requirement paging stays usable.
+  Source, coverage and approval access/identity failures purge sibling private
+  evidence and the parent. Native controls have visible focus and 44px targets,
+  with wrapping content and isolated source identifiers. Fourteen component cases
+  and two route/guard cases cover explicit actions, source separation, off-page
+  retry, eligibility changes, historical/unsupported work, account/privacy loss,
+  guarded abandonment and nonce-specific confirmation. All 678 frontend tests in
+  62 files and the production build pass. Browser discovery still has no connection,
+  so physical keyboard/RTL/320px acceptance remains pending. Final required-check
+  assembly, media acknowledgements and the remaining full specification stay open.

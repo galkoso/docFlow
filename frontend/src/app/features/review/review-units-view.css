@@ -7,12 +7,12 @@ bdi { direction: ltr; unicode-bidi: isolate; }
 .source { border-inline-start: 2px solid var(--border, #ccd2d8); padding-inline-start: .75rem; margin-block: .75rem; }
 .source p { margin-block: .3rem; }
 nav { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
-button { max-width: 100%; white-space: normal; }
+button { min-height: 44px; max-width: 100%; white-space: normal; }
 a:focus-visible, button:focus-visible { outline: 3px solid var(--accent, #216eac); outline-offset: 3px; }
 
 .source-reader { min-width: 0; padding: .75rem; border: 1px solid var(--border, #ccd2d8); }
 .source-reader pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 65vh; overflow: auto; padding: .5rem; background: var(--surface, #f4f6f8); }
 .source-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .5rem; }
-select { max-width: 100%; }
+select { min-height: 44px; max-width: 100%; }
 
 .source-reader pre:focus-visible, select:focus-visible { outline: 3px solid var(--accent, #216eac); outline-offset: 3px; }

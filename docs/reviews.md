@@ -253,8 +253,8 @@ observation of the stored receipt and still requires current eligibility; a new
 action requires the current snapshot context. Historical counts remain labelled
 not current, and matching unit IDs in a new snapshot inherit no approvals. Legacy
 manifests remain unavailable. The service reads no provider data, changes no refs
-or proposal state, and creates no official snapshot decision. Review-panel
-controls and assembly of final approval requirements remain unfinished.
+or proposal state, and creates no official snapshot decision. Assembly of final
+approval requirements remains unfinished.
 
 `GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/unit-approvals`
 exposes the caller's scoped status with strict fingerprint/domain queries and
@@ -267,6 +267,26 @@ legacy evidence are distinct 409 outcomes; conflicting nonce reuse also returns
 storage failures return a bounded retryable 503 and roll back all approval
 evidence. Both operations return no-store responses. Generated client methods
 keep status GETs separate from frozen explicit POST intents.
+
+The required-item panel now explicitly opens personal approval status alongside
+read coverage. Separate section/file approval buttons require current validated
+status and complete acknowledged coverage of all present sides. Unsupported work
+and historical contexts remain ineligible. Counts and row badges come from
+validated status reads; a receipt triggers a new read without incrementing counts
+optimistically. A status read, even one showing an approved item, cannot settle
+the original uncertain nonce. Exact receipt verification remains necessary.
+
+Pending requests retain the captured unit, domain and version outside the paged
+list. Paging, list refresh and status refresh preserve both the original approval
+body and captured source. Pending source or approval writes disable domain changes
+and new sibling writes. Changing eligibility hints keeps the pending domain visible
+until its original request resolves. Closing uncertain approval controls asks
+explicitly whether to leave the result unchecked. Reload, logout, route exit and
+unload guards include the pending approval, while safe requirement paging remains
+available. Access denial or session-identity mismatch hides private sibling data
+immediately and clears the parent snapshot. Native labelled controls, visible
+focus, 44px buttons/selects and wrapping text support keyboard and narrow layouts;
+physical keyboard/RTL/320px verification still awaits an available browser.
 
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks

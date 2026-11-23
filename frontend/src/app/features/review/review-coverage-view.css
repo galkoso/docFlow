@@ -1,4 +1,4 @@
 :host { display: block; min-width: 0; }
 section { margin-block: .75rem; }
 p { overflow-wrap: anywhere; }
-button { max-width: 100%; white-space: normal; }
+button { min-height: 44px; max-width: 100%; white-space: normal; }

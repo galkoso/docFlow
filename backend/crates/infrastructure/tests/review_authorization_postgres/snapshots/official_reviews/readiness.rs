@@ -9,6 +9,115 @@ fn issue(report: &ReviewReadiness, gate: G) -> bool {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn readiness_requires_product_decision_for_proposed_questions_and_keeps_outdated_or_missing_state_blocking(
+    pool: PgPool,
+) {
+    use specspace_application::product_question::{
+        ChangeProductQuestion, CreateProductQuestion, ProductQuestionAction,
+    };
+    use specspace_infrastructure::product_questions::{PgProductQuestions, ProductQuestionError};
+    let (f, source, h, fp, factory) = ready(&pool, true).await;
+    pair(&pool, &f, h, &fp, &factory).await;
+    let reads = source.reads.load(Ordering::SeqCst);
+    let questions = PgProductQuestions::new(pool.clone());
+    let version = sqlx::query_scalar("SELECT version FROM proposals WHERE id=$1")
+        .bind(f.proposal)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let q = questions
+        .create(
+            f.owner,
+            f.proposal,
+            CreateProductQuestion {
+                request_id: Uuid::new_v4(),
+                expected_proposal_version: version,
+                text: "Question before merge".into(),
+                blocking: true,
+                proposed_answer: Some("Unapproved suggestion".into()),
+            },
+        )
+        .await
+        .unwrap();
+    let readiness = PgReviewReadiness::new(pool.clone());
+    let proposed = readiness.stored(f.owner, f.proposal, h).await.unwrap();
+    assert!(
+        proposed
+            .evaluation
+            .issues
+            .iter()
+            .any(|i| i.gate == G::BlockingQuestions && i.code == "POLICY_EVIDENCE_PENDING")
+    );
+    let decide = ChangeProductQuestion {
+        request_id: Uuid::new_v4(),
+        expected_version: 1,
+        action: ProductQuestionAction::Decide {
+            answer: "Explicit Product answer".into(),
+        },
+    };
+    assert_eq!(
+        questions
+            .change(f.development, f.proposal, q.question_id, decide.clone())
+            .await
+            .err(),
+        Some(ProductQuestionError::ProductRequired)
+    );
+    questions
+        .change(f.product, f.proposal, q.question_id, decide)
+        .await
+        .unwrap();
+    let decided = readiness.stored(f.owner, f.proposal, h).await.unwrap();
+    assert_eq!(decided.evaluation.issues.len(), 1);
+    assert!(!issue(&decided, G::BlockingQuestions));
+    assert_eq!(decided.evaluation.conclusion, C::Pending);
+    questions
+        .change(
+            f.owner,
+            f.proposal,
+            q.question_id,
+            ChangeProductQuestion {
+                request_id: Uuid::new_v4(),
+                expected_version: 2,
+                action: ProductQuestionAction::Reopen {},
+            },
+        )
+        .await
+        .unwrap();
+    sqlx::query("UPDATE proposals SET head_sha=$2,version=version+1 WHERE id=$1")
+        .bind(f.proposal)
+        .bind("3".repeat(40))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let stale = readiness.stored(f.owner, f.proposal, h).await.unwrap();
+    assert!(issue(&stale, G::Snapshot) && issue(&stale, G::BlockingQuestions));
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query("ALTER TABLE product_question_revisions DISABLE TRIGGER ALL")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM product_question_revisions WHERE question_id=$1")
+        .bind(q.question_id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("ALTER TABLE product_question_revisions ENABLE TRIGGER ALL")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let missing = readiness.stored(f.owner, f.proposal, h).await.unwrap();
+    assert!(
+        missing
+            .evaluation
+            .issues
+            .iter()
+            .any(|i| i.gate == G::BlockingQuestions && i.code == "POLICY_EVIDENCE_UNAVAILABLE")
+    );
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn readiness_counts_outdated_blocking_threads_until_explicit_resolution(pool: PgPool) {
     use specspace_application::discussion::{
         OpenThreadRequest, ThreadMutation, ThreadMutationRequest, ThreadOrigin,
@@ -102,7 +211,7 @@ async fn pair(pool: &PgPool, f: &Fixture, h: Uuid, fp: &str, factory: &Factory) 
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn stored_readiness_assembles_independent_approvals_without_treating_missing_integrations_as_passed(
+async fn stored_readiness_assembles_independent_approvals_but_requires_provider_evidence(
     pool: PgPool,
 ) {
     let (f, source, h, fp, factory) = ready(&pool, true).await;
@@ -124,8 +233,8 @@ async fn stored_readiness_assembles_independent_approvals_without_treating_missi
     let reads = source.reads.load(Ordering::SeqCst);
     let report = service.stored(f.owner, f.proposal, h).await.unwrap();
     assert_eq!(report.evaluation.conclusion, C::Pending);
-    assert_eq!(report.evaluation.issues.len(), 2);
-    assert!(issue(&report, G::BlockingQuestions));
+    assert_eq!(report.evaluation.issues.len(), 1);
+    assert!(!issue(&report, G::BlockingQuestions));
     assert!(
         report
             .evaluation

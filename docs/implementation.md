@@ -2631,3 +2631,22 @@ Checkboxes represent verified work only.
   retry, role loss, imported/outdated origins, paging and history retention. HTTP,
   typed transport and readiness wiring follow as the next separately committed
   stage; verified bundle import and question UI remain open.
+
+- Product-question HTTP/client and readiness integration: exposed actor-bound,
+  no-store list/history and Origin/XSRF-protected create/change endpoints, with
+  strict bodies, bounded payloads, known conflict/authority errors and retry
+  guidance. The typed client encodes captured identities and preserves write
+  intents. Stored readiness now reads every latest question revision: complete
+  empty/nonblocking/decided sets pass this gate, proposed/open blockers remain
+  pending, and missing state remains unknown. Outdated origins and creator access
+  loss never hide blockers. Four HTTP scenarios and a readiness lifecycle case
+  cover authority, replay, failed-write recovery, proposal/tenant identity and
+  actual gate changes without Git IO or official votes. All 777 backend tests
+  pass with the same two performance measurements ignored; all 696 frontend tests
+  in 63 files and production builds pass. The first frontend run encountered
+  simultaneous timeout gaps in unchanged suites; an unchanged-timeout rerun passed.
+  Clippy with warnings denied, formatting, backend builds and exact OpenAPI export
+  comparison pass; generated types are synchronized. The rebuilt API is ready
+  and anonymous question reads remain authenticated/no-store. The question UI,
+  verified importer, fresh-provider verification, required-check publisher, final
+  approval/merge and remaining full-spec requirements remain open.

@@ -29,17 +29,13 @@ async fn readiness_http_reports_server_evidence_without_provider_reads_writes_or
     assert_eq!(report.1["provider_refs_verified"], false);
     assert_eq!(report.1["evaluation"]["conclusion"], "PENDING");
     let issues = report.1["evaluation"]["issues"].as_array().unwrap();
-    assert_eq!(issues.len(), 2);
+    assert_eq!(issues.len(), 1);
     assert!(
         issues
             .iter()
             .any(|i| i["code"] == "PROVIDER_REFS_UNVERIFIED")
     );
-    assert!(
-        issues.iter().any(
-            |i| i["gate"] == "BLOCKING_QUESTIONS" && i["code"] == "POLICY_EVIDENCE_UNAVAILABLE"
-        )
-    );
+    assert!(!issues.iter().any(|i| i["gate"] == "BLOCKING_QUESTIONS"));
     assert!(!report.1.to_string().contains("PRIVATE SOURCE SENTINEL"));
     assert_eq!(f.provider.ref_reads.load(Ordering::SeqCst), reads);
     assert_eq!(

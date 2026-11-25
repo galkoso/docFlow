@@ -3284,6 +3284,523 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/questions": {
+      "get": {
+        "tags": [
+          "crate::product_questions"
+        ],
+        "operationId": "proposalProductQuestions",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductQuestions"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "crate::product_questions"
+        ],
+        "operationId": "createProposalProductQuestion",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductQuestion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Original receipt replayed; current question state is read separately",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductQuestionRecorded"
+                }
+              }
+            }
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductQuestionRecorded"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/questions/{question}": {
+      "get": {
+        "tags": [
+          "crate::product_questions"
+        ],
+        "operationId": "proposalProductQuestionHistory",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "question",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Append-only revision version cursor, at least 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductQuestionHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal}/questions/{question}/actions": {
+      "post": {
+        "tags": [
+          "crate::product_questions"
+        ],
+        "operationId": "changeProposalProductQuestion",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "question",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeProductQuestion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Exact original action receipt, not a new state transition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductQuestionRecorded"
+                }
+              }
+            }
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductQuestionRecorded"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/review/configuration": {
       "get": {
         "tags": [
@@ -8191,6 +8708,29 @@
           }
         }
       },
+      "ChangeProductQuestion": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "expected_version",
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ProductQuestionAction"
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
       "ComparisonJobResult": {
         "type": "object",
         "required": [
@@ -8371,6 +8911,43 @@
             "format": "uuid"
           }
         }
+      },
+      "CreateProductQuestion": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "expected_proposal_version",
+          "text",
+          "blocking"
+        ],
+        "properties": {
+          "blocking": {
+            "type": "boolean"
+          },
+          "expected_proposal_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "proposed_answer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 10000,
+            "minLength": 1
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
       },
       "CreateProposal": {
         "type": "object",
@@ -10856,6 +11433,438 @@
           },
           "source_sha": {
             "type": "string"
+          }
+        }
+      },
+      "ProductQuestion": {
+        "type": "object",
+        "required": [
+          "id",
+          "proposal_id",
+          "creator",
+          "text",
+          "source",
+          "origin",
+          "outdated_context",
+          "created_at",
+          "current",
+          "permissions"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "creator": {
+            "$ref": "#/components/schemas/ProductQuestionActor"
+          },
+          "current": {
+            "$ref": "#/components/schemas/ProductQuestionRevision"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ProductQuestionOrigin"
+          },
+          "outdated_context": {
+            "type": "boolean"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/ProductQuestionPermissions"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ProductQuestionSource"
+          },
+          "source_reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "A provenance locator, not proof of a verified import or a Product decision."
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductQuestionAction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "answer",
+              "kind"
+            ],
+            "properties": {
+              "answer": {
+                "type": "string",
+                "maxLength": 10000,
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "propose"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "answer",
+              "kind"
+            ],
+            "properties": {
+              "answer": {
+                "type": "string",
+                "maxLength": 10000,
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "decide"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "reopen"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "blocking",
+              "kind"
+            ],
+            "properties": {
+              "blocking": {
+                "type": "boolean"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "set_blocking"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ProductQuestionActor": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductQuestionDecision": {
+        "type": "object",
+        "required": [
+          "actor",
+          "recorded_at"
+        ],
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/ProductQuestionActor"
+          },
+          "recorded_at": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductQuestionHistory": {
+        "type": "object",
+        "required": [
+          "actor_id",
+          "proposal_id",
+          "question",
+          "read_at",
+          "revisions"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "next_after": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "question": {
+            "$ref": "#/components/schemas/ProductQuestion"
+          },
+          "read_at": {
+            "type": "string"
+          },
+          "revisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductQuestionRevision"
+            }
+          }
+        }
+      },
+      "ProductQuestionKind": {
+        "type": "string",
+        "enum": [
+          "OPEN",
+          "PROPOSE",
+          "DECIDE",
+          "REOPEN",
+          "SET_BLOCKING"
+        ]
+      },
+      "ProductQuestionOrigin": {
+        "type": "object",
+        "required": [
+          "repository_id",
+          "branch",
+          "head_sha",
+          "target_sha",
+          "proposal_version"
+        ],
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repository_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_sha": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductQuestionPermissions": {
+        "type": "object",
+        "required": [
+          "can_propose",
+          "can_decide",
+          "can_reopen",
+          "can_toggle_blocking"
+        ],
+        "properties": {
+          "can_decide": {
+            "type": "boolean"
+          },
+          "can_propose": {
+            "type": "boolean"
+          },
+          "can_reopen": {
+            "type": "boolean"
+          },
+          "can_toggle_blocking": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProductQuestionPhase": {
+        "type": "string",
+        "enum": [
+          "OPEN",
+          "PROPOSED",
+          "DECIDED"
+        ]
+      },
+      "ProductQuestionRecorded": {
+        "type": "object",
+        "required": [
+          "id",
+          "request_id",
+          "actor_id",
+          "proposal_id",
+          "question_id",
+          "version",
+          "kind",
+          "recorded_at",
+          "replayed"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProductQuestionKind"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "question_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean",
+            "description": "Observation of the original receipt; current question state is read separately."
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ProductQuestionRevision": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "actor",
+          "kind",
+          "state",
+          "blocking",
+          "recorded_at"
+        ],
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/ProductQuestionActor"
+          },
+          "answer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blocking": {
+            "type": "boolean"
+          },
+          "decision": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProductQuestionDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProductQuestionKind"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ProductQuestionPhase"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ProductQuestionSource": {
+        "type": "string",
+        "enum": [
+          "HUMAN",
+          "IMPORTED"
+        ]
+      },
+      "ProductQuestions": {
+        "type": "object",
+        "required": [
+          "actor_id",
+          "proposal_id",
+          "proposal_version",
+          "can_create",
+          "unresolved_blockers",
+          "read_at",
+          "questions"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "can_create": {
+            "type": "boolean"
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductQuestion"
+            }
+          },
+          "read_at": {
+            "type": "string"
+          },
+          "unresolved_blockers": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

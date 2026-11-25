@@ -40,7 +40,37 @@ roll back together. Origin/revision mutation and event replacement/deletion are
 rejected. A nonce is unique per organization. Successful revisions are limited to
 60 per actor and 600 per organization in ten minutes, with serialized admission.
 
-The domain and persistence foundations are implemented and tested. Authorized
-read/write orchestration, API, import provenance validation, interface and
-readiness integration are subsequent stages. The readiness report continues to
-treat question evidence as unknown until that integration is in place.
+`PgProductQuestions` now authorizes reads and writes from current organization
+membership. Mutations lock the proposal, evaluate the domain transition, and
+commit the revision/audit/event atomically. Exact actor/resource/body nonce
+retries return the original receipt without applying another revision or charging
+quota. Changed intents fail. Current action authority is checked before replay;
+an old receipt can be observed after closure, while new mutations remain forbidden.
+A receipt is not a current-state response: read the question after a write.
+
+All proposal readers can inspect the current state and append-only history.
+Question pages use stable ID cursors and return at most 20 entries. Revision
+history uses ascending version cursors; appending later revisions does not rewrite
+already displayed pages. Blocker totals cover every question, independently of
+pagination. Current permissions and original recorded context accompany each
+question. Lost creator access or an outdated origin does not resolve a blocker.
+
+The authenticated, no-store API exposes GET/POST `/api/v1/proposals/{proposal}/questions`,
+GET `.../questions/{question}` and POST `.../questions/{question}/actions`.
+Creation accepts only a nonce, expected proposal version, text, blocking flag and
+optional proposed answer. The server records HUMAN source and the session actor;
+clients cannot supply a source, state, creator or decider. Mutations carry their
+nonce, expected revision version and propose/decide/reopen/set_blocking intent.
+POSTs require Origin/XSRF and actor binding. Create bodies are limited to 256KiB,
+action bodies to 128KiB, with the domain's separate Unicode text bounds. Known
+conflicts/authority failures are distinct from retryable storage failures; quota
+and unavailable responses include bounded Retry-After guidance.
+
+Stored readiness now reads the latest revision of every scoped question. An empty
+complete set passes this gate; an unresolved blocking question remains pending;
+missing state is unknown. A proposed answer, including an imported suggestion,
+does not resolve it. This integration performs no Git IO or official voting.
+The typed client preserves captured actor/resource IDs and request bodies.
+
+The question interface, verified bundle-import writer/provenance, fresh provider
+verification, required-check publication and merge integration remain open.

@@ -6,6 +6,7 @@ pub mod discussions;
 pub mod drafts;
 pub mod editor;
 pub mod official_reviews;
+mod product_questions;
 pub mod proposal_content;
 pub mod proposal_reads;
 pub mod proposals;
@@ -378,6 +379,7 @@ pub fn router(state: AppState) -> Router {
         .merge(reviews::routes())
         .merge(official_reviews::routes())
         .merge(review_readiness::routes())
+        .merge(product_questions::routes())
         .merge(review_visits::routes())
         .merge(unit_approvals::routes())
         .merge(discussions::routes())

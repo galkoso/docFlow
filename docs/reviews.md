@@ -351,9 +351,13 @@ encodes both resource IDs and carries the captured actor header.
 This endpoint is a stored report, not a provider check or merge grant. It performs
 no Git reads or writes, persists no decision and changes no proposal state.
 `provider_refs_verified` is false and an explicit `PROVIDER_REFS_UNVERIFIED` issue
-prevents success. Product-question evidence remains unknown until its authoritative
-store is implemented; absence of that integration is never interpreted as zero
-blockers. Even a complete independent approval pair therefore remains pending.
+prevents success. The Product-question gate now reads every latest stored question
+revision. An empty complete set passes; proposed/open blocking questions remain
+pending, and missing state remains unknown. An explicit Product decision resolves
+an answer; removing blocking status also requires Product authority. Outdated
+origins and departed creators are not filtered out.
+Even a complete independent approval pair therefore remains pending until fresh
+provider verification is implemented.
 Publishing the required check, fresh-ref revalidation, final APPROVED state and
 merge integration remain open.
 

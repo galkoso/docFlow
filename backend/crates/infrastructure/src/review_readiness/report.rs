@@ -285,9 +285,9 @@ impl PgReviewReadiness {
             blocking_threads_resolved: super::discussions(&mut tx, org, proposal)
                 .await?
                 .verification(),
-            // Authorized question read/write integration is not connected yet.
-            // Schema availability alone does not prove zero blocking questions.
-            blocking_questions_resolved: Verification::Unknown,
+            blocking_questions_resolved: super::questions(&mut tx, org, proposal)
+                .await?
+                .verification(),
         });
         evaluation.issues.push(Issue {
             gate: Gate::Evidence,

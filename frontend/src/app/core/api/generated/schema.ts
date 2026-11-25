@@ -440,6 +440,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalProductQuestions"];
+        put?: never;
+        post: operations["createProposalProductQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}/questions/{question}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["proposalProductQuestionHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}/questions/{question}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["changeProposalProductQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/review/configuration": {
         parameters: {
             query?: never;
@@ -999,6 +1047,13 @@ export interface components {
             mode_changed: boolean;
             status: components["schemas"]["Status"];
         };
+        ChangeProductQuestion: {
+            action: components["schemas"]["ProductQuestionAction"];
+            /** Format: int64 */
+            expected_version: number;
+            /** Format: uuid */
+            request_id: string;
+        };
         ComparisonJobResult: {
             content_id?: string | null;
             progress_path: string;
@@ -1046,6 +1101,15 @@ export interface components {
             replayed: boolean;
             /** Format: uuid */
             request_id: string;
+        };
+        CreateProductQuestion: {
+            blocking: boolean;
+            /** Format: int64 */
+            expected_proposal_version: number;
+            proposed_answer?: string | null;
+            /** Format: uuid */
+            request_id: string;
+            text: string;
         };
         CreateProposal: {
             branch: string;
@@ -1728,6 +1792,128 @@ export interface components {
             repository_id: string;
             source_branch: string;
             source_sha: string;
+        };
+        ProductQuestion: {
+            created_at: string;
+            creator: components["schemas"]["ProductQuestionActor"];
+            current: components["schemas"]["ProductQuestionRevision"];
+            /** Format: uuid */
+            id: string;
+            origin: components["schemas"]["ProductQuestionOrigin"];
+            outdated_context: boolean;
+            permissions: components["schemas"]["ProductQuestionPermissions"];
+            /** Format: uuid */
+            proposal_id: string;
+            source: components["schemas"]["ProductQuestionSource"];
+            /**
+             * Format: uuid
+             * @description A provenance locator, not proof of a verified import or a Product decision.
+             */
+            source_reference?: string | null;
+            text: string;
+        };
+        ProductQuestionAction: {
+            answer: string;
+            /** @enum {string} */
+            kind: "propose";
+        } | {
+            answer: string;
+            /** @enum {string} */
+            kind: "decide";
+        } | {
+            /** @enum {string} */
+            kind: "reopen";
+        } | {
+            blocking: boolean;
+            /** @enum {string} */
+            kind: "set_blocking";
+        };
+        ProductQuestionActor: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        ProductQuestionDecision: {
+            actor: components["schemas"]["ProductQuestionActor"];
+            recorded_at: string;
+        };
+        ProductQuestionHistory: {
+            /** Format: uuid */
+            actor_id: string;
+            /** Format: int64 */
+            next_after?: number | null;
+            /** Format: uuid */
+            proposal_id: string;
+            question: components["schemas"]["ProductQuestion"];
+            read_at: string;
+            revisions: components["schemas"]["ProductQuestionRevision"][];
+        };
+        /** @enum {string} */
+        ProductQuestionKind: "OPEN" | "PROPOSE" | "DECIDE" | "REOPEN" | "SET_BLOCKING";
+        ProductQuestionOrigin: {
+            branch: string;
+            head_sha: string;
+            /** Format: int64 */
+            proposal_version: number;
+            /** Format: uuid */
+            repository_id: string;
+            target_sha: string;
+        };
+        ProductQuestionPermissions: {
+            can_decide: boolean;
+            can_propose: boolean;
+            can_reopen: boolean;
+            can_toggle_blocking: boolean;
+        };
+        /** @enum {string} */
+        ProductQuestionPhase: "OPEN" | "PROPOSED" | "DECIDED";
+        ProductQuestionRecorded: {
+            /** Format: uuid */
+            actor_id: string;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["ProductQuestionKind"];
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: uuid */
+            question_id: string;
+            recorded_at: string;
+            /** @description Observation of the original receipt; current question state is read separately. */
+            replayed: boolean;
+            /** Format: uuid */
+            request_id: string;
+            /** Format: int64 */
+            version: number;
+        };
+        ProductQuestionRevision: {
+            actor: components["schemas"]["ProductQuestionActor"];
+            answer?: string | null;
+            blocking: boolean;
+            decision?: components["schemas"]["ProductQuestionDecision"] | null;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["ProductQuestionKind"];
+            recorded_at: string;
+            state: components["schemas"]["ProductQuestionPhase"];
+            /** Format: int64 */
+            version: number;
+        };
+        /** @enum {string} */
+        ProductQuestionSource: "HUMAN" | "IMPORTED";
+        ProductQuestions: {
+            /** Format: uuid */
+            actor_id: string;
+            can_create: boolean;
+            /** Format: uuid */
+            next_after?: string | null;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: int64 */
+            proposal_version: number;
+            questions: components["schemas"]["ProductQuestion"][];
+            read_at: string;
+            /** Format: int64 */
+            unresolved_blockers: number;
         };
         Profile: {
             capabilities: components["schemas"]["ProfileCapabilities"];
@@ -5026,6 +5212,343 @@ export interface operations {
                 };
             };
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalProductQuestions: {
+        parameters: {
+            query?: {
+                after?: string;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductQuestions"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    createProposalProductQuestion: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+            };
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProductQuestion"];
+            };
+        };
+        responses: {
+            /** @description Original receipt replayed; current question state is read separately */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductQuestionRecorded"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductQuestionRecorded"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalProductQuestionHistory: {
+        parameters: {
+            query?: {
+                /** @description Append-only revision version cursor, at least 1 */
+                after?: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                question: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductQuestionHistory"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    changeProposalProductQuestion: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+            };
+            path: {
+                proposal: string;
+                question: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeProductQuestion"];
+            };
+        };
+        responses: {
+            /** @description Exact original action receipt, not a new state transition */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductQuestionRecorded"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductQuestionRecorded"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

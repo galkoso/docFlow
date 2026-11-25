@@ -2650,3 +2650,13 @@ Checkboxes represent verified work only.
   and anonymous question reads remain authenticated/no-store. The question UI,
   verified importer, fresh-provider verification, required-check publisher, final
   approval/merge and remaining full-spec requirements remain open.
+
+- Product-question evidence and stored-readiness presentation: added strict client
+  validation of scoped questions, contiguous revision pages, explicit Product
+  attribution and exact action receipts. A separate lazy readiness component
+  binds results to the selected snapshot and actor, rejects invented success or
+  provider verification, clears failed refreshes and cancels superseded reads.
+  Synthetic fixtures cover imported suggestions without granting approval.
+  The complete frontend suite passes 742 tests in 66 files and the production
+  build passes. Physical keyboard, visual RTL and 320px acceptance remain open;
+  browser discovery returned no available browser.

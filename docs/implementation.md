@@ -2574,3 +2574,19 @@ Checkboxes represent verified work only.
   PostgreSQL scenarios and a coverage aggregation case pass. This read performs
   no provider IO, state transition or check publication. Product questions, fresh
   provider evaluation, final APPROVED state, publication and merge remain open.
+
+- Stored readiness API and typed client: added the authenticated, actor-bound GET
+  on each proposal snapshot, with strict empty query shape, organization-scoped
+  reads, no-store responses and retry guidance on unavailable evidence. The
+  response names its immutable context, reports gate issues and explicitly says
+  provider refs are unverified. HTTP cases cover an otherwise complete approval
+  pair remaining pending, no provider IO/audit/state writes, foreign scope, lost
+  identity and forged query evidence. The client encodes IDs and sends only the
+  captured actor, never gate results. OpenAPI/generated types are synchronized.
+  All 756 backend tests pass with two existing performance measurements ignored;
+  all 695 frontend tests in 62 files and the production build pass. Clippy with
+  warnings denied, formatting, all backend binaries and exact OpenAPI export
+  comparison pass. The rebuilt API is ready and the new route rejects anonymous
+  reads with no-store. Product-question storage, fresh-provider evaluation, the
+  required-check publisher, final approval state, merge and remaining full-spec
+  requirements stay open.

@@ -32,6 +32,7 @@ export type ReviewDetail = components['schemas']['ProposalDetail'];
 export type OfficialHistory = components['schemas']['OfficialReviewHistory'];
 export type OfficialRequest = components['schemas']['OfficialReviewRequest'];
 export type OfficialRecorded = components['schemas']['OfficialReviewRecorded'];
+export type StoredReviewReadiness = components['schemas']['ReviewReadiness'];
 
 @Injectable({ providedIn: 'root' })
 export class ReviewApi {
@@ -105,6 +106,9 @@ export class ReviewApi {
   }
   recordDecision(actor: string, proposal: string, snapshot: string, body: Readonly<OfficialRequest>) {
     return this.http.post<OfficialRecorded>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/decisions`, body, { headers: this.actor(actor) });
+  }
+  readiness(actor: string, proposal: string, snapshot: string) {
+    return this.http.get<StoredReviewReadiness>(`${this.snapshots(proposal)}/${encodeURIComponent(snapshot)}/readiness`, { headers: this.actor(actor) });
   }
   private actor(actor: string) { return { 'X-Expected-Actor': actor }; }
   private proposal(id: string) { return `/api/v1/proposals/${encodeURIComponent(id)}`; }

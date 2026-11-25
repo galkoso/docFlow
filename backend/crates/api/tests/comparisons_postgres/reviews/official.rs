@@ -1,4 +1,6 @@
 use super::*;
+#[path = "official/readiness.rs"]
+mod readiness;
 async fn ready(pool: &PgPool, updated: bool) -> (Fixture, User, User, String, String) {
     let (f, product, development) = configured(pool, false).await;
     if updated {

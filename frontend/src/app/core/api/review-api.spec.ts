@@ -6,6 +6,15 @@ import { ReviewApi } from './review-api';
 import { submissionContext } from '../../features/review/submission-evidence';
 
 describe('Review API request scope', () => {
+  it('reads stored readiness for the captured actor without supplying gate evidence or performing a write', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ReviewApi), http = TestBed.inject(HttpTestingController);
+    api.readiness(actor, 'p/other?x=1', 'h/other').subscribe();
+    const read = http.expectOne('/api/v1/proposals/p%2Fother%3Fx%3D1/review/snapshots/h%2Fother/readiness');
+    expect(read.request.method).toBe('GET'); expect(read.request.headers.get('X-Expected-Actor')).toBe(actor);
+    expect(read.request.params.keys()).toEqual([]); expect(read.request.body).toBeNull();
+    read.flush({}); http.expectNone(req => req.method === 'POST'); http.verify();
+  });
   it('encodes every identifier and carries the captured actor on submission, context, jobs and shared reads', () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     const api = TestBed.inject(ReviewApi), http = TestBed.inject(HttpTestingController), context = submissionContext(configuration(), detail(), proposal)!;

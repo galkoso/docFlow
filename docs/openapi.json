@@ -5742,6 +5742,105 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/readiness": {
+      "get": {
+        "tags": [
+          "crate::review_readiness"
+        ],
+        "description": "Stored evidence only. Provider refs are unverified; this report never authorizes approval, check publication or merge.",
+        "operationId": "proposalStoredReviewReadiness",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewReadiness"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/unit-approvals": {
       "get": {
         "tags": [
@@ -11577,6 +11676,67 @@
           "RAW_REQUIRED"
         ]
       },
+      "ReadinessConclusion": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "FAILURE",
+          "SUCCESS"
+        ]
+      },
+      "ReadinessEvaluation": {
+        "type": "object",
+        "required": [
+          "conclusion",
+          "issues"
+        ],
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/ReadinessConclusion"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadinessIssue"
+            }
+          }
+        }
+      },
+      "ReadinessGate": {
+        "type": "string",
+        "enum": [
+          "EVIDENCE",
+          "PROPOSAL_STATE",
+          "SNAPSHOT",
+          "APPROVALS",
+          "REQUIRED_REVIEWER",
+          "BASE_UPDATE",
+          "CONTENT_VALIDATION",
+          "MEDIA_VALIDATION",
+          "SECTION_COVERAGE",
+          "BLOCKING_THREADS",
+          "BLOCKING_QUESTIONS"
+        ]
+      },
+      "ReadinessIssue": {
+        "type": "object",
+        "required": [
+          "gate",
+          "conclusion",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "conclusion": {
+            "$ref": "#/components/schemas/ReadinessConclusion"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/ReadinessGate"
+          }
+        }
+      },
       "RenderEvent": {
         "type": "object",
         "required": [
@@ -12469,6 +12629,68 @@
           "snapshot_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "ReviewReadiness": {
+        "type": "object",
+        "required": [
+          "actor_id",
+          "proposal_id",
+          "snapshot_id",
+          "fingerprint",
+          "head_sha",
+          "target_sha",
+          "policy_version",
+          "configuration_version",
+          "current_for_metadata",
+          "provider_refs_verified",
+          "read_at",
+          "evaluation"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "configuration_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "current_for_metadata": {
+            "type": "boolean",
+            "description": "Compares stored proposal/repository metadata only."
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/ReadinessEvaluation"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "policy_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider_refs_verified": {
+            "type": "boolean",
+            "description": "False for this stored report. Provider checks and merge must independently\nre-read refs and authority; this response cannot authorize either action."
+          },
+          "read_at": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_sha": {
+            "type": "string"
           }
         }
       },

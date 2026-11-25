@@ -712,6 +712,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Stored evidence only. Provider refs are unverified; this report never authorizes approval, check publication or merge. */
+        get: operations["proposalStoredReviewReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/review/snapshots/{snapshot}/unit-approvals": {
         parameters: {
             query?: never;
@@ -1910,6 +1927,19 @@ export interface components {
         };
         /** @enum {string} */
         ReadableUnitState: "READY" | "ABSENT" | "RAW_REQUIRED";
+        /** @enum {string} */
+        ReadinessConclusion: "PENDING" | "FAILURE" | "SUCCESS";
+        ReadinessEvaluation: {
+            conclusion: components["schemas"]["ReadinessConclusion"];
+            issues: components["schemas"]["ReadinessIssue"][];
+        };
+        /** @enum {string} */
+        ReadinessGate: "EVIDENCE" | "PROPOSAL_STATE" | "SNAPSHOT" | "APPROVALS" | "REQUIRED_REVIEWER" | "BASE_UPDATE" | "CONTENT_VALIDATION" | "MEDIA_VALIDATION" | "SECTION_COVERAGE" | "BLOCKING_THREADS" | "BLOCKING_QUESTIONS";
+        ReadinessIssue: {
+            code: string;
+            conclusion: components["schemas"]["ReadinessConclusion"];
+            gate: components["schemas"]["ReadinessGate"];
+        };
         RenderEvent: {
             alignments?: string[];
             block_id?: string | null;
@@ -2149,6 +2179,30 @@ export interface components {
             replayed: boolean;
             /** Format: uuid */
             snapshot_id: string;
+        };
+        ReviewReadiness: {
+            /** Format: uuid */
+            actor_id: string;
+            /** Format: int64 */
+            configuration_version: number;
+            /** @description Compares stored proposal/repository metadata only. */
+            current_for_metadata: boolean;
+            evaluation: components["schemas"]["ReadinessEvaluation"];
+            fingerprint: string;
+            head_sha: string;
+            /** Format: int64 */
+            policy_version: number;
+            /** Format: uuid */
+            proposal_id: string;
+            /**
+             * @description False for this stored report. Provider checks and merge must independently
+             *     re-read refs and authority; this response cannot authorize either action.
+             */
+            provider_refs_verified: boolean;
+            read_at: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            target_sha: string;
         };
         ReviewSettings: {
             assignments: components["schemas"]["ReviewerSelection"][];
@@ -6460,6 +6514,70 @@ export interface operations {
                 };
             };
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    proposalStoredReviewReadiness: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                snapshot: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewReadiness"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

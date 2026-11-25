@@ -332,6 +332,31 @@ These checks run in history's authorized repeatable-read transaction without
 provider IO or writes. Fresh-ref evaluation, required-check publication and merge
 remain separate unfinished work.
 
+`GET /api/v1/proposals/{proposal}/review/snapshots/{snapshot}/readiness` now
+assembles a stored readiness report in one authorized repeatable-read transaction.
+The shared domain evaluator receives frozen required assignments, current active
+memberships and qualifications, exact effective decisions, real individual
+approval coverage or the explicit whole-snapshot override, base-update state,
+sealed content validation and file counts, compatible media validation and
+receipt counts, and every latest discussion state. The report includes its actor,
+snapshot/fingerprint, head/target, policy/configuration and server read time.
+
+Only the proposal and snapshot identities are accepted. Extra query fields cannot
+claim passed checks, substitute a head or select another actor. All organization
+members with proposal read access can inspect the report; unknown/foreign scope
+and lost access do not disclose evidence. Responses are private/no-store, and
+temporarily unavailable reads carry bounded retry guidance. The typed client
+encodes both resource IDs and carries the captured actor header.
+
+This endpoint is a stored report, not a provider check or merge grant. It performs
+no Git reads or writes, persists no decision and changes no proposal state.
+`provider_refs_verified` is false and an explicit `PROVIDER_REFS_UNVERIFIED` issue
+prevents success. Product-question evidence remains unknown until its authoritative
+store is implemented; absence of that integration is never interpreted as zero
+blockers. Even a complete independent approval pair therefore remains pending.
+Publishing the required check, fresh-ref revalidation, final APPROVED state and
+merge integration remain open.
+
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks
 current edit authority, then replays an identical actor-bound idempotency key or

@@ -2660,3 +2660,17 @@ Checkboxes represent verified work only.
   The complete frontend suite passes 742 tests in 66 files and the production
   build passes. Physical keyboard, visual RTL and 320px acceptance remain open;
   browser discovery returned no available browser.
+
+- Product-question interface and review-page integration: added proposal-level
+  create/propose/decide/reopen/blocking forms, imported-answer warnings, recorded
+  context and paged immutable history. Drafts retain text across stale-version
+  failures and require explicit version adoption. Uncertain results preserve the
+  exact nonce/body for manual retry, honor Retry-After without automatic writes,
+  and cannot be acknowledged by a history read. Account changes hide private
+  content immediately; navigation, reload, logout and unload guard pending work.
+  Validated question/discussion/official-review receipts refresh an already-open
+  stored-readiness panel. Questions remain usable before any shared snapshot.
+  All 742 frontend tests in 66 files and the production build pass. No backend
+  behavior changed in this stage. Physical UI acceptance, verified bundle import,
+  fresh-provider readiness, required-check publication, final approval/merge and
+  the remaining full specification stay open.

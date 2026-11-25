@@ -12,6 +12,10 @@ import { abcHash, sourceScope, sourceWindow, visitReceipt } from '../../../testi
 import { ReviewUnitsView } from './review-units-view';
 import { OfficialReviewsView } from './official-reviews-view';
 import { DiscussionsView } from './discussions-view';
+import { ProductQuestionsView } from './product-questions-view';
+import { ReviewReadinessView } from './review-readiness-view';
+import { questionPage, questionHistory, questionReceipt, questionId, decidedQuestionHistory } from '../../../testing/product-question-fixtures';
+import { storedReadiness } from '../../../testing/readiness-fixtures';
 import { reviewCoverage } from '../../../testing/review-coverage-fixtures';
 import { unitApprovalPage, unitApprovalReceipt } from '../../../testing/unit-approval-fixtures';
 import { discussionThreads } from '../../../testing/discussion-fixtures';
@@ -67,6 +71,39 @@ describe('Review snapshots page', () => {
     expect(page.submission.pending()).toBe(false); expect(router.url).toContain(`job=${ticket.job_id}`);
     expect(element.textContent).toContain('גרסה משותפת נשמרה לסקירה'); expect(element.textContent).toContain('פרסום באפיון המאושר דורש מיזוג');
     expect([...element.querySelectorAll('button')].some(button => button.textContent?.trim() === 'אישור')).toBe(false); http.verify();
+  });
+  it('guards Product-question drafts on route changes, logout, unload and explicit reload', async () => {
+    const { harness, page, http, router, load, settle, guard } = await create(); load(); await settle();
+    const questions = harness.routeDebugElement!.query(By.directive(ProductQuestionsView)).componentInstance as ProductQuestionsView;
+    questions.open(); http.expectOne(`${root}/questions`).flush(questionPage(actor, [])); questions.beginCreate(); questions.question.set('Unsent product question');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    expect(await router.navigateByUrl(`${route}?snapshot=${other}`)).toBe(false); expect(await router.navigateByUrl('/away')).toBe(false); expect(guard()).toBe(false);
+    page.reload(); http.expectNone(req => req.url === snapshots);
+    const unload = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent; page.beforeUnload(unload); expect(unload.defaultPrevented).toBe(true);
+    confirm.mockReturnValue(true); expect(await router.navigateByUrl('/away')).toBe(true); http.verify();
+  });
+  it('refreshes an opened readiness report only after a verified Product-question receipt', async () => {
+    const { harness, http, load, settle } = await create(`?snapshot=${snapshot}`, product); load(); await settle();
+    const questions = harness.routeDebugElement!.query(By.directive(ProductQuestionsView)).componentInstance as ProductQuestionsView;
+    const readiness = harness.routeDebugElement!.query(By.directive(ReviewReadinessView)).componentInstance as ReviewReadinessView;
+    const ready = `${snapshots}/${snapshot}/readiness`, q = `${root}/questions/${questionId}`;
+    readiness.refresh(); http.expectOne(ready).flush(storedReadiness(product, true));
+    questions.open(); http.expectOne(`${root}/questions`).flush(questionPage()); questions.select(questions.view()!.questions[0]); http.expectOne(q).flush(questionHistory());
+    questions.begin('decide'); questions.answer.set('Explicit Product decision'); questions.send(); const post = http.expectOne(`${q}/actions`), body = post.request.body;
+    post.flush(questionReceipt(body)); expect(readiness.view()).toBeNull();
+    const h = decidedQuestionHistory(body); http.expectOne(`${root}/questions`).flush(questionPage(product, [h.question])); http.expectOne(q).flush(h);
+    http.expectOne(ready).flush(storedReadiness()); await settle();
+    expect(readiness.view()?.evaluation.issues.some(i => i.gate === 'BLOCKING_QUESTIONS')).toBe(false); expect(readiness.view()?.provider_refs_verified).toBe(false);
+    http.expectNone(r => r.method === 'POST'); http.verify();
+  });
+  it('offers proposal-level questions even before the first shared review snapshot', async () => {
+    const { harness, http, settle } = await create('');
+    const h = history(); h.snapshots = []; h.active_snapshot_id = null;
+    http.expectOne(req => req.url === snapshots).flush(h); harness.detectChanges();
+    http.expectOne(`${root}/threads`).flush(discussionThreads(actor)); await settle();
+    const questions = harness.routeDebugElement!.query(By.directive(ProductQuestionsView)).componentInstance as ProductQuestionsView;
+    questions.open(); http.expectOne(`${root}/questions`).flush(questionPage(actor, [])); questions.beginCreate(); questions.question.set('Question before snapshot');
+    expect(questions.canSend()).toBe(true); http.expectNone(r => r.method === 'POST'); http.verify();
   });
   it('purges the shared snapshot and body when PR status reports lost access', async () => {
     const { harness, page, http, load, settle } = await create(); load(); await settle();

@@ -30,6 +30,7 @@ function frozen<T>(value: T): T {
 export class DiscussionsView implements OnDestroy {
   readonly scope = input.required<DiscussionScope>();
   readonly accessDenied = output<void>();
+  readonly recorded = output<void>();
   private readonly api = inject(DiscussionApi);
   private readonly reviews = inject(ReviewApi);
   private readonly session = inject(SessionState);
@@ -260,7 +261,7 @@ export class DiscussionsView implements OnDestroy {
           this.error.set('תוצאת הפעולה אינה תואמת לבקשה. הבקשה המקורית נשמרת לבדיקה.'); return;
         }
         this.pending.set(null); this.draft.set(null); this.body.set(''); this.message.set('פעולת הדיון נשמרה. החלטות סקירה רשמיות נבדקות בנפרד.');
-        this.selected.set(value.thread_id); this.loadList(); this.loadComments(value.thread_id);
+        this.selected.set(value.thread_id); this.loadList(); this.loadComments(value.thread_id); this.recorded.emit();
       },
       error: e => {
         if (generation !== this.writeGeneration || !this.owns(attempt.scope, attempt.epoch)) return;

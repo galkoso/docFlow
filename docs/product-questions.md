@@ -72,5 +72,25 @@ missing state is unknown. A proposed answer, including an imported suggestion,
 does not resolve it. This integration performs no Git IO or official voting.
 The typed client preserves captured actor/resource IDs and request bodies.
 
-The question interface, verified bundle-import writer/provenance, fresh provider
-verification, required-check publication and merge integration remain open.
+The review page now exposes proposal-level question creation and explicit
+propose/decide/reopen/blocking actions, including before the first shared snapshot.
+Imported suggestions remain visibly unapproved. Original context, current state,
+Product decider and immutable history are displayed as escaped text. Permission
+hints guide controls; server authority remains mandatory for every mutation.
+
+Drafts capture the proposal/question version. A conflict retains the text and
+requires fresh reads and explicit adoption of the current version. Uncertain
+writes retain the original immutable body and nonce for manual retry; a later
+history read never confirms that request. Retry-After delays the retry control
+without automatically sending writes. Navigation, reload and logout guard drafts
+and uncertain attempts. Account/scope changes cancel reads and hide private data.
+
+Stored readiness loads on request and refreshes after validated question,
+discussion or review receipts. It binds to the selected actor/snapshot and clearly
+states that provider refs remain unverified. Neither this view nor a Product
+question decision grants formal approval or merge authority. Automated component
+and integration tests pass; physical keyboard, visual RTL and 320px acceptance
+remain pending because no browser was available.
+
+Verified bundle-import writer/provenance, fresh provider verification,
+required-check publication and merge integration remain open.

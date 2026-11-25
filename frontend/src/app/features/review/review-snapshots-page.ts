@@ -10,12 +10,18 @@ import { ReviewUnitsView } from './review-units-view';
 import { ReviewPrStatusView } from './review-pr-status';
 import { OfficialReviewsView } from './official-reviews-view';
 import { DiscussionsView, type DiscussionScope } from './discussions-view';
+import { ProductQuestionsView, type QuestionScope } from './product-questions-view';
+import { ReviewReadinessView } from './review-readiness-view';
 import type { RawScope } from '../comparison/raw-state';
 import { SharedReviewState } from './shared-review-state';
 import { reviewLocation, type ReviewPageLocation } from './review-location';
 
 @Component({
-  selector: 'app-review-snapshots', imports: [RouterLink, DatePipe, SharedReviewBody, ReviewPrStatusView, OfficialReviewsView, DiscussionsView, ReviewUnitsView],
+  selector: 'app-review-snapshots',
+  imports: [
+    RouterLink, DatePipe, SharedReviewBody, ReviewPrStatusView, OfficialReviewsView, DiscussionsView, ReviewUnitsView,
+    ProductQuestionsView, ReviewReadinessView,
+  ],
   providers: [ReviewSubmission, SharedReviewState],
   changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './review-snapshots-page.html', styleUrl: './review-snapshots-page.css',
 })
@@ -23,6 +29,8 @@ export class ReviewSnapshotsPage implements OnDestroy {
   private readonly official = viewChild(OfficialReviewsView);
   private readonly discussions = viewChild(DiscussionsView);
   private readonly requirements = viewChild(ReviewUnitsView);
+  private readonly questions = viewChild(ProductQuestionsView);
+  private readonly readiness = viewChild(ReviewReadinessView);
   readonly sourceDomains = computed(() => this.official()?.view()?.domains ?? []);
   readonly session = inject(SessionState);
   readonly submission = inject(ReviewSubmission);
@@ -56,6 +64,10 @@ export class ReviewSnapshotsPage implements OnDestroy {
     return { actor, proposal, snapshot: snapshot.snapshot_id, content: summary.comparison_content_id, head: summary.head_sha, base: summary.merge_base_sha, file };
   });
   readonly stateLabel = stateLabel;
+  readonly questionScope = computed<QuestionScope | null>(() => {
+    const actor = this.session.profile()?.user_id, proposal = this.proposal();
+    return this.visible() && actor && proposal ? { actor, proposal } : null;
+  });
   readonly discussionScope = computed<DiscussionScope | null>(() => {
     const actor = this.session.profile()?.user_id, proposal = this.proposal();
     return this.visible() && this.state.phase() === 'ready' && actor && proposal
@@ -114,7 +126,7 @@ export class ReviewSnapshotsPage implements OnDestroy {
     }
   }
   reload(): void {
-    if ((this.official()?.hasDraft() || this.discussions()?.hasDraft() || this.requirements()?.hasPending()) && !this.canLeave()) return;
+    if ((this.official()?.hasDraft() || this.discussions()?.hasDraft() || this.requirements()?.hasPending() || this.questions()?.hasDraft()) && !this.canLeave()) return;
     const actor = this.session.profile()?.user_id, proposal = this.proposal();
     if (!actor || !proposal) return;
     let location = this.location();
@@ -146,8 +158,10 @@ export class ReviewSnapshotsPage implements OnDestroy {
   decisionRecorded(): void {
     const actor = this.session.profile()?.user_id, proposal = this.proposal();
     if (actor && proposal && this.visible()) this.state.refreshHistory(actor, proposal);
+    this.evidenceRecorded();
   }
-  individualApprovalRecorded(): void { if (this.visible()) this.official()?.refreshAfterUnitApproval(); }
+  individualApprovalRecorded(): void { if (this.visible()) this.official()?.refreshAfterUnitApproval(); this.evidenceRecorded(); }
+  evidenceRecorded(): void { if (this.visible()) this.readiness()?.refreshIfLoaded(); }
   requirementPage(offset: number): void { this.navigate({ snapshot: this.state.selected(), requirements: offset }); }
   mediaPage(offset: number): void { this.navigate({ snapshot: this.state.selected(), media: offset }); }
   historyPage(after: string | null): void { this.navigate({ after }); }
@@ -179,12 +193,12 @@ export class ReviewSnapshotsPage implements OnDestroy {
       UNSUPPORTED_HEADING_LEVEL: 'רמת הכותרת אינה נתמכת בעורך' } as Record<string, string>)[value] ?? value;
   }
   canLeave(): boolean {
-    return !this.submission.pending() && !this.official()?.hasDraft() && !this.discussions()?.hasDraft() && !this.requirements()?.hasPending()
+    return !this.submission.pending() && !this.official()?.hasDraft() && !this.discussions()?.hasDraft() && !this.requirements()?.hasPending() && !this.questions()?.hasDraft()
       || window.confirm('הודעה, טיוטה או בקשת סקירה עדיין ממתינה או שתוצאתה אינה ודאית. לעזוב ולבדוק את הגרסאות וההיסטוריה בכניסה הבאה?');
   }
   @HostListener('window:beforeunload', ['$event'])
   beforeUnload(event: BeforeUnloadEvent): void {
-    if (this.submission.pending() || this.official()?.hasDraft() || this.discussions()?.hasDraft() || this.requirements()?.hasPending()) { event.preventDefault(); event.returnValue = ''; }
+    if (this.submission.pending() || this.official()?.hasDraft() || this.discussions()?.hasDraft() || this.requirements()?.hasPending() || this.questions()?.hasDraft()) { event.preventDefault(); event.returnValue = ''; }
   }
   ngOnDestroy(): void { this.releaseLogout(); this.state.clear(); this.submission.clear(); }
 }

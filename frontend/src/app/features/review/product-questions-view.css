@@ -1,0 +1,16 @@
+:host { display: block; min-width: 0; margin-block: 1.5rem; }
+section, article, form { min-width: 0; border: 1px solid #c7d2df; padding: 1rem; margin-block: 1rem; }
+form { background: #f8fafc; }
+button, input, textarea { font: inherit; max-width: 100%; }
+button { min-height: 2.75rem; padding: .5rem .75rem; white-space: normal; cursor: pointer; }
+button:disabled { cursor: default; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
+label { display: block; margin-block-start: .75rem; }
+textarea { width: 100%; box-sizing: border-box; padding: .5rem; resize: vertical; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
+.plain { white-space: pre-wrap; overflow-wrap: anywhere; }
+p, bdi, button, li { overflow-wrap: anywhere; }
+ol { padding-inline-start: 1.25rem; }
+li { margin-block: .75rem; }
+summary { cursor: pointer; padding-block: .75rem; }
+.notice { border-inline-start: 4px solid #ad6b11; padding-inline-start: .75rem; }

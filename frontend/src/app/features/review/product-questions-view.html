@@ -1,0 +1,72 @@
+<section aria-labelledby="product-questions-title">
+  <h2 id="product-questions-title">שאלות מוצר והכרעות</h2>
+  <p>השאלות שייכות להצעה כולה ונשארות גם כשגרסאות הסקירה משתנות. הכרעת מוצר אינה אישור סקירה או מיזוג.</p>
+  @if (live()) {
+    @if (!opened()) {<button type="button" (click)="open()">טעינת שאלות מוצר</button>}
+    @else {
+      <div class="actions"><button type="button" (click)="refresh()" [disabled]="sending() || loading() || reading()">רענון שאלות והיסטוריה</button>
+        <button type="button" (click)="beginCreate()" [disabled]="!view()?.can_create || hasDraft() || loading()">שאלה חדשה</button></div>
+      @if (loading() || reading()) {<p role="status">טוענים את מצב השאלות…</p>}
+      @if (error()) {<p role="alert" class="notice">{{ error() }}</p>}
+      @if (message()) {<p role="status">{{ message() }}</p>}
+      @if (view(); as listing) {
+        <p>שאלות חוסמות שטרם הוכרעו בכל ההצעה: {{ listing.unresolved_blockers }}</p>
+        @if (!listing.questions.length) {<p>אין שאלות בעמוד זה.</p>}
+        <ol>@for (q of listing.questions; track q.id) {
+          <li><p class="plain">{{ q.text }}</p><p>{{ stateLabel(q.current.state) }} · {{ q.current.blocking ? 'מסומנת כחוסמת' : 'אינה חוסמת' }}
+            · {{ q.source === 'IMPORTED' ? 'מקור מיובא' : 'מקור אנושי' }}</p>
+            <button type="button" (click)="select(q)" [disabled]="sending() || !!pending()" [attr.aria-pressed]="selected() === q.id">פתיחת השאלה והיסטוריית ההכרעות</button></li>
+        }</ol>
+        <div class="actions">@if (after()) {<button type="button" (click)="page()" [disabled]="sending()">לשאלות האחרונות</button>}
+          @if (listing.next_after) {<button type="button" (click)="page(listing.next_after)" [disabled]="sending()">שאלות קודמות</button>}</div>
+      }
+      @if (history(); as h) {
+        <article aria-label="השאלה הנבחרת"><h3>השאלה והמצב העדכני</h3><p class="plain">{{ h.question.text }}</p>
+          <p>{{ stateLabel(h.question.current.state) }} · גרסה {{ h.question.current.version }}</p>
+          @if (h.question.source === 'IMPORTED' && h.question.current.state !== 'DECIDED') {<p class="notice">תשובה מיובאת היא הצעה בלבד. נדרשת הכרעת מוצר מפורשת.</p>}
+          @if (h.question.outdated_context) {<p class="notice">ההקשר המקורי השתנה; חסימה אינה נפתרת אוטומטית.</p>}
+          <details><summary>ההקשר המקורי</summary><p>ענף <bdi>{{ h.question.origin.branch }}</bdi></p><p><bdi>{{ h.question.origin.head_sha }}</bdi></p></details>
+          @if (h.question.current.answer != null) {<h4>התשובה הנוכחית</h4><p class="plain">{{ h.question.current.answer }}</p>}
+          @if (h.question.current.decision; as decision) {<p>הכריע/ה: {{ decision.actor.name }} · {{ decision.recorded_at | date:'dd/MM/yyyy HH:mm:ss' }}</p>}
+          <div class="actions"><button type="button" (click)="begin('propose')" [disabled]="hasDraft() || !h.question.permissions.can_propose">הצעת תשובה</button>
+            <button type="button" (click)="begin('decide')" [disabled]="hasDraft() || !h.question.permissions.can_decide">בדיקת תשובה והכרעת מוצר</button>
+            <button type="button" (click)="begin('reopen')" [disabled]="hasDraft() || !h.question.permissions.can_reopen">פתיחה מחדש</button>
+            <button type="button" (click)="begin('set_blocking')" [disabled]="hasDraft() || !h.question.permissions.can_toggle_blocking">{{ h.question.current.blocking ? 'ביטול חסימה בסמכות מוצר' : 'סימון כחוסמת' }}</button></div>
+          <h4>היסטוריה — רשומות קודמות נשמרות</h4><ol>@for (r of h.revisions; track r.id) {
+            <li>גרסה {{ r.version }} · {{ label(r.kind) }} · {{ r.actor.name }} · {{ r.recorded_at | date:'dd/MM/yyyy HH:mm:ss' }}
+              <p>{{ stateLabel(r.state) }} · {{ r.blocking ? 'מסומנת כחוסמת' : 'אינה חוסמת' }}</p>@if (r.answer != null) {<p class="plain">{{ r.answer }}</p>}</li>
+          }</ol>
+          <div class="actions">@if (historyAfter()) {<button type="button" (click)="historyPage()" [disabled]="sending()">לתחילת ההיסטוריה</button>}
+            @if (h.next_after != null) {<button type="button" (click)="historyPage(h.next_after)" [disabled]="sending()">המשך היסטוריה</button>}</div>
+        </article>
+      }
+      @if (draft(); as d) {
+        <form (ngSubmit)="send()"><h3>{{ label(d.kind) }}</h3><p>{{ d.kind === 'create' ? 'גרסת ההצעה שנבחרה' : 'גרסת השאלה שנבחרה' }}: {{ d.version }}</p>
+          @if (d.kind !== 'create') {<p class="plain">{{ d.question.text }}</p>}
+          @if (d.kind === 'create') {
+            <label for="question-text">השאלה</label><textarea id="question-text" name="questionText" rows="4" maxlength="20000" [ngModel]="question()" (ngModelChange)="question.set($event)" [disabled]="!!pending() || sending()"></textarea><p>{{ questionLength() }} / 10000 תווים</p>
+            <label><input type="checkbox" name="blockingQuestion" [ngModel]="blocking()" (ngModelChange)="blocking.set($event)" [disabled]="!!pending() || sending()"> חוסמת לפני מיזוג</label>
+          }
+          @if (d.kind === 'create' || d.kind === 'propose' || d.kind === 'decide') {
+            <label for="question-answer">{{ d.kind === 'create' ? 'הצעת תשובה (רשות)' : d.kind === 'decide' ? 'התשובה להכרעת מוצר מפורשת' : 'תשובה מוצעת' }}</label>
+            <textarea id="question-answer" name="questionAnswer" rows="4" maxlength="20000" [ngModel]="answer()" (ngModelChange)="answer.set($event)" [disabled]="!!pending() || sending()"></textarea><p>{{ answerLength() }} / 10000 תווים</p>
+            <p>{{ d.kind === 'decide' ? 'שליחה תשמור הכרעת מוצר מפורשת בשם החשבון הנוכחי.' : 'תשובה מוצעת אינה הכרעת מוצר ואינה פותרת חסימה.' }}</p>
+          }
+          @if (d.kind === 'reopen') {<p>השאלה תיפתח ללא תשובה נוכחית. ההכרעה הקודמת תישאר בהיסטוריה.</p>}
+          @if (d.kind === 'set_blocking') {<p>{{ d.blocking ? 'השאלה תסומן כחוסמת לפני מיזוג.' : 'סמכות מוצר נדרשת לביטול החסימה.' }}</p>}
+          <div class="actions"><button type="submit" [disabled]="!canSend()">שמירת {{ label(d.kind) }}</button>
+            <button type="button" (click)="updateContext()" [disabled]="!!pending() || sending()">עדכון הגרסה לטיוטה לאחר בדיקה</button>
+            <button type="button" (click)="cancel()" [disabled]="sending()">סגירת הטיוטה או הבקשה</button></div>
+        </form>
+      }
+      @if (pending(); as p) {
+        <div class="notice" aria-label="בקשת שאלה ממתינה"><p>בקשה מקורית ממתינה או שתוצאתה טרם אומתה. רענון היסטוריה אינו אישור לקבלתה.</p>
+          <p>פעולה: {{ label(p.intent.kind === 'create' ? 'create' : p.intent.body.action.kind) }} · גרסה {{ p.intent.kind === 'create' ? p.intent.body.expected_proposal_version : p.intent.body.expected_version }}</p>
+          @if (sending()) {<p role="status">שולחים את אותה בקשה…</p>}
+          @if (retryWait()) {<p role="status">ניתן לנסות שוב בעוד {{ retryWait() }} שניות.</p>}
+          <button type="button" (click)="retry()" [disabled]="sending() || !!retryWait()">בדיקת אותה בקשה</button>
+        </div>
+      }
+    }
+  } @else {<p>המידע הוסתר עד לאימות החשבון והגישה.</p>}
+</section>

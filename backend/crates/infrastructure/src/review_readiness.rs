@@ -1,10 +1,12 @@
-//! Stored inputs for the required review-policy check. These reads do not prove
-//! fresh Git refs, publish a check, change proposal state, or authorize merge.
+//! Stored review-policy inputs and an explicit fresh provider observation.
+//! Neither report publishes a check, changes proposal state, or authorizes merge.
 use specspace_domain::review_check::Verification;
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 pub(crate) mod decisions;
+mod fresh;
 mod report;
+pub use fresh::FreshReadinessError;
 pub use report::{PgReviewReadiness, ReadinessError};
 
 #[derive(FromRow)]

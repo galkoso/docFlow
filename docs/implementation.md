@@ -2674,3 +2674,19 @@ Checkboxes represent verified work only.
   behavior changed in this stage. Physical UI acceptance, verified bundle import,
   fresh-provider readiness, required-check publication, final approval/merge and
   the remaining full specification stay open.
+
+- Fresh provider-backed readiness: added an internal read-only evaluator that
+  binds the exact authorized repository/installation, reads proposal/main refs,
+  verifies the snapshot merge base and rereads refs before returning. Independent
+  repeatable-read captures recheck access and binding after connection and IO,
+  then assemble latest reviewer authority, effective votes and all blockers.
+  No transaction spans provider work; two concurrent reads per service instance
+  and a 30-second deadline bound the work. Five PostgreSQL scenarios cover
+  positive/pending outcomes without state/audit writes, changed refs/base and
+  movement during base calculation, provider retry errors, connection rebinding,
+  reviewer revocation and actor revocation suppressing provider diagnostics.
+  All 782 backend tests pass with the same two performance tests ignored; Clippy
+  with warnings denied and formatting pass. No migration or HTTP contract changes
+  were needed. The stored endpoint/UI retain their unverified semantics. Required
+  check publication/enforcement, final APPROVED state, serialized merge, physical
+  UI acceptance and the remaining full specification stay open.

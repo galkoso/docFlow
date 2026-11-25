@@ -3,6 +3,8 @@ use specspace_application::review_readiness::{
     ReadinessConclusion as C, ReadinessGate as G, ReviewReadiness,
 };
 use specspace_infrastructure::review_readiness::{PgReviewReadiness, ReadinessError};
+#[path = "readiness/fresh.rs"]
+mod fresh;
 
 fn issue(report: &ReviewReadiness, gate: G) -> bool {
     report.evaluation.issues.iter().any(|i| i.gate == gate)

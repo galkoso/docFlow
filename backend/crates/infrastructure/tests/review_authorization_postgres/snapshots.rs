@@ -51,6 +51,7 @@ struct Source {
     release: tokio::sync::Notify,
     invalid_media: AtomicBool,
     base_updated: AtomicBool,
+    move_head_after_base: AtomicBool,
 }
 fn sha(digit: usize) -> CommitSha {
     CommitSha::parse(digit.to_string().repeat(40)).unwrap()
@@ -124,6 +125,9 @@ impl GitProvider for Source {
     async fn merge_base(&self, left: &CommitSha, right: &CommitSha) -> Result<CommitSha, GitError> {
         assert_eq!(left, &sha(2));
         assert_eq!(right, &sha(1));
+        if self.move_head_after_base.swap(false, Ordering::SeqCst) {
+            self.branch_head.store(3, Ordering::SeqCst);
+        }
         Ok(if self.base_updated.load(Ordering::SeqCst) {
             sha(2)
         } else {
@@ -234,6 +238,7 @@ async fn setup_book_options(
         release: tokio::sync::Notify::new(),
         invalid_media: AtomicBool::new(false),
         base_updated: AtomicBool::new(false),
+        move_head_after_base: AtomicBool::new(false),
     });
     let factory = Arc::new(Factory {
         source: source.clone(),

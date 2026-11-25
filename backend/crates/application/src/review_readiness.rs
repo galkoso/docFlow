@@ -1,4 +1,5 @@
-//! Stored readiness facts. This response never grants approval or merge authority.
+//! Readiness facts. Reports never grant approval or merge authority. The stored
+//! HTTP endpoint does not verify provider refs; the server evaluator can do so.
 use serde::Serialize;
 use specspace_domain::review_check::{self, Conclusion, Gate};
 use uuid::Uuid;

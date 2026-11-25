@@ -356,10 +356,25 @@ revision. An empty complete set passes; proposed/open blocking questions remain
 pending, and missing state remains unknown. An explicit Product decision resolves
 an answer; removing blocking status also requires Product authority. Outdated
 origins and departed creators are not filtered out.
-Even a complete independent approval pair therefore remains pending until fresh
-provider verification is implemented.
-Publishing the required check, fresh-ref revalidation, final APPROVED state and
-merge integration remain open.
+Even a complete independent approval pair therefore remains pending at this
+stored endpoint.
+
+`PgReviewReadiness::fresh` separately observes the server-bound GitHub repository.
+It checks exact proposal/main refs, verifies the frozen merge base, then reads
+refs again to detect movement during that calculation. Current access and the
+frozen numeric repository connection are rechecked after connection and provider
+IO. Latest reviewer authority, votes and blockers are assembled after IO; provider
+diagnostics are withheld if reader access was revoked. No database transaction
+spans provider calls. Each service instance admits two concurrent fresh reads,
+with a 30-second overall deadline and explicit backpressure/error results.
+
+A fresh result can report success only when both provider and stored policy
+evidence pass. It remains a read-only observation: it neither changes proposal
+state nor publishes the required check. There is no fresh-read HTTP endpoint yet;
+the existing stored endpoint and its frontend keep their unverified semantics.
+Required-check publication, provider enforcement, final APPROVED state and merge
+integration remain open. Publication and merge must independently recheck current
+authority and provider refs; this report cannot substitute for their fences.
 
 Migration 010 stores immutable submission expectations, the actor/proposal/repo
 binding, and a canonical authority digest. `PgReviewSubmissions::reserve` checks

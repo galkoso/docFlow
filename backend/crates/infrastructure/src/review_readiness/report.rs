@@ -1,5 +1,6 @@
 use super::*;
 use serde_json::Value;
+use specspace_application::comparison_reader::ReadContext;
 use specspace_application::{
     review_configuration::ReviewArea,
     review_readiness::ReviewReadiness,
@@ -10,6 +11,8 @@ use specspace_domain::{
     review_check::{self, Conclusion, Gate, Issue},
 };
 use sqlx::PgPool;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ReadinessError {
@@ -24,6 +27,12 @@ impl From<sqlx::Error> for ReadinessError {
 }
 pub struct PgReviewReadiness {
     pool: PgPool,
+    pub(super) fresh_loads: Arc<Semaphore>,
+}
+pub(super) struct CapturedReadiness {
+    pub report: ReviewReadiness,
+    pub context: Option<ReadContext>,
+    pub merge_base: String,
 }
 
 #[derive(FromRow)]
@@ -162,7 +171,10 @@ fn coverage(values: impl Iterator<Item = Verification>) -> Verification {
 }
 impl PgReviewReadiness {
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            fresh_loads: Arc::new(Semaphore::new(2)),
+        }
     }
 
     /// Reads current stored authority and immutable evidence in one transaction.
@@ -173,6 +185,16 @@ impl PgReviewReadiness {
         proposal: Uuid,
         snapshot: Uuid,
     ) -> Result<ReviewReadiness, ReadinessError> {
+        Ok(self.capture(actor, proposal, snapshot, false).await?.report)
+    }
+
+    pub(super) async fn capture(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        with_context: bool,
+    ) -> Result<CapturedReadiness, ReadinessError> {
         if [actor, proposal, snapshot].iter().any(Uuid::is_nil) {
             return Err(ReadinessError::Invalid);
         }
@@ -203,6 +225,26 @@ impl PgReviewReadiness {
              JOIN organizations o ON o.id=p.organization_id
              WHERE h.organization_id=$1 AND h.proposal_id=$2 AND h.id=$3 AND h.state='READY'"
         ).bind(org).bind(proposal).bind(snapshot).fetch_optional(&mut *tx).await?.ok_or(ReadinessError::NotFound)?;
+        let context = if with_context {
+            let context =
+                crate::comparison_authorization::context_in(&mut tx, actor, proposal, false)
+                    .await
+                    .map_err(|e| match e {
+                        specspace_application::comparison_reader::ComparisonReadError::NotFound => {
+                            ReadinessError::NotFound
+                        }
+                        _ => ReadinessError::Unavailable,
+                    })?;
+            if context.organization != org
+                || context.connection.repository != h.repository_id
+                || context.branch.as_str() != h.branch
+            {
+                return Err(ReadinessError::Unavailable);
+            }
+            Some(context)
+        } else {
+            None
+        };
         let m = metadata(&h, proposal)?;
         let ids: Vec<_> = m.assignments.iter().map(|a| a.reviewer_id).collect();
         let members = sqlx::query_as::<_, Member>("SELECT m.user_id,u.status='ACTIVE' AS active,m.role,m.review_domains FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.organization_id=$1 AND m.user_id=ANY($2) ORDER BY m.user_id")
@@ -302,19 +344,23 @@ impl PgReviewReadiness {
                 .fetch_one(&mut *tx)
                 .await?;
         tx.commit().await?;
-        Ok(ReviewReadiness {
-            actor_id: actor,
-            proposal_id: proposal,
-            snapshot_id: snapshot,
-            fingerprint: h.fingerprint,
-            head_sha: h.head_sha,
-            target_sha: h.target_sha,
-            policy_version: h.policy_version,
-            configuration_version: h.configuration_version,
-            current_for_metadata: h.current,
-            provider_refs_verified: false,
-            read_at: now.to_rfc3339(),
-            evaluation: evaluation.into(),
+        Ok(CapturedReadiness {
+            context,
+            merge_base: h.merge_base_sha,
+            report: ReviewReadiness {
+                actor_id: actor,
+                proposal_id: proposal,
+                snapshot_id: snapshot,
+                fingerprint: h.fingerprint,
+                head_sha: h.head_sha,
+                target_sha: h.target_sha,
+                policy_version: h.policy_version,
+                configuration_version: h.configuration_version,
+                current_for_metadata: h.current,
+                provider_refs_verified: false,
+                read_at: now.to_rfc3339(),
+                evaluation: evaluation.into(),
+            },
         })
     }
 }

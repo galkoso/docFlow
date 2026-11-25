@@ -250,6 +250,7 @@ mod tests {
         assert!(token.claims.exp <= now().unwrap() + 600);
         assert_eq!(body["repository_ids"], json!([42]));
         assert_eq!(body["permissions"]["contents"], "write");
+        assert_eq!(body["permissions"]["checks"], "write");
         assert!(body["permissions"].get("administration").is_none());
         Json(
             json!({"token": "synthetic-installation-token", "expires_at": chrono::Utc::now().checked_add_signed(chrono::Duration::hours(1)).unwrap().to_rfc3339()}),

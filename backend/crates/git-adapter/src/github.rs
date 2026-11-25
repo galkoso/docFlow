@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 use specspace_domain::{BranchName, RepositoryPath};
 use std::{collections::HashSet, time::Duration};
 
+mod checks;
 mod pull_requests;
 
 pub struct GitHub {

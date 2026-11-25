@@ -2690,3 +2690,20 @@ Checkboxes represent verified work only.
   were needed. The stored endpoint/UI retain their unverified semantics. Required
   check publication/enforcement, final APPROVED state, serialized merge, physical
   UI acceptance and the remaining full specification stay open.
+
+- GitHub required-check capability: added typed repository/App/head-bound check
+  reads, bounded all-evaluation listing, pending-only creation and preflighted
+  completion/invalidation updates. Canonical operation UUIDs support later
+  reconciliation without claiming provider-side POST idempotency. Every receipt
+  verifies name, head, App, operation, status and fixed content-free output;
+  malformed or substituted write responses remain uncertain and are never
+  automatically retried. Neutral/skipped/cancelled outcomes cannot count as
+  success, and a completed run cannot be reset to pending without explicit
+  invalidation/new journaled creation. The existing one-repository installation
+  token's checks-write permission is now asserted in its contract test. All 36
+  adapter tests and all 328 workspace library tests pass; workspace Clippy with
+  warnings denied and formatting pass. The first library invocation omitted the
+  database environment required by an existing infrastructure test; the corrected
+  invocation passes. No HTTP, migration or frontend behavior changed. Durable
+  worker publication/reconciliation, native required-check enforcement, final
+  APPROVED/merge and the remaining full specification stay open.

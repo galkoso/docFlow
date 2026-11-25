@@ -1,6 +1,7 @@
 pub mod book;
 pub mod discussion;
 pub mod draft;
+pub mod product_question;
 pub mod proposal;
 pub mod proposal_reader;
 pub mod reader;

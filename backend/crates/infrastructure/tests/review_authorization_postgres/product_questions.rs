@@ -1,5 +1,7 @@
 use super::*;
 use serde_json::json;
+#[path = "product_questions/service.rs"]
+mod service;
 #[derive(Clone)]
 struct Question {
     id: Uuid,

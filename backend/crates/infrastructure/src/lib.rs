@@ -13,6 +13,7 @@ pub mod official_reviews;
 pub mod oidc;
 pub mod pr_sync;
 pub mod pr_sync_worker;
+pub mod product_questions;
 pub mod proposal_worker;
 pub mod proposals;
 mod provider_backoff;

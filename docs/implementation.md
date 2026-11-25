@@ -2618,3 +2618,16 @@ Checkboxes represent verified work only.
   question read/write orchestration, API, verified importer provenance, UI and
   readiness integration remain open. Schema availability alone does not clear
   the readiness report's unknown question gate; the full goal stays active.
+
+- Authorized Product-question service: added manual create/change intents without
+  actor, source or approval claims and a transaction-scoped `PgProductQuestions`
+  service. Current membership/action authority is checked before exact receipt
+  replay; changed nonce intents fail, optimistic versions prevent lost updates,
+  and every new revision commits with its exact audit/outbox pair. Manual answers
+  remain proposals. Shared question pages and append-only history use bounded
+  stable cursors, current permission hints and original recorded context; blocker
+  counts cover all questions and missing state fails unavailable. Four focused
+  service scenarios pass, covering concurrent replay/version races, rollback and
+  retry, role loss, imported/outdated origins, paging and history retention. HTTP,
+  typed transport and readiness wiring follow as the next separately committed
+  stage; verified bundle import and question UI remain open.

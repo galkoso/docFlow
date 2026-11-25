@@ -8,15 +8,15 @@ mod report;
 pub use report::{PgReviewReadiness, ReadinessError};
 
 #[derive(FromRow)]
-pub(crate) struct DiscussionEvidence {
-    thread_count: i64,
+pub(crate) struct BlockerEvidence {
+    total_count: i64,
     state_count: i64,
     unresolved_blockers: i64,
 }
-impl DiscussionEvidence {
+impl BlockerEvidence {
     pub fn verification(&self) -> Verification {
-        if self.thread_count < 0
-            || self.state_count != self.thread_count
+        if self.total_count < 0
+            || self.state_count != self.total_count
             || !(0..=self.state_count).contains(&self.unresolved_blockers)
         {
             Verification::Unknown
@@ -30,7 +30,7 @@ impl DiscussionEvidence {
     pub fn verified_unresolved(&self) -> Result<i64, sqlx::Error> {
         if self.verification() == Verification::Unknown {
             return Err(sqlx::Error::Protocol(
-                "incomplete discussion state evidence".into(),
+                "incomplete blocker state evidence".into(),
             ));
         }
         Ok(self.unresolved_blockers)
@@ -46,11 +46,11 @@ pub(crate) async fn discussions(
     conn: &mut PgConnection,
     organization: Uuid,
     proposal: Uuid,
-) -> Result<DiscussionEvidence, sqlx::Error> {
-    sqlx::query_as::<_, DiscussionEvidence>(
-        "SELECT e.thread_count,e.state_count,e.unresolved_blockers
+) -> Result<BlockerEvidence, sqlx::Error> {
+    sqlx::query_as::<_, BlockerEvidence>(
+        "SELECT e.total_count,e.state_count,e.unresolved_blockers
          FROM proposals p CROSS JOIN LATERAL (
-           SELECT count(*) AS thread_count,count(r.version) AS state_count,
+           SELECT count(*) AS total_count,count(r.version) AS state_count,
              count(*) FILTER (WHERE r.blocking AND NOT r.resolved) AS unresolved_blockers
            FROM discussion_threads t LEFT JOIN LATERAL (
              SELECT version,blocking,resolved FROM discussion_revisions
@@ -66,6 +66,25 @@ pub(crate) async fn discussions(
     .await
 }
 
+/// Product questions are proposal-level blockers; old origin SHAs and departed
+/// creators do not resolve them. Missing state remains unknown.
+pub(crate) async fn questions(
+    conn: &mut PgConnection,
+    organization: Uuid,
+    proposal: Uuid,
+) -> Result<BlockerEvidence, sqlx::Error> {
+    sqlx::query_as::<_, BlockerEvidence>(
+        "SELECT e.total_count,e.state_count,e.unresolved_blockers FROM proposals p CROSS JOIN LATERAL (
+           SELECT count(*) AS total_count,count(r.version) AS state_count,
+             count(*) FILTER (WHERE r.blocking AND r.state<>'DECIDED') AS unresolved_blockers
+           FROM product_questions q LEFT JOIN LATERAL (
+             SELECT version,blocking,state FROM product_question_revisions
+             WHERE organization_id=q.organization_id AND proposal_id=q.proposal_id AND question_id=q.id ORDER BY version DESC LIMIT 1
+           ) r ON true WHERE q.organization_id=p.organization_id AND q.proposal_id=p.id
+         ) e WHERE p.organization_id=$1 AND p.id=$2"
+    ).bind(organization).bind(proposal).fetch_one(conn).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -78,8 +97,8 @@ mod tests {
             (30, 1, Verification::Pending),
             (30, 30, Verification::Pending),
         ] {
-            let evidence = DiscussionEvidence {
-                thread_count: threads,
+            let evidence = BlockerEvidence {
+                total_count: threads,
                 state_count: threads,
                 unresolved_blockers: blockers,
             };
@@ -98,8 +117,8 @@ mod tests {
             (1, 1, -1),
             (1, 1, 2),
         ] {
-            let evidence = DiscussionEvidence {
-                thread_count: threads,
+            let evidence = BlockerEvidence {
+                total_count: threads,
                 state_count: states,
                 unresolved_blockers: blockers,
             };

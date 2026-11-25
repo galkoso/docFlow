@@ -2,6 +2,7 @@
 pub mod discussion;
 mod identifiers;
 pub mod policy;
+pub mod product_question;
 pub mod review_check;
 
 pub use identifiers::{BranchName, RepositoryPath, ValidationError};

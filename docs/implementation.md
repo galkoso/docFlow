@@ -2590,3 +2590,13 @@ Checkboxes represent verified work only.
   reads with no-store. Product-question storage, fresh-provider evaluation, the
   required-check publisher, final approval state, merge and remaining full-spec
   requirements stay open.
+
+- Product-question lifecycle: introduced OPEN/PROPOSED/DECIDED business state
+  separate from formal snapshot approvals. Supplied human/imported answers are
+  never automatically decided, even for a Product-qualified caller. An explicit
+  current qualified Product action decides an answer; Product authority is also
+  required to remove blocking status. Creator/Product reopening and safe merging
+  transitions preserve those distinctions. Text retains original bytes with
+  Unicode bounds and blank/NUL rejection. Five domain cases and domain Clippy
+  pass. Persistence, transport, importer/UI and readiness integration remain open;
+  question evidence is still unknown in the readiness report.

@@ -285,8 +285,8 @@ impl PgReviewReadiness {
             blocking_threads_resolved: super::discussions(&mut tx, org, proposal)
                 .await?
                 .verification(),
-            // There is no authoritative product-question store yet. An absent
-            // integration is unknown, never evidence of zero blocking questions.
+            // Authorized question read/write integration is not connected yet.
+            // Schema availability alone does not prove zero blocking questions.
             blocking_questions_resolved: Verification::Unknown,
         });
         evaluation.issues.push(Issue {

@@ -24,7 +24,23 @@ actions that do not introduce blockers remain possible. Text preserves original
 UTF-8/CRLF bytes, rejects NUL/blank content and is limited to 10,000 Unicode scalar
 values per question/answer.
 
-The domain lifecycle is implemented and tested. Persistence, API, import
-provenance validation, interface and readiness integration are subsequent stages;
-the readiness report continues to treat question evidence as unknown until its
-authoritative read/write integration is in place.
+Migration 030 stores immutable question origins and revisions, with exact
+organization/proposal scope, recorded repository/branch/head/target and proposal
+version. These are recorded database context, not fresh provider proofs. Human
+and imported source labels are retained; the imported source-reference UUID is
+only a provenance locator until the importer verifies it against an ImportSession.
+It never grants approval. Answer revisions cannot silently rewrite question text.
+
+The database independently checks current membership, Product qualification,
+allowed state transitions, optimistic revision versions and the merge barrier.
+The proposal row serializes revisions against merge transitions. Opening is
+complete only with its matching first revision. Every revision must commit with
+an exact append-only audit record and content-free outbox event; incomplete writes
+roll back together. Origin/revision mutation and event replacement/deletion are
+rejected. A nonce is unique per organization. Successful revisions are limited to
+60 per actor and 600 per organization in ten minutes, with serialized admission.
+
+The domain and persistence foundations are implemented and tested. Authorized
+read/write orchestration, API, import provenance validation, interface and
+readiness integration are subsequent stages. The readiness report continues to
+treat question evidence as unknown until that integration is in place.

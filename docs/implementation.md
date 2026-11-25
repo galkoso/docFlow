@@ -2600,3 +2600,21 @@ Checkboxes represent verified work only.
   Unicode bounds and blank/NUL rejection. Five domain cases and domain Clippy
   pass. Persistence, transport, importer/UI and readiness integration remain open;
   question evidence is still unknown in the readiness report.
+
+- Product-question persistence: migration 030 adds immutable recorded origins and
+  versioned OPEN/PROPOSE/DECIDE/REOPEN/SET_BLOCKING revisions. Database guards
+  independently enforce current Product qualification, exact decider identity,
+  source answers remaining unapproved, scope/version checks and the merge barrier.
+  Revision/origin changes, silent question-text replacement and event rewriting
+  are rejected. Each revision requires an atomic exact audit/outbox pair; failed
+  writes leave no partial question. Actor and organization quotas serialize on
+  admission. Seven focused PostgreSQL cases pass, including concurrent versions,
+  current-role/activity loss, imported answers, Unicode limits, rollback, merge
+  safety and shared organization quota/isolation. The full backend regression
+  before the additional organization-quota case passes 767 tests with the same
+  two performance measurements ignored. Workspace Clippy, formatting, backend
+  binary builds and unchanged OpenAPI export comparison pass. Migration 030 is
+  applied locally and reruns cleanly; the existing API remains ready. Authorized
+  question read/write orchestration, API, verified importer provenance, UI and
+  readiness integration remain open. Schema availability alone does not clear
+  the readiness report's unknown question gate; the full goal stays active.

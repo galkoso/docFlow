@@ -13,6 +13,8 @@ use specspace_infrastructure::{
 };
 use sqlx::PgPool;
 use uuid::Uuid;
+#[path = "review_authorization_postgres/product_questions.rs"]
+mod product_questions;
 #[path = "review_authorization_postgres/snapshots.rs"]
 mod snapshots;
 #[path = "review_authorization_postgres/submissions.rs"]

@@ -4,6 +4,8 @@ use specspace_application::{
     review_configuration::ReviewArea,
 };
 use specspace_infrastructure::official_reviews::{OfficialReviewError, PgOfficialReviews};
+#[path = "official_reviews/readiness.rs"]
+mod readiness;
 
 async fn ready(pool: &PgPool, base_updated: bool) -> (Fixture, Arc<Source>, Uuid, String, Factory) {
     let (f, source, preparer) = setup(pool).await;

@@ -22,7 +22,7 @@ pub mod review_authorization;
 pub mod review_configuration;
 mod review_coverage;
 pub mod review_files;
-mod review_readiness;
+pub mod review_readiness;
 pub mod review_snapshots;
 pub mod review_submissions;
 pub mod review_visits;

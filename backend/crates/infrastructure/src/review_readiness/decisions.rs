@@ -14,6 +14,30 @@ pub(crate) struct EffectiveDecision {
     coverage: Verification,
 }
 impl EffectiveDecision {
+    pub fn policy_review(&self, snapshot: Uuid) -> Option<specspace_domain::policy::Review> {
+        use specspace_domain::policy::{Decision, Review};
+        if !self.validates_entry(self.id, self.reviewer, self.domain, self.decision) {
+            return None;
+        }
+        Some(Review {
+            snapshot_id: snapshot,
+            reviewer_id: self.reviewer,
+            domain: super::report::domain(self.domain),
+            decision: if self.decision == ReviewDecision::RequestChanges {
+                Decision::RequestChanges
+            } else {
+                Decision::Approve
+            },
+        })
+    }
+    pub fn positive_coverage(&self) -> Option<Verification> {
+        (self.eligible
+            && matches!(
+                self.decision,
+                ReviewDecision::Approve | ReviewDecision::ApproveAll
+            ))
+        .then_some(self.coverage)
+    }
     /// Stored eligibility/coverage only. The caller separately checks current
     /// proposal/snapshot context; this never proves provider freshness.
     pub fn validates_entry(

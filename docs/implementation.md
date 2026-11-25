@@ -2561,3 +2561,16 @@ Checkboxes represent verified work only.
   performance measurements ignored. Clippy with warnings denied, formatting and
   backend binary builds pass. The rebuilt API is ready, and anonymous decision
   history remains authenticated with no-store responses.
+
+- Stored readiness assembly: `PgReviewReadiness` now loads frozen assignments,
+  current qualified memberships and effective decisions in one authorized
+  repeatable-read transaction, then invokes the shared domain policy evaluator.
+  Real individual approvals and the explicit whole-snapshot override stay
+  separate. Base state, sealed content/file evidence, compatible media receipts
+  and every latest blocking discussion feed their own gates. Lost evidence does
+  not pass; outdated blockers survive until explicit resolution, and comments do
+  not clear a change-request veto. Product-question evidence remains unknown and
+  provider refs remain explicitly unverified, preventing a false success. Four
+  PostgreSQL scenarios and a coverage aggregation case pass. This read performs
+  no provider IO, state transition or check publication. Product questions, fresh
+  provider evaluation, final APPROVED state, publication and merge remain open.

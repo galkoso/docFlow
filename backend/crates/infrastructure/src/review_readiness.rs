@@ -4,6 +4,8 @@ use specspace_domain::review_check::Verification;
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 pub(crate) mod decisions;
+mod report;
+pub use report::{PgReviewReadiness, ReadinessError};
 
 #[derive(FromRow)]
 pub(crate) struct DiscussionEvidence {

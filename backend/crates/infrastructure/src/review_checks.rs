@@ -3,7 +3,6 @@
 use crate::review_readiness::{
     CapturedReadiness, FreshReadinessError, PgReviewReadiness, ReadinessError,
 };
-use serde_json::json;
 use specspace_application::{
     comparison_reader::BoundProviderFactory,
     review_check_publication::{CheckPublicationIntent, CheckPublicationSource},
@@ -12,8 +11,10 @@ use specspace_git_adapter::CommitSha;
 use sqlx::{PgConnection, PgPool};
 use std::sync::Arc;
 use uuid::Uuid;
+mod invalidation;
 mod journal;
 mod read;
+mod reservation;
 pub use journal::{CheckLease, CheckObservation};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -183,32 +184,7 @@ impl PgReviewChecks {
         }
         admission_limits(&mut tx, org, actor, proposal, operation).await?;
         journal::connection_cooldown(&mut tx, org, &intent.source().repository).await?;
-        let job_id = Uuid::new_v4();
-        let audit = Uuid::new_v4();
-        let event = Uuid::new_v4();
-        let s = intent.source();
-        sqlx::query("INSERT INTO git_operations(id,organization_id,proposal_id,actor_id,kind,idempotency_key,request_hash,expected_sha) VALUES($1,$2,$3,$4,'REVIEW_CHECK',$1::text,$5,$6)")
-            .bind(operation).bind(org).bind(proposal).bind(actor).bind(intent.request_hash()).bind(s.head.as_str()).execute(&mut *tx).await?;
-        sqlx::query("INSERT INTO jobs(id,organization_id,operation_id,kind,payload,max_attempts) VALUES($1,$2,$3,'PUBLISH_REVIEW_CHECK',jsonb_build_object('operation_id',$3::uuid),8)")
-            .bind(job_id).bind(org).bind(operation).execute(&mut *tx).await?;
-        let report_digest = match intent.purpose() {
-            specspace_application::review_check_publication::CheckPurpose::Evaluation {
-                report_digest,
-            } => report_digest,
-            _ => return Err(CheckStoreError::InvalidRecord),
-        };
-        sqlx::query("INSERT INTO review_check_intents(operation_id,job_id,organization_id,proposal_id,repository_id,actor_id,snapshot_id,
-            remote_id,installation_id,app_id,branch,head_sha,target_sha,merge_base_sha,proposal_version,configuration_version,policy_version,
-            fingerprint,evidence_digest,authority_digest,request_hash,purpose,result,report_digest,audit_id,event_id)
-            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'EVALUATION',$22,$23,$24,$25)")
-            .bind(operation).bind(job_id).bind(org).bind(proposal).bind(s.repository.repository).bind(actor).bind(snapshot)
-            .bind(s.repository.remote_id as i64).bind(s.repository.installation_id as i64).bind(s.app_id as i64).bind(s.branch.as_str()).bind(s.head.as_str()).bind(s.target.as_str()).bind(s.merge_base.as_str())
-            .bind(s.proposal_version).bind(s.configuration_version).bind(s.policy_version).bind(&s.fingerprint).bind(&s.evidence_digest).bind(&s.authority_digest).bind(intent.request_hash())
-            .bind(read::result(intent.result())).bind(report_digest).bind(audit).bind(event).execute(&mut *tx).await?;
-        sqlx::query("INSERT INTO audit_events(id,organization_id,actor_id,action,entity_id,after_ref,operation_id,result) VALUES($1,$2,$3,'REVIEW_CHECK_RESERVED',$4,$5,$6,'QUEUED')")
-            .bind(audit).bind(org).bind(actor).bind(proposal).bind(snapshot.to_string()).bind(operation).execute(&mut *tx).await?;
-        sqlx::query("INSERT INTO outbox(id,organization_id,event_type,entity_id,payload) VALUES($1,$2,'REVIEW_CHECK_QUEUED',$3,$4)")
-            .bind(event).bind(org).bind(proposal).bind(json!({"operation_id":operation,"snapshot_id":snapshot,"purpose":"EVALUATION","result":read::result(intent.result())})).execute(&mut *tx).await?;
+        let job_id = reservation::reserve(&mut tx, &intent).await?;
         tx.commit().await?;
         Ok(CheckReservation {
             job_id,

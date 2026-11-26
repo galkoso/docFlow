@@ -2810,3 +2810,26 @@ Checkboxes represent verified work only.
   suite; real GitHub acceptance is still pending. Automatic dispatch/invalidation,
   invalidation admission, recovery/supersession, administrator/native enforcement,
   final APPROVED/merge and the remaining full specification stay open.
+
+- Explicit required-check invalidation admission: `PgReviewChecks::invalidate`
+  requires current Maintainer/Admin authority and resolves an original evaluation
+  and its exact adopted run from immutable journal data. Its new canonical intent
+  retains the original head/App/provider operation and can only publish failure,
+  including after closure, changed refs/policy or loss of the original publisher.
+  No old approval or Git-ref read is needed. Shared atomic reservation code keeps
+  operation/job/intent/audit/outbox consistent for both intent purposes. Exact
+  replay checks current privilege and restores the same job/hash without charging
+  quota; actor, resource, target, reason and purpose substitutions are rejected.
+  New work respects the shared actor/organization quotas, connection cooldown and
+  active lane. Twelve PostgreSQL scenarios cover worker publication after closure,
+  disabled original publishers, lost failure responses without another PATCH,
+  role/binding/tenant/target rejection, concurrent replay, audit rollback, quota
+  exhaustion, cooldown, authority loss while waiting for a lock and preservation
+  of unresolved started work. All 845 backend tests pass with the same two
+  performance tests ignored; workspace Clippy with warnings denied, formatting
+  and all runtime binary builds pass. The OpenAPI export is unchanged and the
+  existing local API remains ready. No migration or HTTP contract changed.
+  The reason records an explicit operator rationale; automatic policy-event
+  invalidation, recovery/supersession, admin workflow/native enforcement, final
+  APPROVED/merge, real GitHub acceptance and the remaining full specification
+  remain open.

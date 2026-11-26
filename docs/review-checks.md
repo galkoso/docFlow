@@ -175,7 +175,28 @@ shared connection cooldown, which prevents another provider read during the wait
 Only UUIDs and typed outcomes enter worker logs. Private source or review text
 never enters check output or errors.
 
-Invalidation admission, automatic event dispatch, stale-operation resolution and
+`PgReviewChecks::invalidate` admits explicit Maintainer/Admin revocation using
+an original evaluation operation and a bounded reason. It resolves the canonical
+intent and exact adopted run from the immutable journal. The new intent keeps the
+original head/App/provider operation identity and can only publish failure. Its
+reason records the operator's rationale; admission does not claim to have observed
+an automatic policy-change event. Old approvals and live old refs are unnecessary,
+so the worker can revoke the run after closure or a head/target/policy change.
+Current repository/installation/App binding and active privileged membership are
+still required before admission and before each write/completion.
+
+Admission locks the proposal, organization quota and current authority in the
+shared writer order. It reserves the operation, job, canonical intent, audit and
+outbox atomically. Exact replay checks current privilege first, restores the same
+intent/job and consumes no new quota, including after configuration changes.
+Actor, proposal, target operation, reason and purpose cannot be substituted. New
+invalidation shares evaluation's 60-per-actor/600-per-organization ten-minute
+limits, persistent connection cooldown and active-operation lane. An unadopted
+run cannot be targeted; an unresolved active operation still requires recovery
+before a separate invalidation can enter that lane. Admission itself has no
+provider IO and never changes proposal state.
+
+Automatic event dispatch/invalidation, stale-operation resolution and
 administrator recovery remain open. App configuration and native rule verification
 also remain to be exposed to the authorized administrator. Runtime publishing of
 admitted jobs does not establish native enforcement, proposal approval or merge

@@ -8,6 +8,9 @@ use specspace_infrastructure::{
     review_checks::PgReviewChecks,
 };
 
+#[path = "check_worker/invalidation.rs"]
+mod invalidation;
+
 struct Provider {
     rows: Mutex<Vec<CheckRun>>,
     creates: AtomicUsize,
@@ -159,9 +162,9 @@ impl ReviewCheckProvider for Provider {
         operation: Uuid,
         result: CheckResult,
     ) -> Result<CheckRun, CheckError> {
-        assert_eq!(
-            self.updates.fetch_add(1, Ordering::SeqCst),
-            0,
+        let prior = self.updates.fetch_add(1, Ordering::SeqCst);
+        assert!(
+            prior == 0 || (prior == 1 && result == CheckResult::Failure),
             "PATCH repeated"
         );
         let row = CheckRun {

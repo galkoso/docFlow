@@ -2,6 +2,7 @@
 //! started phase is never rearmed; only an exact observed result can resolve it.
 use super::*;
 use crate::provider_backoff::{self, ConnectionKey};
+use serde_json::json;
 use specspace_application::review_check_publication::{
     CheckPublicationDecision as D, CheckPublicationPhase as P, CheckPurpose,
 };
@@ -57,7 +58,7 @@ struct Recorded {
 }
 
 impl PgReviewChecks {
-    async fn transaction(&self) -> Result<Transaction<'_, Postgres>, CheckStoreError> {
+    pub(super) async fn transaction(&self) -> Result<Transaction<'_, Postgres>, CheckStoreError> {
         let mut tx = self.pool.begin().await?;
         sqlx::query("SET LOCAL lock_timeout='5s'")
             .execute(&mut *tx)
@@ -463,7 +464,7 @@ async fn has_write(conn: &mut PgConnection, op: Uuid) -> Result<bool, CheckStore
         .await?,
     )
 }
-async fn phase(
+pub(super) async fn phase(
     conn: &mut PgConnection,
     intent: &CheckPublicationIntent,
 ) -> Result<P, CheckStoreError> {

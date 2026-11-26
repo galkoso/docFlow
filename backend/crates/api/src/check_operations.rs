@@ -7,12 +7,14 @@ use axum::{
     routing::{get, post},
 };
 use specspace_application::review_check_operations::{
-    ReviewCheckOperation, ReviewCheckRecoveryAccepted, ReviewCheckRecoveryRequest,
+    ReviewCheckOperation, ReviewCheckOperationPage, ReviewCheckRecoveryAccepted,
+    ReviewCheckRecoveryRequest,
 };
 use specspace_infrastructure::review_checks::{CheckRecoveryMode, CheckStoreError as E};
 use uuid::Uuid;
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .route("/api/v1/proposals/{proposal}/review/checks", get(page))
         .route(
             "/api/v1/proposals/{proposal}/review/checks/{operation}",
             get(read),
@@ -21,6 +23,38 @@ pub fn routes() -> Router<AppState> {
             "/api/v1/proposals/{proposal}/review/checks/{operation}/recover",
             post(recover).layer(DefaultBodyLimit::max(1024)),
         )
+}
+
+#[derive(serde::Deserialize, utoipa::IntoParams)]
+#[serde(deny_unknown_fields)]
+#[into_params(parameter_in=Query)]
+pub struct PageQuery {
+    pub after: Option<Uuid>,
+    pub limit: Option<i32>,
+}
+#[utoipa::path(get,path="/api/v1/proposals/{proposal}/review/checks",operation_id="reviewCheckOperations",security(("sessionCookie"=[])),
+    params(("proposal"=Uuid,Path),("X-Expected-Actor"=Uuid,Header),PageQuery),responses((status=200,body=ReviewCheckOperationPage,description="Admin-only bounded journal history; no provider observation or mutation."),(status=400,body=ErrorBody),(status=401,body=ErrorBody),(status=403,body=ErrorBody),(status=404,body=ErrorBody),(status=409,body=ErrorBody),(status=503,body=ErrorBody)))]
+pub(crate) async fn page(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<Uuid>, axum::extract::rejection::PathRejection>,
+    query: Result<Query<PageQuery>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let actor = match actor(&state, &headers, false).await {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    let (Ok(Path(proposal)), Ok(Query(query))) = (path, query) else {
+        return proposals::invalid_query();
+    };
+    match state
+        .review_checks
+        .page(actor, proposal, query.after, query.limit.unwrap_or(20))
+        .await
+    {
+        Ok(v) => Json(v).into_response(),
+        Err(e) => failure(e),
+    }
 }
 async fn actor(
     state: &AppState,

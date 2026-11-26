@@ -3801,6 +3801,123 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal}/review/checks": {
+      "get": {
+        "tags": [
+          "crate::check_operations"
+        ],
+        "operationId": "reviewCheckOperations",
+        "parameters": [
+          {
+            "name": "proposal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Expected-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin-only bounded journal history; no provider observation or mutation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewCheckOperationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal}/review/checks/{operation}": {
       "get": {
         "tags": [
@@ -13355,6 +13472,7 @@
         "type": "object",
         "required": [
           "viewer_id",
+          "organization_id",
           "proposal_id",
           "operation_id",
           "snapshot_id",
@@ -13401,6 +13519,10 @@
           "operation_state": {
             "type": "string"
           },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "proposal_id": {
             "type": "string",
             "format": "uuid"
@@ -13427,6 +13549,54 @@
           },
           "write_phase": {
             "type": "string"
+          }
+        }
+      },
+      "ReviewCheckOperationPage": {
+        "type": "object",
+        "required": [
+          "viewer_id",
+          "organization_id",
+          "proposal_id",
+          "limit",
+          "items"
+        ],
+        "properties": {
+          "after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewCheckOperation"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "viewer_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },

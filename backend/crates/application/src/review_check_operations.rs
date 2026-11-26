@@ -6,6 +6,7 @@ use uuid::Uuid;
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewCheckOperation {
     pub viewer_id: Uuid,
+    pub organization_id: Uuid,
     pub proposal_id: Uuid,
     pub operation_id: Uuid,
     pub snapshot_id: Uuid,
@@ -38,4 +39,16 @@ pub struct ReviewCheckRecoveryAccepted {
     pub mode: String,
     pub max_attempts: i32,
     pub replayed: bool,
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ReviewCheckOperationPage {
+    pub viewer_id: Uuid,
+    pub organization_id: Uuid,
+    pub proposal_id: Uuid,
+    pub after: Option<Uuid>,
+    pub limit: i32,
+    pub items: Vec<ReviewCheckOperation>,
+    pub next_cursor: Option<Uuid>,
 }

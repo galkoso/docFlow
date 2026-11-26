@@ -2879,3 +2879,17 @@ Checkboxes represent verified work only.
   changed. Automatic invalidation, stale-operation resolution, administrator UI
   and operation discovery, native enforcement, final APPROVED/merge, real GitHub
   acceptance and the remaining full specification stay open.
+
+- Bounded administrator check-operation discovery: added a read-only proposal
+  history endpoint with default 20/maximum 50 records and immutable creation/UUID
+  keyset ordering. Cursors must belong to the same organization/proposal. The
+  page shares the current Admin authorization and canonical status validation;
+  malformed rows cannot return a partial page. Item/page organization identity
+  lets clients bind the actual resource membership. No provider observation,
+  admission, claim or mutation occurs. Two additional PostgreSQL HTTP cases
+  verify ordering/pagination, empty history, role loss, limits, forged/foreign
+  cursors and unchanged provider/audit counters. All 863 backend tests pass with
+  the same two performance tests ignored; workspace Clippy with warnings denied,
+  formatting and runtime binary builds pass. OpenAPI is exported and its
+  TypeScript schema regenerated. No migration changed. The administrator UI and
+  the remaining full specification continue in the next stage.

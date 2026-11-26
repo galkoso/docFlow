@@ -466,3 +466,149 @@ async fn provider_cooldown_blocks_new_recovery_but_not_status_or_exact_receipt_o
         1
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn administrator_operation_discovery_is_bounded_keyset_scoped_and_read_only(pool: PgPool) {
+    let (f, admin, store, lease, path) = stopped(&pool, false).await;
+    let mut expected = vec![lease.operation_id()];
+    for _ in 0..3 {
+        let ticket = store
+            .evaluate(
+                f.owner.id,
+                f.proposal,
+                lease.intent().source().snapshot,
+                Uuid::new_v4(),
+            )
+            .await
+            .unwrap();
+        expected.push(ticket.operation_id());
+        let current = store.claim(Uuid::new_v4(), 120).await.unwrap().unwrap();
+        store
+            .defer(&current, "CHECK_PROVIDER_UNAVAILABLE", None, None)
+            .await
+            .unwrap();
+    }
+    expected.reverse();
+    let collection = path.rsplit_once('/').unwrap().0;
+    let reads = f.provider.ref_reads.load(Ordering::SeqCst);
+    let audit = sqlx::query_scalar::<_, i64>("SELECT count(*) FROM audit_events")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let first = get(&f.app, &admin, &format!("{collection}?limit=2"), true).await;
+    assert_eq!(first.0, StatusCode::OK, "{}", first.1);
+    assert_eq!(first.1["viewer_id"], admin.id.to_string());
+    assert_eq!(first.1["organization_id"], f.organization.to_string());
+    assert_eq!(first.1["items"].as_array().unwrap().len(), 2);
+    assert_eq!(first.1["items"][0]["operation_id"], expected[0].to_string());
+    assert_eq!(first.1["items"][1]["operation_id"], expected[1].to_string());
+    assert_eq!(first.1["next_cursor"], expected[1].to_string());
+    let second = get(
+        &f.app,
+        &admin,
+        &format!("{collection}?limit=2&after={}", expected[1]),
+        true,
+    )
+    .await;
+    assert_eq!(second.0, StatusCode::OK);
+    assert_eq!(second.1["after"], expected[1].to_string());
+    assert_eq!(
+        second.1["items"][0]["operation_id"],
+        expected[2].to_string()
+    );
+    assert_eq!(
+        second.1["items"][1]["operation_id"],
+        expected[3].to_string()
+    );
+    assert!(second.1["next_cursor"].is_null());
+    for item in first.1["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(second.1["items"].as_array().unwrap())
+    {
+        assert_eq!(item["organization_id"], f.organization.to_string());
+        assert_eq!(item["provider_verified"], false);
+        assert!(item.get("job_id").is_none());
+    }
+    assert_eq!(f.provider.ref_reads.load(Ordering::SeqCst), reads);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM audit_events")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        audit
+    );
+    assert_eq!(
+        get(&f.app, &f.actor, collection, true).await.0,
+        StatusCode::FORBIDDEN
+    );
+    for query in [
+        "?limit=0",
+        "?limit=51",
+        "?limit=-1",
+        "?actor_id=forged",
+        "?after=not-a-uuid",
+        "?after=00000000-0000-0000-0000-000000000000",
+    ] {
+        assert_eq!(
+            get(&f.app, &admin, &format!("{collection}{query}"), true)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    assert_eq!(
+        get(
+            &f.app,
+            &admin,
+            &format!("{collection}?after={}", Uuid::new_v4()),
+            true
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    sqlx::query("UPDATE memberships SET role='READER' WHERE user_id=$1")
+        .bind(admin.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(&f.app, &admin, collection, true).await.0,
+        StatusCode::FORBIDDEN
+    );
+}
+#[sqlx::test(migrations = "../../migrations")]
+async fn operation_discovery_reports_empty_history_and_rejects_foreign_cursors_and_memberships(
+    pool: PgPool,
+) {
+    let (f, _, _) = configured(&pool, false).await;
+    let admin = user(&pool, f.organization, "ADMIN").await;
+    let path = format!("/api/v1/proposals/{}/review/checks", f.proposal);
+    let empty = get(&f.app, &admin, &path, true).await;
+    assert_eq!(empty.0, StatusCode::OK);
+    assert_eq!(empty.1["items"], json!([]));
+    assert!(empty.1["next_cursor"].is_null());
+    let (foreign, foreign_admin, _, foreign_lease, _) = stopped(&pool, false).await;
+    assert_eq!(
+        get(&f.app, &foreign_admin, &path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        get(
+            &f.app,
+            &admin,
+            &format!("{path}?after={}", foreign_lease.operation_id()),
+            true
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    let foreign_path = format!("/api/v1/proposals/{}/review/checks", foreign.proposal);
+    assert_eq!(
+        get(&f.app, &admin, &foreign_path, true).await.0,
+        StatusCode::NOT_FOUND
+    );
+}

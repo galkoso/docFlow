@@ -488,6 +488,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reviewCheckOperations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/review/checks/{operation}": {
         parameters: {
             query?: never;
@@ -2250,6 +2266,8 @@ export interface components {
             operation_id: string;
             operation_state: string;
             /** Format: uuid */
+            organization_id: string;
+            /** Format: uuid */
             proposal_id: string;
             provider_verified: boolean;
             published: boolean;
@@ -2260,6 +2278,21 @@ export interface components {
             /** Format: uuid */
             viewer_id: string;
             write_phase: string;
+        };
+        ReviewCheckOperationPage: {
+            /** Format: uuid */
+            after?: string | null;
+            items: components["schemas"]["ReviewCheckOperation"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: uuid */
+            next_cursor?: string | null;
+            /** Format: uuid */
+            organization_id: string;
+            /** Format: uuid */
+            proposal_id: string;
+            /** Format: uuid */
+            viewer_id: string;
         };
         ReviewCheckRecoveryAccepted: {
             /** Format: int32 */
@@ -5622,6 +5655,81 @@ export interface operations {
                 };
             };
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reviewCheckOperations: {
+        parameters: {
+            query?: {
+                after?: string;
+                limit?: number;
+            };
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Admin-only bounded journal history; no provider observation or mutation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCheckOperationPage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

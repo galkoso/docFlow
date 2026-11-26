@@ -80,6 +80,33 @@ factory now uses the existing frozen numeric connection/token selection path;
 it preserves binding-change, missing-setup and source failures without giving a
 content reader mutation authority.
 
+Migration 031 stores immutable check intents, CREATE/UPDATE start markers,
+adopted run identities and final receipts. A nullable `repositories.check_app_id`
+disables admission until the exact numeric App is configured. Admission validates
+the scoped ready snapshot, numeric connection, current actor role and metadata,
+plus the exact queued job/operation and reserved audit/outbox pair. An active
+check operation serializes this lane per proposal without taking the content
+mutation slot. Generic workers cannot claim or complete its dedicated jobs.
+
+Provider writes require a live owner/attempt fence and current authority/context;
+receipt adoption may preserve a known run after review context or actor access
+changes, while final publication remains forbidden. A reclaimed attempt cannot
+reuse an old fence or replace a write-start marker. Started operations cannot be
+failed or rewound to unstarted, and failed jobs with started writes retain UNKNOWN
+operations. Completion commits its exact run/result, job/operation outcome and
+separate audit/outbox pair together; partial receipts roll back. Delivered event
+metadata, intents, start markers, runs and results cannot be rewritten or deleted.
+Maintainer/Admin invalidation can target the original run after closure or a
+context change and can only record failure.
+
+These database guards do not verify provider refs or recompute application policy
+proofs. The journal service must capture/restore the canonical intent, independently
+recheck live provider and policy evidence, fence IO, and reconcile uncertainty.
+Admission orchestration, stale-operation resolution/recovery and worker execution
+are still open; schema availability is not runtime publication or native check
+enforcement. App configuration and native rule verification also remain to be
+exposed to the authorized administrator.
+
 Fenced check publication/reconciliation, native rule verification and serialized
 merge still require implementation. Until those are connected, no runtime
 required check is advertised as enforcing this policy.

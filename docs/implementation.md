@@ -2725,3 +2725,23 @@ Checkboxes represent verified work only.
   runtime publisher yet: database journal/fencing, worker reconciliation, native
   enforcement, final APPROVED/merge and the remaining full specification remain
   open. No migration, HTTP contract or frontend behavior changed in this stage.
+
+- Durable required-check schema: migration 031 adds separately fenced immutable
+  intents, CREATE/UPDATE start markers, adopted run identities and final receipts.
+  A configured numeric App, exact snapshot/connection, current role/context and
+  reserved audit/outbox pair are required for admission. Started writes survive
+  lease expiry and cannot be erased, failed or reset; reclaimed attempts cannot
+  complete with an old fence. Known runs remain recordable after actor/context
+  changes, but new writes and publication are blocked. Maintainer/Admin revocation
+  can fail its original bound run after closure. Completion commits its receipt,
+  job/operation outcome and separate audit/outbox pair together. Generic workers
+  exclude these jobs. Six PostgreSQL contract cases verify rollback, immutable
+  events/history, disabled/mismatched App settings, role loss, stale metadata,
+  same-owner attempt reclaim and explicit revocation. All 807 backend tests pass
+  with the same two performance tests ignored; workspace Clippy with warnings
+  denied, formatting and all runtime binary builds pass. The OpenAPI export is
+  unchanged. Migration 031 is applied locally and reruns cleanly; the existing API
+  remains ready. Admission service, recovery/supersession, worker publication,
+  administrator setup/native enforcement, final APPROVED/merge and the remaining
+  full specification stay open. Schema availability alone grants no publication
+  or merge authority.

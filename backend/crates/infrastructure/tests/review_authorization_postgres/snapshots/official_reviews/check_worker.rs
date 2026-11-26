@@ -10,6 +10,8 @@ use specspace_infrastructure::{
 
 #[path = "check_worker/invalidation.rs"]
 mod invalidation;
+#[path = "check_worker/recovery.rs"]
+mod recovery;
 
 struct Provider {
     rows: Mutex<Vec<CheckRun>>,

@@ -14,8 +14,10 @@ use uuid::Uuid;
 mod invalidation;
 mod journal;
 mod read;
+mod recovery;
 mod reservation;
 pub use journal::{CheckLease, CheckObservation};
+pub use recovery::{CheckRecovery, CheckRecoveryMode};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum CheckStoreError {

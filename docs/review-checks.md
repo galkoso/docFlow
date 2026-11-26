@@ -196,8 +196,31 @@ run cannot be targeted; an unresolved active operation still requires recovery
 before a separate invalidation can enter that lane. Admission itself has no
 provider IO and never changes proposal state.
 
-Automatic event dispatch/invalidation, stale-operation resolution and
-administrator recovery remain open. App configuration and native rule verification
+Migration 032 adds explicit administrator recovery of the same stopped job.
+`PgReviewChecks::recover` binds a new request UUID to the exact original operation
+and canonical intent hash. It keeps the original publishing actor, intent, provider
+identity, markers and monotonically increasing attempts. RETRY_UNSTARTED requires
+current original authority and local policy evidence; the worker checks live refs
+before any write. OBSERVE_STARTED retains UNKNOWN and resumes the existing phase,
+including safe identity adoption after original authority loss. Recovery does not
+transfer publication authority to the administrator.
+
+Each accepted recovery raises the existing attempt ceiling by eight. Admission is
+limited to two per administrator and twelve per organization in ten minutes, and
+respects the shared provider cooldown and active lane. Current Admin authority
+precedes exact replay; replay restores the original accepted mode/budget without
+adding attempts or another recovery. A current job or completed publication cannot
+be reopened. Failed invalidation jobs retain their failure-only purpose.
+
+The recovery row, queue/budget update, operation state and separate audit/outbox
+pair commit together. Database guards require the exact receipt from the same
+transaction before permitting a failed job to reopen or its budget to change.
+Recovery records and event payloads are immutable. Old leases stay fenced out;
+started writes remain single-use. Missing audit/events roll back the entire
+recovery. The service performs no provider IO inside its transaction.
+
+Automatic event dispatch/invalidation, stale-operation resolution and the
+administrator recovery HTTP/UI workflow remain open. App configuration and native rule verification
 also remain to be exposed to the authorized administrator. Runtime publishing of
 admitted jobs does not establish native enforcement, proposal approval or merge
 permission. Real GitHub integration acceptance, automatic invalidation and

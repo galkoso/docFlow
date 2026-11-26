@@ -417,9 +417,21 @@ async fn binding(
     }
 }
 async fn current(conn: &mut PgConnection, lease: &CheckLease) -> Result<(), CheckStoreError> {
-    binding(&mut *conn, lease, true).await?;
-    if matches!(lease.intent.purpose(), CheckPurpose::Evaluation { .. }) {
-        let s = lease.intent.source();
+    authorize(conn, &lease.intent).await
+}
+pub(super) async fn authorize(
+    conn: &mut PgConnection,
+    intent: &CheckPublicationIntent,
+) -> Result<(), CheckStoreError> {
+    if !sqlx::query_scalar::<_, bool>("SELECT review_check_lock_scope($1,true)")
+        .bind(intent.source().operation)
+        .fetch_one(&mut *conn)
+        .await?
+    {
+        return Err(CheckStoreError::Stale);
+    }
+    if matches!(intent.purpose(), CheckPurpose::Evaluation { .. }) {
+        let s = intent.source();
         let c = PgReviewReadiness::capture_in(conn, s.actor, s.proposal, s.snapshot, true, true)
             .await?;
         matches_capture(&c, s)?;

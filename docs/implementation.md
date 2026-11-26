@@ -2833,3 +2833,27 @@ Checkboxes represent verified work only.
   invalidation, recovery/supersession, admin workflow/native enforcement, final
   APPROVED/merge, real GitHub acceptance and the remaining full specification
   remain open.
+
+- Bounded check-job recovery: migration 032 and `PgReviewChecks::recover` let a
+  current Admin extend the same failed job's attempt ceiling by eight using an
+  exact operation/hash/request frame. The original actor, intent, markers and
+  provider identity stay unchanged. Unstarted retry requires current original
+  authority/local evidence; started recovery retains UNKNOWN and resumes only its
+  recorded phase. Recovery grants no replacement publication authority. Attempts
+  remain monotonic and old leases stay fenced. The recovery row, queue/budget,
+  operation state and separate audit/outbox pair commit atomically; schema guards
+  reject reopening/budget changes without that same-transaction receipt. Exact
+  replay restores its accepted mode/budget without another charge, while new
+  recovery respects the active lane, shared connection cooldown and separate
+  two-per-admin/twelve-per-organization ten-minute limits. Ten PostgreSQL cases
+  verify both modes, genuine exhaustion followed by attempt nine without another
+  create, negative invalidation recovery, revoked authority, exact/concurrent
+  replay, actor/org quotas, binding changes, audit/event rollback, immutable
+  records and direct SQL attempts to bypass the recovery fence. All 855 backend
+  tests pass with the same two performance tests ignored; workspace Clippy with
+  warnings denied, formatting and all runtime binary builds pass. OpenAPI remains
+  unchanged. Migration 032 is applied locally, verified in the migration ledger,
+  and reruns cleanly; the existing API remains ready. Automatic invalidation,
+  stale-operation supersession/resolution, administrator HTTP/UI workflow, native
+  enforcement, final APPROVED/merge, real GitHub acceptance and the remaining full
+  specification stay open.

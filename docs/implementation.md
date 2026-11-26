@@ -2857,3 +2857,25 @@ Checkboxes represent verified work only.
   stale-operation supersession/resolution, administrator HTTP/UI workflow, native
   enforcement, final APPROVED/merge, real GitHub acceptance and the remaining full
   specification stay open.
+
+- Administrator check-operation HTTP workflow: added authenticated, actor-bound
+  journal status and explicit recovery routes for an exact proposal/operation.
+  Status requires current Admin authority, returns only bounded metadata and the
+  canonical hash, and explicitly sets provider_verified=false. It performs no
+  provider calls, claims or writes, excludes private job IDs and refuses malformed
+  error metadata. Recovery uses the existing Origin/CSRF checks, a 1 KiB body and
+  request UUID/hash framing; actor/result overrides and extra query/body fields
+  are rejected. Accepted receipts point to the authorized status URL and retain
+  the original operator window on exact replay. Fixed errors distinguish current
+  authority/context, active/completed work, idempotency, recovery quotas and
+  provider cooldown; cooldown keeps its remaining Retry-After. Six PostgreSQL
+  HTTP scenarios cover both modes, no-store/read-only status, tenant/actor/role
+  changes, malformed/private metadata, CSRF/origin/body rejection, exact replay,
+  busy work, quota and cooldown without another marker or provider read.
+  All 861 backend tests pass with the same two performance tests ignored;
+  workspace Clippy with warnings denied, formatting and all runtime binary builds
+  pass. OpenAPI is exported and matches the runtime contract, its TypeScript
+  schema is regenerated, and the Angular production build passes. No migration
+  changed. Automatic invalidation, stale-operation resolution, administrator UI
+  and operation discovery, native enforcement, final APPROVED/merge, real GitHub
+  acceptance and the remaining full specification stay open.

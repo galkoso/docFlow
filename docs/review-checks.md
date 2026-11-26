@@ -219,8 +219,25 @@ Recovery records and event payloads are immutable. Old leases stay fenced out;
 started writes remain single-use. Missing audit/events roll back the entire
 recovery. The service performs no provider IO inside its transaction.
 
+Administrator HTTP access is available at
+`GET /api/v1/proposals/:proposal/review/checks/:operation` and the matching
+`POST .../recover`. Reads require a current Admin session and expected actor,
+return journal metadata with `provider_verified=false`, and perform no provider IO,
+claims or mutations. The canonical request hash binds the explicit recovery body:
+`request_id` plus `expected_request_hash`. The accepted receipt omits private job
+identifiers and points Location to the same authorized status URL. Its mode and
+budget describe that accepted recovery, including exact replay.
+
+Recovery additionally requires the existing Origin/CSRF checks. Unknown query/body
+fields, mismatched identities and oversized bodies are rejected. Fixed errors
+separate stale context, active/completed jobs, idempotency mismatch, admission
+limits, provider cooldown and unavailable journal data. Provider cooldown preserves
+its own Retry-After; recovery quotas use 600 seconds. Responses are no-store.
+Status reads recheck current authority and withhold malformed error metadata.
+OpenAPI and the generated TypeScript schema include both routes.
+
 Automatic event dispatch/invalidation, stale-operation resolution and the
-administrator recovery HTTP/UI workflow remain open. App configuration and native rule verification
+administrator recovery UI/operation-discovery workflow remain open. App configuration and native rule verification
 also remain to be exposed to the authorized administrator. Runtime publishing of
 admitted jobs does not establish native enforcement, proposal approval or merge
 permission. Real GitHub integration acceptance, automatic invalidation and

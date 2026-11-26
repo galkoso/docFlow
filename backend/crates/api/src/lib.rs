@@ -1,4 +1,5 @@
 pub mod auth;
+mod check_operations;
 pub mod comparisons;
 pub mod contract;
 pub mod creation_context;
@@ -401,6 +402,7 @@ pub fn router(state: AppState) -> Router {
         .merge(saves::routes())
         .merge(review_configuration::routes())
         .merge(reviews::routes())
+        .merge(check_operations::routes())
         .merge(official_reviews::routes())
         .merge(review_readiness::routes())
         .merge(product_questions::routes())

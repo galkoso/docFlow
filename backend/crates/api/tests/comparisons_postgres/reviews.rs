@@ -1,4 +1,6 @@
 use super::*;
+#[path = "reviews/check_recovery.rs"]
+mod check_recovery;
 #[path = "reviews/discussions.rs"]
 mod discussions;
 #[path = "reviews/official.rs"]

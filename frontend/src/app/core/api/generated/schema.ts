@@ -488,6 +488,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal}/review/checks/{operation}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reviewCheckOperation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal}/review/checks/{operation}/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recoverReviewCheckOperation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal}/review/configuration": {
         parameters: {
             query?: never;
@@ -2204,6 +2236,47 @@ export interface components {
         ReviewBookDocument: {
             id: string;
             source: components["schemas"]["Side"];
+        };
+        ReviewCheckOperation: {
+            /** Format: int32 */
+            attempts: number;
+            desired_result: string;
+            error_code?: string | null;
+            job_state: string;
+            known_run: boolean;
+            /** Format: int32 */
+            max_attempts: number;
+            /** Format: uuid */
+            operation_id: string;
+            operation_state: string;
+            /** Format: uuid */
+            proposal_id: string;
+            provider_verified: boolean;
+            published: boolean;
+            purpose: string;
+            request_hash: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: uuid */
+            viewer_id: string;
+            write_phase: string;
+        };
+        ReviewCheckRecoveryAccepted: {
+            /** Format: int32 */
+            max_attempts: number;
+            mode: string;
+            /** Format: uuid */
+            operation_id: string;
+            /** Format: uuid */
+            proposal_id: string;
+            replayed: boolean;
+            /** Format: uuid */
+            request_id: string;
+        };
+        ReviewCheckRecoveryRequest: {
+            expected_request_hash: string;
+            /** Format: uuid */
+            request_id: string;
         };
         ReviewConfiguration: {
             branch: string;
@@ -5498,6 +5571,176 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductQuestionRecorded"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reviewCheckOperation: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+            };
+            path: {
+                proposal: string;
+                operation: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Admin-only durable journal status; provider state is not refreshed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCheckOperation"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    recoverReviewCheckOperation: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Expected-Actor": string;
+                Origin: string;
+                "X-XSRF-TOKEN": string;
+            };
+            path: {
+                proposal: string;
+                operation: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewCheckRecoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Admin recovery accepted or exactly replayed; original publication authority and markers remain in force. */
+            202: {
+                headers: {
+                    Location?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCheckRecoveryAccepted"];
                 };
             };
             400: {

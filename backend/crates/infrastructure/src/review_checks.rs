@@ -16,6 +16,7 @@ mod journal;
 mod read;
 mod recovery;
 mod reservation;
+mod status;
 pub use journal::{CheckLease, CheckObservation};
 pub use recovery::{CheckRecovery, CheckRecoveryMode};
 

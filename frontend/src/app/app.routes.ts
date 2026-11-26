@@ -3,6 +3,7 @@ import { creationExit } from './features/proposals/creation-exit';
 import { editorExit } from './features/editor/editor-exit';
 import { reviewExit } from './features/review/review-exit';
 import { reviewSnapshotExit } from './features/review/review-snapshot-exit';
+import { checkOperationsExit } from './features/review/check-operations-exit';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'specification' },
@@ -15,6 +16,8 @@ export const routes: Routes = [
     loadComponent: () => import('./features/review/review-configuration-page').then(m => m.ReviewConfigurationPage) },
   { path: 'changes/:id/review/snapshots', title: 'גרסאות סקירה | SpecSpace', canDeactivate: [reviewSnapshotExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange',
     loadComponent: () => import('./features/review/review-snapshots-page').then(m => m.ReviewSnapshotsPage) },
+  { path: 'changes/:id/review/checks', title: 'בדיקות סקירה | SpecSpace', canDeactivate: [checkOperationsExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange',
+    loadComponent: () => import('./features/review/check-operations-page').then(m => m.CheckOperationsPage) },
   { path: 'changes/:id/book', title: 'תוכן ההצעה | SpecSpace', loadComponent: () => import('./features/specification/specification').then(m => m.Specification) },
   { path: 'changes/:id/edit/:document', title: 'עריכת הצעה | SpecSpace', canDeactivate: [editorExit], runGuardsAndResolvers: 'paramsOrQueryParamsChange',
     loadComponent: () => import('./features/editor/editor-page').then(m => m.EditorPage) },

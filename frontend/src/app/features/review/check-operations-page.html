@@ -1,0 +1,44 @@
+<a [routerLink]="['/changes', proposal()]">חזרה לפרטי ההצעה</a>
+<h1>בדיקות סקירה</h1>
+<p>תצוגת מנהל מערכת של העבודה שנרשמה באתר. מצב הספק, תוקף האישורים והרשאת המיזוג נבדקים בנפרד.</p>
+@if (!session.profile()) {<p role="status">יש להתחבר כדי לצפות בבדיקות.</p>}
+@if (error(); as text) {<p role="alert">{{ text }}</p>}
+@if (message(); as text) {<p role="status">{{ text }}</p>}
+@if (busy()) {<p role="status">טוענים את מצב הבדיקות…</p>}
+@if (recovering()) {<p role="status">שולחים בקשת התאוששות…</p>}
+@if (recoveryPending()) {
+  <section aria-label="בקשת התאוששות שטרם אומתה">
+    <h2>תוצאת הבקשה טרם אומתה</h2><p>אותה בקשה נשמרת בזיכרון העמוד. בדיקה נוספת תשתמש בפרטים המקוריים.</p>
+    <button type="button" (click)="recover()" [disabled]="busy() || recovering() || retryAt() > 0">בדיקת אותה בקשת התאוששות</button>
+  </section>
+}
+@if (retryAt(); as until) {<p role="status">אפשר לנסות שוב לאחר {{ until | date:'dd/MM/yyyy HH:mm:ss' }}.</p>}
+@if (view(); as operation) {
+  <section aria-label="פרטי בדיקה">
+    <h2>{{ label(operation) }}</h2>
+    <p>מזהה עבודה: <bdi>{{ operation.operation_id }}</bdi></p>
+    <p>{{ operation.purpose === 'INVALIDATION' ? 'ביטול תוצאת בדיקה קודמת' : 'שליחת תוצאת סקירה' }}.</p>
+    <p>היעד שנרשם: {{ operation.desired_result === 'SUCCESS' ? 'תנאי הסקירה מולאו בגרסה שנבדקה' : operation.desired_result === 'FAILURE' ? 'קיימת חסימה' : 'ממתינים להשלמת תנאי הסקירה' }}.</p>
+    <p>ניסיונות: {{ operation.attempts }} מתוך {{ operation.max_attempts }}.</p>
+    <a [routerLink]="['/changes', proposal(), 'review', 'snapshots']" [queryParams]="{ snapshot: operation.snapshot_id }">פתיחת גרסת הסקירה הקשורה</a>
+    @if (operation.job_state === 'FAILED' && !operation.published && !recoveryPending() && operation.max_attempts <= 2147483639) {
+      @if (operation.write_phase === 'NOT_STARTED') {<p>אפשר לבקש ניסיון נוסף. ההרשאות והגרסה ייבדקו שוב לפני שליחה לספק.</p>}
+      @else {<p>אפשר לחדש בדיקה של התוצאה הקיימת בספק. כתיבה שכבר החלה לא תישלח שוב.</p>}
+      <button type="button" (click)="recover()" [disabled]="busy() || recovering() || retryAt() > 0">{{ operation.write_phase === 'NOT_STARTED' ? 'ניסיון נוסף לעבודה שלא התחילה' : 'חידוש בדיקת תוצאת הספק' }}</button>
+    }
+  </section>
+}
+@if (page(); as history) {
+  <section aria-label="היסטוריית בדיקות">
+    <h2>עבודות בדיקה שנרשמו</h2>
+    @if (!history.items.length) {<p>אין עבודות בדיקה להצעה זו בעמוד הנוכחי.</p>}
+    <ul>@for (operation of history.items; track operation.operation_id) {
+      <li><a [routerLink]="[]" [queryParams]="{ after: location()?.after, operation: operation.operation_id }" [attr.aria-current]="location()?.operation === operation.operation_id ? 'true' : null"><bdi>{{ operation.operation_id }}</bdi> — {{ label(operation) }}</a></li>
+    }</ul>
+    @if (history.next_cursor; as cursor) {<a [routerLink]="[]" [queryParams]="{ after: cursor }">בדיקות קודמות</a>}
+  </section>
+}
+<nav aria-label="ניווט בדיקות">
+  @if (location()?.after) {<a [routerLink]="[]" [queryParams]="{}">לתחילת הרשימה</a>}
+  <button type="button" (click)="reload()" [disabled]="busy() || recovering()">עדכון מצב הבדיקות</button>
+</nav>

@@ -2893,3 +2893,27 @@ Checkboxes represent verified work only.
   formatting and runtime binary builds pass. OpenAPI is exported and its
   TypeScript schema regenerated. No migration changed. The administrator UI and
   the remaining full specification continue in the next stage.
+
+- Administrator check-operation page: added `/changes/:id/review/checks`, linked
+  from proposal detail for administrator profiles, with cursor/operation URLs,
+  bounded discovery, exact selection, recorded status and explicit recovery.
+  Actual organization membership and actor/scope are checked before rendering or
+  acting; backend authorization remains authoritative. Runtime validators reject
+  mixed identities, contradictory phases/results, malformed counters and cursors.
+  A frozen in-memory request survives timeout/lost/unverified responses for manual
+  exact retry, including later budget/phase advances by another operator. Refresh
+  only observes; cooldown timers never POST. Account/role loss purges private
+  data, obsolete reads are cancelled and synchronous guards prevent an action
+  before reactive cleanup. Route/query navigation, logout and unload guard an
+  unconfirmed recovery. Operation URLs restore reads only. Labelled Hebrew
+  controls, focus outlines, LTR-isolated IDs and wrapping layouts support narrow
+  screens; recorded publication remains distinct from live provider/merge proof.
+  Sixty-nine focused transport/evidence/router scenarios cover these boundaries.
+  All 811 frontend tests pass and the Angular production build passes. The final
+  combined workspace also passes all 863 backend tests (same two performance
+  tests ignored), Clippy with warnings denied, formatting, runtime builds and
+  exact OpenAPI export comparison. No migration changed. Browser setup/selection
+  returned no available browser and discovery returned an empty list; physical
+  keyboard, visual RTL and 320px acceptance remain unverified. Automatic
+  invalidation, stale-operation resolution, native enforcement, final APPROVED/
+  merge, real GitHub acceptance and the remaining full specification stay open.

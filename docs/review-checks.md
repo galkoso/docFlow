@@ -236,8 +236,41 @@ its own Retry-After; recovery quotas use 600 seconds. Responses are no-store.
 Status reads recheck current authority and withhold malformed error metadata.
 OpenAPI and the generated TypeScript schema include both routes.
 
-Automatic event dispatch/invalidation, stale-operation resolution and the
-administrator recovery UI/operation-discovery workflow remain open. App configuration and native rule verification
+`GET /api/v1/proposals/:proposal/review/checks` now discovers scoped operation
+history in descending immutable creation/UUID order. Its bounded keyset pages
+(default 20, maximum 50) validate the cursor in the same organization/proposal.
+The whole page is authorized and validated in one transaction; malformed rows
+cannot produce a partial successful page. Page and item responses bind the current
+viewer and organization. Discovery reads no provider data and reserves no work.
+
+The administrator page at `/changes/:id/review/checks` supports cursor and selected
+operation URLs and is linked from proposal detail for administrator profiles.
+The server still checks the actual organization role. The client verifies actor,
+organization, proposal, operation, snapshot, intent hash, bounded counters, phase/
+state consistency, unique pages and cursors before displaying metadata. Historical
+publication is explicitly distinct from live provider state or merge permission.
+
+Recovery is explicit. The original request UUID, canonical hash and actor/scope
+are frozen in page memory while its result is uncertain. Timeouts, lost or
+unverifiable replies preserve that same request for manual exact retry. Refresh
+only reads status. Other operators may advance the budget in increments of eight
+or advance an unstarted retry to observation; receipt validation accepts those
+forward transitions while rejecting identity changes and phase rewinds. A valid
+receipt triggers separate status observation. Cooldown only enables the retry
+button after its deadline; it never posts or polls automatically.
+
+Account/role loss clears private data and pending intent. Reads are cancelled on
+scope changes, obsolete replies cannot install data, and synchronous event guards
+prevent an action before reactive cleanup. Route/query changes, logout and unload
+warn while a recovery result remains uncertain. Restoration from an operation URL
+only reads metadata and cannot reconstruct or resend an old mutation. Native
+labelled controls, focus outlines, RTL/LTR isolation and wrapping layouts support
+keyboard and narrow-screen use. DOM/router tests cover these controls and guards;
+physical keyboard, visual RTL and 320px checks remain pending because browser
+selection and discovery found no connected browser.
+
+Automatic event dispatch/invalidation, stale-operation resolution, native rule
+verification and the remaining merge workflow remain open. App configuration and native rule verification
 also remain to be exposed to the authorized administrator. Runtime publishing of
 admitted jobs does not establish native enforcement, proposal approval or merge
 permission. Real GitHub integration acceptance, automatic invalidation and

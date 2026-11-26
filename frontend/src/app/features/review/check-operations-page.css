@@ -1,0 +1,13 @@
+:host { display: block; min-width: 0; max-width: 70rem; margin-inline: auto; overflow-wrap: anywhere; }
+p, li { line-height: 1.7; }
+section { margin-block: 1.5rem; border: 1px solid #cbd5e1; border-radius: .5rem; padding: 1rem; min-width: 0; }
+h1, h2 { line-height: 1.4; }
+ul { padding-inline-start: 1.25rem; }
+a { color: #174f8b; display: inline-block; min-block-size: 44px; padding-block: .6rem; box-sizing: border-box; }
+a[aria-current] { font-weight: 600; text-decoration-thickness: 2px; }
+button { font: inherit; min-height: 44px; max-width: 100%; padding: .55rem 1rem; margin-block: .5rem; cursor: pointer; }
+button:disabled { cursor: default; }
+nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+bdi { direction: ltr; unicode-bidi: isolate; }
+a:focus-visible, button:focus-visible { outline: 3px solid #2558a5; outline-offset: 3px; }
+[role=alert] { color: #8b1c24; }

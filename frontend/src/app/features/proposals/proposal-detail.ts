@@ -23,6 +23,7 @@ export class ProposalDetailPage implements OnDestroy {
       untracked(() => { if (profile && id) this.state.load(id); else this.state.clear(); });
     });
   }
+  isAdmin(): boolean { const memberships = this.session.profile()?.memberships; return Array.isArray(memberships) && memberships.some(m => m.role === 'ADMIN'); }
   refresh(): void { const id = this.params().get('id'); if (id && this.session.profile()) this.state.load(id); }
   ngOnDestroy(): void { this.state.clear(); }
 }

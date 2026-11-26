@@ -36,6 +36,18 @@ impl PgReviewReadiness {
         snapshot: Uuid,
         source: &dyn BoundProviderFactory,
     ) -> Result<ReviewReadiness, FreshReadinessError> {
+        Ok(self
+            .fresh_capture(actor, proposal, snapshot, source)
+            .await?
+            .report)
+    }
+    pub(crate) async fn fresh_capture(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        source: &dyn BoundProviderFactory,
+    ) -> Result<CapturedReadiness, FreshReadinessError> {
         let _permit = self
             .fresh_loads
             .try_acquire()
@@ -53,7 +65,7 @@ impl PgReviewReadiness {
         proposal: Uuid,
         snapshot: Uuid,
         source: &dyn BoundProviderFactory,
-    ) -> Result<ReviewReadiness, FreshReadinessError> {
+    ) -> Result<CapturedReadiness, FreshReadinessError> {
         let initial = self.capture(actor, proposal, snapshot, true).await?;
         let context = initial
             .context
@@ -87,7 +99,7 @@ impl PgReviewReadiness {
         } else {
             ReadinessConclusion::Pending
         };
-        Ok(final_read.report)
+        Ok(final_read)
     }
 }
 fn unchanged(a: &CapturedReadiness, b: &CapturedReadiness) -> Result<(), FreshReadinessError> {

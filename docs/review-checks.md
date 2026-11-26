@@ -102,10 +102,34 @@ context change and can only record failure.
 These database guards do not verify provider refs or recompute application policy
 proofs. The journal service must capture/restore the canonical intent, independently
 recheck live provider and policy evidence, fence IO, and reconcile uncertainty.
-Admission orchestration, stale-operation resolution/recovery and worker execution
-are still open; schema availability is not runtime publication or native check
-enforcement. App configuration and native rule verification also remain to be
-exposed to the authorized administrator.
+`PgReviewChecks::evaluate` now admits evaluation work from server identities only.
+It checks current write authority before observing an exact retry, rejects missing
+App configuration and an occupied lane before provider IO, and obtains a fresh
+provider-backed report. A short final transaction locks the proposal, organization
+quota and actor/reviewer authority, then compares scope and private evidence
+digests before inserting the operation/job/intent/audit/outbox together. The job
+payload contains only the operation UUID. Admission is limited to 60 per actor
+and 600 per organization in ten minutes; retries do not consume another slot.
+
+The private readiness capture hashes current memberships/qualifications, effective
+decisions/coverage, immutable snapshot facts, App/connection settings and append
+counters for question/discussion revisions, official reviews, unit approvals and
+acknowledged source visits. It excludes read time and text bodies. Equal visible
+conclusions therefore cannot conceal changed underlying policy evidence. Locked
+captures retain current positive authority until commit; no transaction spans
+provider reads. Existing stored-report semantics and HTTP types are unchanged.
+
+An exact reservation retry restores its original canonical intent and job without
+new Git reads or new quota admission, including after closure. Current action
+authority is still checked first; another actor/resource or intent purpose cannot
+reuse that operation. A concurrent identical reservation wins once. New operations
+cannot silently replace active work, and failed transactions leave no partial
+queue/audit state. This is queue admission, not check publication or approval.
+
+Invalidation admission, stale-operation resolution/recovery and worker execution
+remain open. Neither storage nor evaluation admission is runtime publication or
+native enforcement. App configuration and native rule verification also remain
+to be exposed to the authorized administrator.
 
 Fenced check publication/reconciliation, native rule verification and serialized
 merge still require implementation. Until those are connected, no runtime

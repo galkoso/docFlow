@@ -1,0 +1,113 @@
+use super::*;
+use specspace_application::{
+    comparison_reader::RepositoryBinding,
+    review_check_publication::{CheckPublicationIntent, CheckPublicationSource, CheckPurpose},
+};
+use specspace_domain::BranchName;
+use specspace_git_adapter::checks::CheckResult;
+use sqlx::FromRow;
+
+#[derive(FromRow)]
+struct Frozen {
+    operation_id: Uuid,
+    job_id: Uuid,
+    organization_id: Uuid,
+    proposal_id: Uuid,
+    repository_id: Uuid,
+    actor_id: Uuid,
+    snapshot_id: Uuid,
+    remote_id: i64,
+    installation_id: i64,
+    app_id: i64,
+    branch: String,
+    head_sha: String,
+    target_sha: String,
+    merge_base_sha: String,
+    proposal_version: i64,
+    configuration_version: i64,
+    policy_version: i64,
+    fingerprint: String,
+    evidence_digest: String,
+    authority_digest: String,
+    request_hash: String,
+    purpose: String,
+    result: String,
+    report_digest: Option<String>,
+}
+pub(super) fn result(result: CheckResult) -> &'static str {
+    match result {
+        CheckResult::Pending => "PENDING",
+        CheckResult::Failure => "FAILURE",
+        CheckResult::Success => "SUCCESS",
+    }
+}
+pub(super) async fn evaluation(
+    conn: &mut PgConnection,
+    org: Uuid,
+    actor: Uuid,
+    proposal: Uuid,
+    snapshot: Uuid,
+    operation: Uuid,
+) -> Result<Option<CheckReservation>, CheckStoreError> {
+    let Some(row) = sqlx::query_as::<_, Frozen>(
+        "SELECT * FROM review_check_intents WHERE organization_id=$1 AND operation_id=$2",
+    )
+    .bind(org)
+    .bind(operation)
+    .fetch_optional(conn)
+    .await?
+    else {
+        return Ok(None);
+    };
+    if row.actor_id != actor
+        || row.proposal_id != proposal
+        || row.snapshot_id != snapshot
+        || row.purpose != "EVALUATION"
+    {
+        return Err(CheckStoreError::IdempotencyMismatch);
+    }
+    let invalid = || CheckStoreError::InvalidRecord;
+    let source = CheckPublicationSource {
+        organization: row.organization_id,
+        actor: row.actor_id,
+        proposal: row.proposal_id,
+        operation: row.operation_id,
+        snapshot: row.snapshot_id,
+        repository: RepositoryBinding {
+            repository: row.repository_id,
+            remote_id: u64::try_from(row.remote_id).map_err(|_| invalid())?,
+            installation_id: u64::try_from(row.installation_id).map_err(|_| invalid())?,
+        },
+        app_id: u64::try_from(row.app_id).map_err(|_| invalid())?,
+        branch: BranchName::parse(row.branch).map_err(|_| invalid())?,
+        head: CommitSha::parse(row.head_sha).map_err(|_| invalid())?,
+        target: CommitSha::parse(row.target_sha).map_err(|_| invalid())?,
+        merge_base: CommitSha::parse(row.merge_base_sha).map_err(|_| invalid())?,
+        proposal_version: row.proposal_version,
+        configuration_version: row.configuration_version,
+        policy_version: row.policy_version,
+        fingerprint: row.fingerprint,
+        evidence_digest: row.evidence_digest,
+        authority_digest: row.authority_digest,
+    };
+    let result = match row.result.as_str() {
+        "PENDING" => CheckResult::Pending,
+        "FAILURE" => CheckResult::Failure,
+        "SUCCESS" => CheckResult::Success,
+        _ => return Err(invalid()),
+    };
+    let intent = CheckPublicationIntent::restore(
+        source,
+        CheckPurpose::Evaluation {
+            report_digest: row.report_digest.ok_or_else(invalid)?,
+        },
+        result,
+        &row.request_hash,
+    )
+    .map_err(|_| invalid())?;
+    Ok(Some(CheckReservation {
+        job_id: row.job_id,
+        replayed: true,
+        intent,
+    }))
+}

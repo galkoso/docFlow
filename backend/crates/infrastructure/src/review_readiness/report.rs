@@ -1,5 +1,6 @@
 use super::*;
-use serde_json::Value;
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use specspace_application::comparison_reader::ReadContext;
 use specspace_application::{
     review_configuration::ReviewArea,
@@ -29,15 +30,21 @@ pub struct PgReviewReadiness {
     pool: PgPool,
     pub(super) fresh_loads: Arc<Semaphore>,
 }
-pub(super) struct CapturedReadiness {
+pub(crate) struct CapturedReadiness {
     pub report: ReviewReadiness,
     pub context: Option<ReadContext>,
     pub merge_base: String,
+    pub evidence_digest: String,
+    pub authority_digest: String,
+    pub app_id: Option<i64>,
+    pub publication_authorized: bool,
 }
 
 #[derive(FromRow)]
 struct Header {
     fingerprint: String,
+    evidence_digest: String,
+    app_id: Option<i64>,
     plan_fingerprint: String,
     head_sha: String,
     target_sha: String,
@@ -188,7 +195,7 @@ impl PgReviewReadiness {
         Ok(self.capture(actor, proposal, snapshot, false).await?.report)
     }
 
-    pub(super) async fn capture(
+    pub(crate) async fn capture(
         &self,
         actor: Uuid,
         proposal: Uuid,
@@ -208,14 +215,30 @@ impl PgReviewReadiness {
         sqlx::query("SET LOCAL statement_timeout='10s'")
             .execute(&mut *tx)
             .await?;
-        let org = crate::review_snapshots::read_access(&mut tx, actor, proposal)
+        let captured =
+            Self::capture_in(&mut tx, actor, proposal, snapshot, with_context, false).await?;
+        tx.commit().await?;
+        Ok(captured)
+    }
+
+    /// The caller owns a consistent transaction. Locked publication captures
+    /// hold current reviewer/actor authority while reserving work, never over IO.
+    pub(crate) async fn capture_in(
+        conn: &mut PgConnection,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        with_context: bool,
+        lock_authority: bool,
+    ) -> Result<CapturedReadiness, ReadinessError> {
+        let org = crate::review_snapshots::read_access(&mut *conn, actor, proposal)
             .await
             .map_err(|e| match e {
                 crate::review_submissions::SubmissionError::NotFound => ReadinessError::NotFound,
                 _ => ReadinessError::Unavailable,
             })?;
         let h = sqlx::query_as::<_, Header>(
-            "SELECT h.fingerprint,h.plan_fingerprint,h.head_sha,h.target_sha,h.recorded_base_sha,h.merge_base_sha,h.repository_id,h.branch,
+            "SELECT h.fingerprint,h.evidence_digest,r.check_app_id AS app_id,h.plan_fingerprint,h.head_sha,h.target_sha,h.recorded_base_sha,h.merge_base_sha,h.repository_id,h.branch,
                h.policy_version,h.configuration_version,h.metadata,h.file_count,h.media_count,h.media_validation_version,
                (SELECT count(*) FROM review_snapshot_files f WHERE f.organization_id=h.organization_id AND f.proposal_id=h.proposal_id AND f.snapshot_id=h.id) AS actual_files,
                (SELECT count(*) FROM review_snapshot_media m WHERE m.organization_id=h.organization_id AND m.proposal_id=h.proposal_id AND m.snapshot_id=h.id) AS actual_media,
@@ -223,18 +246,23 @@ impl PgReviewReadiness {
                pr_sync_snapshot_current(h.organization_id,h.proposal_id,h.id) AS current
              FROM review_snapshots h JOIN proposals p ON p.organization_id=h.organization_id AND p.id=h.proposal_id
              JOIN organizations o ON o.id=p.organization_id
+             JOIN repositories r ON r.id=p.repository_id AND r.organization_id=p.organization_id
              WHERE h.organization_id=$1 AND h.proposal_id=$2 AND h.id=$3 AND h.state='READY'"
-        ).bind(org).bind(proposal).bind(snapshot).fetch_optional(&mut *tx).await?.ok_or(ReadinessError::NotFound)?;
+        ).bind(org).bind(proposal).bind(snapshot).fetch_optional(&mut *conn).await?.ok_or(ReadinessError::NotFound)?;
         let context = if with_context {
-            let context =
-                crate::comparison_authorization::context_in(&mut tx, actor, proposal, false)
-                    .await
-                    .map_err(|e| match e {
-                        specspace_application::comparison_reader::ComparisonReadError::NotFound => {
-                            ReadinessError::NotFound
-                        }
-                        _ => ReadinessError::Unavailable,
-                    })?;
+            let context = crate::comparison_authorization::context_in(
+                &mut *conn,
+                actor,
+                proposal,
+                lock_authority,
+            )
+            .await
+            .map_err(|e| match e {
+                specspace_application::comparison_reader::ComparisonReadError::NotFound => {
+                    ReadinessError::NotFound
+                }
+                _ => ReadinessError::Unavailable,
+            })?;
             if context.organization != org
                 || context.connection.repository != h.repository_id
                 || context.branch.as_str() != h.branch
@@ -246,9 +274,26 @@ impl PgReviewReadiness {
             None
         };
         let m = metadata(&h, proposal)?;
-        let ids: Vec<_> = m.assignments.iter().map(|a| a.reviewer_id).collect();
-        let members = sqlx::query_as::<_, Member>("SELECT m.user_id,u.status='ACTIVE' AS active,m.role,m.review_domains FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.organization_id=$1 AND m.user_id=ANY($2) ORDER BY m.user_id")
-            .bind(org).bind(ids).fetch_all(&mut *tx).await?.into_iter().map(|m| member(m, org)).collect::<Result<Vec<_>, _>>()?;
+        let mut ids: Vec<_> = m.assignments.iter().map(|a| a.reviewer_id).collect();
+        if with_context {
+            ids.push(actor);
+        }
+        ids.sort();
+        ids.dedup();
+        let member_sql = "SELECT m.user_id,u.status='ACTIVE' AS active,m.role,m.review_domains FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.organization_id=$1 AND m.user_id=ANY($2) ORDER BY m.user_id";
+        let member_sql = if lock_authority {
+            format!("{member_sql} FOR SHARE OF m,u")
+        } else {
+            member_sql.into()
+        };
+        let members = sqlx::query_as::<_, Member>(&member_sql)
+            .bind(org)
+            .bind(ids)
+            .fetch_all(&mut *conn)
+            .await?
+            .into_iter()
+            .map(|m| member(m, org))
+            .collect::<Result<Vec<_>, _>>()?;
         let assignments: Vec<_> = m
             .assignments
             .iter()
@@ -266,7 +311,7 @@ impl PgReviewReadiness {
                 domain: domain(a.domain),
             })
             .collect();
-        let decisions = super::decisions::read(&mut tx, org, proposal, snapshot).await?;
+        let decisions = super::decisions::read(&mut *conn, org, proposal, snapshot).await?;
         let reviews: Vec<_> = decisions
             .iter()
             .filter_map(|d| d.policy_review(snapshot))
@@ -324,10 +369,10 @@ impl PgReviewReadiness {
             content_validation: content,
             media_validation: media,
             section_coverage: coverage(decisions.iter().filter_map(|d| d.positive_coverage())),
-            blocking_threads_resolved: super::discussions(&mut tx, org, proposal)
+            blocking_threads_resolved: super::discussions(&mut *conn, org, proposal)
                 .await?
                 .verification(),
-            blocking_questions_resolved: super::questions(&mut tx, org, proposal)
+            blocking_questions_resolved: super::questions(&mut *conn, org, proposal)
                 .await?
                 .verification(),
         });
@@ -341,12 +386,104 @@ impl PgReviewReadiness {
         }
         let now: sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc> =
             sqlx::query_scalar("SELECT clock_timestamp()")
-                .fetch_one(&mut *tx)
+                .fetch_one(&mut *conn)
                 .await?;
-        tx.commit().await?;
+        let publication_authorized = members
+            .iter()
+            .any(|m| m.user_id == actor && m.active && m.role != Role::Reader);
+        let authority_digest = if with_context {
+            let counts: Value = sqlx::query_scalar("SELECT jsonb_build_array(
+                (SELECT count(*) FROM discussion_threads WHERE organization_id=$1 AND proposal_id=$2),
+                (SELECT count(*) FROM discussion_revisions WHERE organization_id=$1 AND proposal_id=$2),
+                (SELECT count(*) FROM product_questions WHERE organization_id=$1 AND proposal_id=$2),
+                (SELECT count(*) FROM product_question_revisions WHERE organization_id=$1 AND proposal_id=$2),
+                (SELECT count(*) FROM official_reviews WHERE organization_id=$1 AND proposal_id=$2 AND snapshot_id=$3),
+                (SELECT count(*) FROM review_unit_approvals WHERE organization_id=$1 AND proposal_id=$2 AND snapshot_id=$3),
+                (SELECT count(*) FROM review_source_visits v JOIN review_source_deliveries d ON d.id=v.delivery_id
+                  JOIN review_source_attempts a ON a.id=d.attempt_id WHERE a.organization_id=$1 AND v.organization_id=a.organization_id AND a.proposal_id=$2 AND a.snapshot_id=$3))")
+                .bind(org).bind(proposal).bind(snapshot).fetch_one(&mut *conn).await?;
+            let members: Vec<_> = members
+                .iter()
+                .map(|m| {
+                    json!([
+                        m.organization_id,
+                        m.user_id,
+                        m.active,
+                        format!("{:?}", m.role),
+                        format!("{:?}", m.review_domains)
+                    ])
+                })
+                .collect();
+            let decisions: Vec<_> = decisions.iter().map(|d| d.proof()).collect();
+            let context_proof = context.as_ref().map(|c| {
+                json!([
+                    c.actor,
+                    c.organization,
+                    c.proposal,
+                    c.connection.repository,
+                    c.connection.remote_id.to_string(),
+                    c.connection.installation_id.to_string(),
+                    c.branch.as_str(),
+                    c.recorded_head.as_str(),
+                    c.recorded_base.as_str(),
+                    c.version.to_string(),
+                    c.state
+                ])
+            });
+            let evaluation = json!([
+                format!("{:?}", evaluation.conclusion),
+                evaluation
+                    .issues
+                    .iter()
+                    .map(|i| json!([
+                        format!("{:?}", i.gate),
+                        format!("{:?}", i.conclusion),
+                        i.code
+                    ]))
+                    .collect::<Vec<_>>()
+            ]);
+            format!(
+                "{:x}",
+                Sha256::digest(
+                    serde_json::to_vec(&json!([
+                        "specspace-check-authority-v1",
+                        context_proof,
+                        h.app_id,
+                        h.fingerprint,
+                        h.evidence_digest,
+                        h.head_sha,
+                        h.target_sha,
+                        h.merge_base_sha,
+                        h.recorded_base_sha,
+                        h.policy_version,
+                        h.configuration_version,
+                        h.author_id,
+                        h.current_policy,
+                        h.current_head,
+                        h.current_target,
+                        h.state,
+                        h.current,
+                        h.actual_files,
+                        h.actual_media,
+                        members,
+                        decisions,
+                        counts,
+                        evaluation
+                    ]))
+                    .map_err(|_| ReadinessError::Unavailable)?
+                )
+            )
+        } else {
+            String::new()
+        };
+
         Ok(CapturedReadiness {
             context,
             merge_base: h.merge_base_sha,
+            evidence_digest: h.evidence_digest,
+            authority_digest,
+            app_id: h.app_id,
+            publication_authorized,
             report: ReviewReadiness {
                 actor_id: actor,
                 proposal_id: proposal,

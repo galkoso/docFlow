@@ -197,7 +197,7 @@ async fn readiness_counts_outdated_blocking_threads_until_explicit_resolution(po
     assert!(!issue(&resolved, G::BlockingThreads));
     assert_eq!(resolved.evaluation.conclusion, C::Failure);
 }
-async fn pair(pool: &PgPool, f: &Fixture, h: Uuid, fp: &str, factory: &Factory) {
+pub(super) async fn pair(pool: &PgPool, f: &Fixture, h: Uuid, fp: &str, factory: &Factory) {
     let service = PgOfficialReviews::new(pool.clone());
     for (actor, area) in [
         (f.product, ReviewArea::Product),

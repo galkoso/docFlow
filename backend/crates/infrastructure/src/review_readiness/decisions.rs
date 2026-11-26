@@ -14,6 +14,17 @@ pub(crate) struct EffectiveDecision {
     coverage: Verification,
 }
 impl EffectiveDecision {
+    pub(super) fn proof(&self) -> serde_json::Value {
+        serde_json::json!([
+            self.id,
+            self.reviewer,
+            format!("{:?}", self.domain),
+            format!("{:?}", self.decision),
+            self.eligible,
+            format!("{:?}", self.coverage)
+        ])
+    }
+
     pub fn policy_review(&self, snapshot: Uuid) -> Option<specspace_domain::policy::Review> {
         use specspace_domain::policy::{Decision, Review};
         if !self.validates_entry(self.id, self.reviewer, self.domain, self.decision) {

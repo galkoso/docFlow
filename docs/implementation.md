@@ -2745,3 +2745,26 @@ Checkboxes represent verified work only.
   administrator setup/native enforcement, final APPROVED/merge and the remaining
   full specification stay open. Schema availability alone grants no publication
   or merge authority.
+
+- Evaluation admission for required checks: added `PgReviewChecks` to resolve
+  current server scope, read exact provider refs, capture consistent readiness
+  and atomically reserve the canonical operation/job/intent/audit/outbox. A private
+  evidence digest binds actor/reviewer qualifications, effective decisions and
+  coverage, App/connection settings, immutable snapshot facts and append counters
+  for questions/discussions/reviews/coverage. Final locked rechecks reject changes
+  even when visible policy issues are identical. Provider IO holds no transaction.
+  Current action authority precedes exact replay; replay restores the original
+  intent/job without another Git read or quota charge, including after closure.
+  Identical concurrent calls win once; new operations respect the active lane
+  and serialized actor/organization admission quotas. Seven PostgreSQL scenarios
+  verify real pending/success inputs without votes or publication, scope/role/App
+  and provider failures, rollback/retry, concurrent replay, role loss during IO,
+  final-boundary qualification changes and distinct question revision evidence
+  under equal conclusions. All 814 backend tests pass with the same two ignored
+  performance tests; workspace Clippy with warnings denied, formatting and all
+  runtime binary builds pass. The OpenAPI export is unchanged and the existing
+  local API remains ready.
+  Stored readiness and HTTP types remain unchanged. Invalidation admission,
+  lease/write/reconciliation service, recovery/supersession, runtime worker/native
+  enforcement, final APPROVED/merge and the remaining full specification stay
+  open. A reservation is not a published check or merge permission.

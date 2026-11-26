@@ -7,6 +7,7 @@ pub(crate) mod decisions;
 mod fresh;
 mod report;
 pub use fresh::FreshReadinessError;
+pub(crate) use report::CapturedReadiness;
 pub use report::{PgReviewReadiness, ReadinessError};
 
 #[derive(FromRow)]

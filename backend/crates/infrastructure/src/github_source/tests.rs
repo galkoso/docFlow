@@ -68,6 +68,10 @@ async fn malformed_frozen_binding_fails_without_database_or_provider_access() {
             source.provider_bound(&binding).await,
             Err(ComparisonReadError::ContextChanged)
         ));
+        assert!(matches!(
+            source.check_provider_bound(&binding).await,
+            Err(CheckProviderError::BindingChanged)
+        ));
     }
 }
 
@@ -94,6 +98,12 @@ async fn frozen_binding_is_rechecked_before_credential_selection(pool: PgPool) {
         source.pr_provider_bound(&binding).await,
         Err(PrProviderError::Source(BookError::RepositoryNotConfigured))
     ));
+    assert!(matches!(
+        source.check_provider_bound(&binding).await,
+        Err(CheckProviderError::Source(
+            BookError::RepositoryNotConfigured
+        ))
+    ));
     for (remote, installation, branch) in [
         ("43", "7", "main"),
         ("42", "8", "main"),
@@ -117,6 +127,10 @@ async fn frozen_binding_is_rechecked_before_credential_selection(pool: PgPool) {
             source.provider_bound(&binding).await,
             Err(ComparisonReadError::ContextChanged)
         ));
+        assert!(matches!(
+            source.check_provider_bound(&binding).await,
+            Err(CheckProviderError::BindingChanged)
+        ));
     }
     sqlx::query("DELETE FROM repositories WHERE id=$1")
         .bind(repository)
@@ -126,5 +140,9 @@ async fn frozen_binding_is_rechecked_before_credential_selection(pool: PgPool) {
     assert!(matches!(
         source.pr_provider_bound(&binding).await,
         Err(PrProviderError::Source(BookError::NotFound))
+    ));
+    assert!(matches!(
+        source.check_provider_bound(&binding).await,
+        Err(CheckProviderError::Source(BookError::NotFound))
     ));
 }

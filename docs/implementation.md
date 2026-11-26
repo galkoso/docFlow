@@ -2707,3 +2707,21 @@ Checkboxes represent verified work only.
   invocation passes. No HTTP, migration or frontend behavior changed. Durable
   worker publication/reconciliation, native required-check enforcement, final
   APPROVED/merge and the remaining full specification stay open.
+
+- Check publication/revocation intent contract: added immutable scoped intents
+  whose canonical hashes bind all identities, numeric connection/App settings,
+  refs, versions, evidence/authority proofs, result and readiness report. Only
+  consistent provider-verified reports create evaluation intents. Restoration
+  rejects substitutions, while explicit revocation targets the original run and
+  provider operation under a distinct new journal operation and can only fail it.
+  Recovery requires exact create/update phase evidence and complete bounded
+  discovery; absence after a started write never creates another POST. Duplicate,
+  foreign, premature or oversized provider evidence cannot prove completion.
+  The dedicated check-provider factory now uses the existing frozen numeric
+  token-selection path, with malformed/moved/deleted repository and missing-key
+  cases verified without unsafe provider fallback. Nine application contract
+  cases cover these behaviors. All 337 workspace library tests pass; workspace
+  Clippy with warnings denied and formatting pass. There is no persistence or
+  runtime publisher yet: database journal/fencing, worker reconciliation, native
+  enforcement, final APPROVED/merge and the remaining full specification remain
+  open. No migration, HTTP contract or frontend behavior changed in this stage.

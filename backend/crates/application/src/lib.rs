@@ -14,6 +14,7 @@ pub mod comparison_reader;
 
 pub mod official_review;
 pub mod review;
+pub mod review_check_publication;
 pub mod review_configuration;
 pub mod review_context;
 pub mod review_pr_status;

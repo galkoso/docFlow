@@ -55,6 +55,31 @@ enter check output.
 
 The REST contract was checked against the
 [GitHub Checks API documentation](https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10).
+
+`CheckPublicationIntent` now freezes the actor/organization/proposal/snapshot,
+numeric repository/installation/App identity, branch and exact refs, versions,
+snapshot/evidence/authority digests, desired result and whole readiness-report
+digest into a canonical request hash. Evaluation intents require consistent
+provider-verified report identities and conclusions; the stored HTTP report
+cannot produce one. Restore checks the complete hash rather than silently
+rebuilding a changed request. These constructors do not grant publication
+authority or prove that the evidence remains current.
+
+Recovery decisions require complete bounded discovery and exact phase evidence.
+An unknown create is never repeated on apparent absence; discovered pending runs
+can be adopted only after the create-start record. A completion receipt requires
+the exact update-start record and run/operation identity. Duplicate operations,
+substituted runs and oversized discovery sets stop recovery. Other evaluations
+of the same head do not prove that this operation succeeded.
+
+Invalidation has a new journal operation but targets the exact original check
+run and its original provider operation ID. It can only publish failure and
+never creates a replacement run or depends on old approval evidence. The frozen
+reason and target participate in the intent hash. A dedicated check-provider
+factory now uses the existing frozen numeric connection/token selection path;
+it preserves binding-change, missing-setup and source failures without giving a
+content reader mutation authority.
+
 Fenced check publication/reconciliation, native rule verification and serialized
 merge still require implementation. Until those are connected, no runtime
 required check is advertised as enforcing this policy.

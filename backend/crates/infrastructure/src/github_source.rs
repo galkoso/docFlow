@@ -4,9 +4,11 @@ use specspace_application::{
     comparison_reader::{BoundProviderFactory, ComparisonReadError, RepositoryBinding},
     pr_sync::{PrProviderError, PrProviderFactory},
     reader::BookProviderFactory,
+    review_check_publication::{CheckProviderError, CheckProviderFactory},
 };
 use specspace_git_adapter::{
-    GitProvider, app_auth::GitHubAppKey, github::GitHub, pull_requests::PullRequestProvider,
+    GitProvider, app_auth::GitHubAppKey, checks::ReviewCheckProvider, github::GitHub,
+    pull_requests::PullRequestProvider,
 };
 use sqlx::{FromRow, PgPool};
 use std::{
@@ -185,6 +187,23 @@ impl PrProviderFactory for PgGitHubSource {
         binding: &RepositoryBinding,
     ) -> Result<Arc<dyn PullRequestProvider>, PrProviderError> {
         let provider = self.connect_bound(binding).await?;
+        Ok(provider)
+    }
+}
+
+#[async_trait]
+impl CheckProviderFactory for PgGitHubSource {
+    async fn check_provider_bound(
+        &self,
+        binding: &RepositoryBinding,
+    ) -> Result<Arc<dyn ReviewCheckProvider>, CheckProviderError> {
+        let provider = self
+            .connect_bound(binding)
+            .await
+            .map_err(|error| match error {
+                PrProviderError::BindingChanged => CheckProviderError::BindingChanged,
+                PrProviderError::Source(error) => CheckProviderError::Source(error),
+            })?;
         Ok(provider)
     }
 }

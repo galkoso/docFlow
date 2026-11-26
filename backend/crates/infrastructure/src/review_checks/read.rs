@@ -1,10 +1,12 @@
 use super::*;
 use specspace_application::{
     comparison_reader::RepositoryBinding,
-    review_check_publication::{CheckPublicationIntent, CheckPublicationSource, CheckPurpose},
+    review_check_publication::{
+        CheckInvalidation, CheckPublicationIntent, CheckPublicationSource, CheckPurpose,
+    },
 };
 use specspace_domain::BranchName;
-use specspace_git_adapter::checks::CheckResult;
+use specspace_git_adapter::checks::{CheckResult, CheckRunId};
 use sqlx::FromRow;
 
 #[derive(FromRow)]
@@ -33,6 +35,9 @@ struct Frozen {
     purpose: String,
     result: String,
     report_digest: Option<String>,
+    invalidation_reason: Option<String>,
+    target_run_id: Option<i64>,
+    target_operation: Option<Uuid>,
 }
 pub(super) fn result(result: CheckResult) -> &'static str {
     match result {
@@ -49,6 +54,24 @@ pub(super) async fn evaluation(
     snapshot: Uuid,
     operation: Uuid,
 ) -> Result<Option<CheckReservation>, CheckStoreError> {
+    let Some(receipt) = load(conn, org, operation).await? else {
+        return Ok(None);
+    };
+    let source = receipt.intent.source();
+    if source.actor != actor
+        || source.proposal != proposal
+        || source.snapshot != snapshot
+        || !matches!(receipt.intent.purpose(), CheckPurpose::Evaluation { .. })
+    {
+        return Err(CheckStoreError::IdempotencyMismatch);
+    }
+    Ok(Some(receipt))
+}
+pub(super) async fn load(
+    conn: &mut PgConnection,
+    org: Uuid,
+    operation: Uuid,
+) -> Result<Option<CheckReservation>, CheckStoreError> {
     let Some(row) = sqlx::query_as::<_, Frozen>(
         "SELECT * FROM review_check_intents WHERE organization_id=$1 AND operation_id=$2",
     )
@@ -59,13 +82,6 @@ pub(super) async fn evaluation(
     else {
         return Ok(None);
     };
-    if row.actor_id != actor
-        || row.proposal_id != proposal
-        || row.snapshot_id != snapshot
-        || row.purpose != "EVALUATION"
-    {
-        return Err(CheckStoreError::IdempotencyMismatch);
-    }
     let invalid = || CheckStoreError::InvalidRecord;
     let source = CheckPublicationSource {
         organization: row.organization_id,
@@ -96,15 +112,40 @@ pub(super) async fn evaluation(
         "SUCCESS" => CheckResult::Success,
         _ => return Err(invalid()),
     };
-    let intent = CheckPublicationIntent::restore(
-        source,
-        CheckPurpose::Evaluation {
-            report_digest: row.report_digest.ok_or_else(invalid)?,
-        },
-        result,
-        &row.request_hash,
-    )
-    .map_err(|_| invalid())?;
+    let purpose = match row.purpose.as_str() {
+        "EVALUATION"
+            if row.invalidation_reason.is_none()
+                && row.target_run_id.is_none()
+                && row.target_operation.is_none() =>
+        {
+            CheckPurpose::Evaluation {
+                report_digest: row.report_digest.ok_or_else(invalid)?,
+            }
+        }
+        "INVALIDATION" if row.report_digest.is_none() => {
+            let reason = match row.invalidation_reason.as_deref() {
+                Some("HEAD_CHANGED") => CheckInvalidation::HeadChanged,
+                Some("TARGET_CHANGED") => CheckInvalidation::TargetChanged,
+                Some("POLICY_CHANGED") => CheckInvalidation::PolicyChanged,
+                Some("AUTHORITY_CHANGED") => CheckInvalidation::AuthorityChanged,
+                Some("SNAPSHOT_CHANGED") => CheckInvalidation::SnapshotChanged,
+                Some("BLOCKERS_CHANGED") => CheckInvalidation::BlockersChanged,
+                Some("SUPERSEDED") => CheckInvalidation::Superseded,
+                _ => return Err(invalid()),
+            };
+            CheckPurpose::Invalidation {
+                reason,
+                run: CheckRunId::new(
+                    u64::try_from(row.target_run_id.ok_or_else(invalid)?).map_err(|_| invalid())?,
+                )
+                .map_err(|_| invalid())?,
+                check_operation: row.target_operation.ok_or_else(invalid)?,
+            }
+        }
+        _ => return Err(invalid()),
+    };
+    let intent = CheckPublicationIntent::restore(source, purpose, result, &row.request_hash)
+        .map_err(|_| invalid())?;
     Ok(Some(CheckReservation {
         job_id: row.job_id,
         replayed: true,

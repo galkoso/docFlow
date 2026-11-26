@@ -6,6 +6,8 @@ use specspace_application::{
 use specspace_infrastructure::official_reviews::{OfficialReviewError, PgOfficialReviews};
 #[path = "official_reviews/check_admission.rs"]
 mod check_admission;
+#[path = "official_reviews/check_execution.rs"]
+mod check_execution;
 #[path = "official_reviews/check_journal.rs"]
 mod check_journal;
 #[path = "official_reviews/readiness.rs"]

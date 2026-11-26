@@ -12,7 +12,9 @@ use specspace_git_adapter::CommitSha;
 use sqlx::{PgConnection, PgPool};
 use std::sync::Arc;
 use uuid::Uuid;
+mod journal;
 mod read;
+pub use journal::{CheckLease, CheckObservation};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum CheckStoreError {
@@ -25,6 +27,10 @@ pub enum CheckStoreError {
     Quota,
     IdempotencyMismatch,
     InvalidRecord,
+    LeaseLost,
+    WriteAlreadyStarted,
+    InvalidReceipt,
+    Cooldown(u32),
     Fresh(FreshReadinessError),
     Unavailable,
 }
@@ -114,6 +120,16 @@ impl PgReviewChecks {
         }
         available(&initial)?;
         admission_limits(&mut conn, org, actor, proposal, operation).await?;
+        journal::connection_cooldown(
+            &mut conn,
+            org,
+            &initial
+                .context
+                .as_ref()
+                .ok_or(CheckStoreError::InvalidRecord)?
+                .connection,
+        )
+        .await?;
         drop(conn);
 
         let fresh = self
@@ -166,6 +182,7 @@ impl PgReviewChecks {
             return Err(CheckStoreError::Stale);
         }
         admission_limits(&mut tx, org, actor, proposal, operation).await?;
+        journal::connection_cooldown(&mut tx, org, &intent.source().repository).await?;
         let job_id = Uuid::new_v4();
         let audit = Uuid::new_v4();
         let event = Uuid::new_v4();

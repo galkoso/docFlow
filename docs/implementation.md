@@ -2768,3 +2768,24 @@ Checkboxes represent verified work only.
   lease/write/reconciliation service, recovery/supersession, runtime worker/native
   enforcement, final APPROVED/merge and the remaining full specification stay
   open. A reservation is not a published check or merge permission.
+
+- Leased check-journal execution: added dedicated claim/reclaim, renewal, phase
+  observation, fresh-policy/ref checks, single-use CREATE/UPDATE start markers,
+  known-run adoption, atomic completion and retry/exhaustion handling. Every
+  mutation/result checks current authority and the owner/attempt/deadline fence;
+  known identities remain recordable after revocation without permitting another
+  write. Complete bounded observations reject duplicate/substituted runs. An
+  exact committed receipt can be observed again by its original completing frame
+  without another Git call; stale attempts and damaged binding/phase chains are
+  rejected. Started effects remain UNKNOWN through deferral/exhaustion and are
+  never rearmed. Persistent connection cooldown is separate from job retry and
+  also prevents new admission reads. Nine PostgreSQL scenarios with typed provider
+  observations verify these boundaries, including same-owner reclaim, role/ref/
+  question-proof changes, cooldown, exhaustion, audit rollback and receipt replay.
+  All 823 backend tests pass with the same two performance tests ignored;
+  workspace Clippy with warnings denied, formatting and all runtime binary builds
+  pass. The OpenAPI export remains unchanged and the existing local API is ready.
+  No Check Run HTTP mutation is issued by these primitives and no proposal is
+  approved or merged. HTTP worker/dispatcher integration, invalidation admission,
+  recovery/supersession, administrator/native enforcement, final APPROVED/merge
+  and the remaining full specification stay open.

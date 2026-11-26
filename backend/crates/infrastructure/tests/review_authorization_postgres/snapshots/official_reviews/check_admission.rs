@@ -5,7 +5,7 @@ use specspace_infrastructure::{
     review_readiness::PgReviewReadiness,
 };
 
-async fn prepared(
+pub(super) async fn prepared(
     pool: &PgPool,
     approved: bool,
 ) -> (Fixture, Arc<Source>, Uuid, Arc<PgReviewChecks>) {

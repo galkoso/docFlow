@@ -126,10 +126,34 @@ reuse that operation. A concurrent identical reservation wins once. New operatio
 cannot silently replace active work, and failed transactions leave no partial
 queue/audit state. This is queue admission, not check publication or approval.
 
-Invalidation admission, stale-operation resolution/recovery and worker execution
-remain open. Neither storage nor evaluation admission is runtime publication or
-native enforcement. App configuration and native rule verification also remain
-to be exposed to the authorized administrator.
+The execution journal now claims and renews dedicated owner/attempt leases,
+reclaims expired work, derives phases from immutable markers/bindings, and stops
+automatic attempts at exhaustion. `check`, `start_write` and `complete` verify
+fresh provider refs/policy outside a transaction and recheck current local facts
+and the live lease inside the short write transaction. The worker must supply
+complete bounded check discovery; reconciliation rejects duplicate/substituted
+runs, and each CREATE/UPDATE marker can be inserted only once. No Check Run HTTP
+mutation is sent by the journal itself.
+
+Known run identities can be adopted after authority loss, preserving evidence for
+reconciliation without allowing another mutation. A completion receipt requires
+the exact UPDATE phase, run, original provider operation and desired conclusion,
+plus current policy and lease. It atomically publishes the audit/outbox pair and
+job/operation result. The original completing frame can replay its committed
+receipt without another Git call; other attempts remain fenced out. Replay also
+validates the immutable run/phase chain instead of treating damaged bindings as
+absence. A receipt does not approve or merge the proposal.
+
+Deferral records a bounded content-free code and preserves a started operation as
+UNKNOWN, including after exhaustion. Retry timing never rearms a marker. Provider
+cooldown is stored for the exact organization/repository/remote/installation and
+is shared with other provider consumers; new admission/observation respects it.
+Heartbeats and fresh-policy operations must not race their own DB transactions.
+
+Invalidation admission, stale-operation resolution/administrator recovery and
+the Check Run HTTP worker/dispatcher remain open. Neither the journal nor
+evaluation admission is native enforcement. App configuration and native rule
+verification also remain to be exposed to the authorized administrator.
 
 Fenced check publication/reconciliation, native rule verification and serialized
 merge still require implementation. Until those are connected, no runtime

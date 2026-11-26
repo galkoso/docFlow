@@ -2789,3 +2789,24 @@ Checkboxes represent verified work only.
   approved or merged. HTTP worker/dispatcher integration, invalidation admission,
   recovery/supersession, administrator/native enforcement, final APPROVED/merge
   and the remaining full specification stay open.
+
+- Runtime Check Run publication: connected the bound provider capability to the
+  durable journal with a dedicated API worker. It exhausts bounded discovery,
+  reads the exact owned run, journals each write once, adopts creation receipts,
+  updates the frozen result and observes completion under fresh policy/ref and
+  lease fences. Lost responses resume through observation without duplicate POST
+  or PATCH. Provider IO renews leases; journal transactions never compete with
+  their own heartbeat. Shutdown preserves markers for fenced recovery. Fixed
+  error codes, bounded retries and shared persistent provider cooldown retain
+  uncertainty without exposing content. Ten PostgreSQL worker scenarios verify
+  pending/success publication without approving/merging, lost responses and
+  apparent absence, malformed/foreign/duplicate discovery, authority changes,
+  ref changes after writes, cooldown, shutdown and long-IO lease renewal.
+  All 833 backend tests pass with the same two performance tests ignored;
+  workspace Clippy with warnings denied, formatting and all runtime binary builds
+  pass. The OpenAPI export is unchanged and the existing local API remains ready.
+  `REVIEW_CHECK_WORKER_TIMEOUT_SECONDS` defaults to 120 (30–900 allowed).
+  Tests use validated provider doubles plus the existing local HTTP adapter
+  suite; real GitHub acceptance is still pending. Automatic dispatch/invalidation,
+  invalidation admission, recovery/supersession, administrator/native enforcement,
+  final APPROVED/merge and the remaining full specification stay open.

@@ -31,6 +31,7 @@ use specspace_application::draft::DraftRetention;
 use specspace_application::pr_sync::PrProviderFactory;
 use specspace_application::proposal_reader::ProposalReader;
 use specspace_application::reader::{BookProviderFactory, BookReader};
+use specspace_application::review_check_publication::CheckProviderFactory;
 use specspace_application::review_preparation::ReviewPreparer;
 use specspace_application::{
     comparison_file::ComparisonFileReader,
@@ -63,6 +64,10 @@ use specspace_infrastructure::{
     review_worker::ReviewWorker,
 };
 use specspace_infrastructure::{
+    review_check_worker::ReviewCheckWorker,
+    review_checks::{CheckStoreError, PgReviewChecks},
+};
+use specspace_infrastructure::{
     save_worker::SaveWorker,
     saves::{PgSaves, SaveJournalError},
 };
@@ -85,10 +90,12 @@ pub struct AppState {
     pub review_submissions: Arc<PgReviewSubmissions>,
     pub review_snapshots: Arc<PgReviewSnapshots>,
     pub pr_sync: Arc<PgPrSync>,
+    pub review_checks: Arc<PgReviewChecks>,
     pub official_reviews: Arc<specspace_infrastructure::official_reviews::PgOfficialReviews>,
     pub unit_approvals: Arc<specspace_infrastructure::unit_approvals::PgUnitApprovals>,
     pub discussions: Arc<specspace_infrastructure::discussions::PgDiscussions>,
     pr_source: Arc<dyn PrProviderFactory>,
+    check_source: Arc<dyn CheckProviderFactory>,
     bound_source: Arc<dyn BoundProviderFactory>,
     review_preparer: Arc<ReviewPreparer>,
     pub drafts: Arc<PgDrafts>,
@@ -157,6 +164,8 @@ impl AppState {
             review_submissions: Arc::new(PgReviewSubmissions::new(database.clone())),
             review_snapshots: Arc::new(PgReviewSnapshots::new(database.clone())),
             pr_sync: Arc::new(PgPrSync::new(database.clone())),
+            review_checks: Arc::new(PgReviewChecks::new(database.clone(), source.clone())),
+            check_source: source.clone(),
             official_reviews: Arc::new(
                 specspace_infrastructure::official_reviews::PgOfficialReviews::new(
                     database.clone(),
@@ -191,6 +200,7 @@ impl AppState {
             Some(Arc::new(key)),
         ));
         self.configure_pr_source(source.clone());
+        self.configure_check_source(source.clone());
         self.configure_comparison_source(source.clone());
         self.configure_book_source(source);
     }
@@ -199,6 +209,7 @@ impl AppState {
     /// an unbound book source is never silently reused for this capability.
     pub fn configure_comparison_source(&mut self, source: Arc<dyn BoundProviderFactory>) {
         self.bound_source = source.clone();
+        self.review_checks = Arc::new(PgReviewChecks::new(self.database.clone(), source.clone()));
         self.comparison_files = Arc::new(
             ComparisonFileReader::new(
                 self.comparison_jobs.clone(),
@@ -269,6 +280,19 @@ impl AppState {
             self.review_submissions.clone(),
             self.review_snapshots.clone(),
             self.review_preparer.clone(),
+            timeout,
+        )
+    }
+    pub fn configure_check_source(&mut self, source: Arc<dyn CheckProviderFactory>) {
+        self.check_source = source;
+    }
+    pub fn review_check_worker(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<ReviewCheckWorker, CheckStoreError> {
+        ReviewCheckWorker::new(
+            self.review_checks.clone(),
+            self.check_source.clone(),
             timeout,
         )
     }

@@ -10,6 +10,8 @@ mod check_admission;
 mod check_execution;
 #[path = "official_reviews/check_journal.rs"]
 mod check_journal;
+#[path = "official_reviews/check_worker.rs"]
+mod check_worker;
 #[path = "official_reviews/readiness.rs"]
 mod readiness;
 

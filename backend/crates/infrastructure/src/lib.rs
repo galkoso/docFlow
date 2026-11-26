@@ -20,6 +20,7 @@ mod provider_backoff;
 pub mod provisioning;
 mod review_approval_coverage;
 pub mod review_authorization;
+pub mod review_check_worker;
 pub mod review_checks;
 pub mod review_configuration;
 mod review_coverage;

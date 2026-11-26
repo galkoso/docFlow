@@ -190,6 +190,12 @@ automatic publication-event dispatch when `APP_PUBLIC_URL` is configured, with
 durable quota/access retries and audited stale/invalid outcomes. Recovery/status
 UI and required checks remain pending; see
 [PR synchronization](docs/pull-requests.md).
+Admitted review-policy check jobs now have a dedicated publisher in the API.
+`REVIEW_CHECK_WORKER_TIMEOUT_SECONDS` defaults to 120 (30–900 allowed).
+It journals each provider write and observes uncertain results without repeating
+mutations. Automatic dispatch/invalidation, native enforcement and merge remain
+open; see [review-policy checks](docs/review-checks.md).
+
 `/changes/:id/review/snapshots` offers explicit saved-version preflight and
 submission, private job observation, shared history and paged metadata/manifests.
 Uncertain writes retain their original actor/key/body; restored job URLs observe

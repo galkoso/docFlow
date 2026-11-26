@@ -150,11 +150,34 @@ cooldown is stored for the exact organization/repository/remote/installation and
 is shared with other provider consumers; new admission/observation respects it.
 Heartbeats and fresh-policy operations must not race their own DB transactions.
 
-Invalidation admission, stale-operation resolution/administrator recovery and
-the Check Run HTTP worker/dispatcher remain open. Neither the journal nor
-evaluation admission is native enforcement. App configuration and native rule
-verification also remain to be exposed to the authorized administrator.
+`ReviewCheckWorker` connects the execution journal to the configured bound check
+provider. One instance runs with the API. `REVIEW_CHECK_WORKER_TIMEOUT_SECONDS`
+defaults to 120 and accepts 30–900 seconds; each claim uses a 120-second lease.
+Provider IO renews it every 15 seconds. Journal operations renew at their boundaries
+and never run alongside their own heartbeat transaction. Shutdown cancels the
+attempt, preserving any start marker and lease for fenced recovery after expiry.
 
-Fenced check publication/reconciliation, native rule verification and serialized
-merge still require implementation. Until those are connected, no runtime
-required check is advertised as enforcing this policy.
+Every attempt restores the durable phase, exhausts bounded all-run discovery and
+reads the exact owned run before deciding. Counts must agree across pages, IDs and
+scope must be valid and unique, and discovery/read status must agree. Incomplete
+or changing evidence cannot authorize a create. The worker starts a pending run,
+adopts its exact receipt, updates once to the frozen result, then independently
+observes and records completion. Fresh policy and refs are checked at mutation
+and completion boundaries; the provider factory is reconnected before writes.
+No transaction spans Check Run IO.
+
+A lost create response resumes by observation and adoption; apparent absence never
+permits another POST. A lost update response resumes by observation without another
+PATCH. Permission or ref changes preserve known run identity while preventing
+further writes or stale publication receipts. Fixed error codes and bounded
+exponential retries preserve uncertainty; provider Retry-After also persists the
+shared connection cooldown, which prevents another provider read during the wait.
+Only UUIDs and typed outcomes enter worker logs. Private source or review text
+never enters check output or errors.
+
+Invalidation admission, automatic event dispatch, stale-operation resolution and
+administrator recovery remain open. App configuration and native rule verification
+also remain to be exposed to the authorized administrator. Runtime publishing of
+admitted jobs does not establish native enforcement, proposal approval or merge
+permission. Real GitHub integration acceptance, automatic invalidation and
+serialized merge still require implementation.

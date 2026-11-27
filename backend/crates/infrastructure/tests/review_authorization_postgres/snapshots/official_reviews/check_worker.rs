@@ -8,6 +8,8 @@ use specspace_infrastructure::{
     review_checks::PgReviewChecks,
 };
 
+#[path = "check_worker/dispatch.rs"]
+mod dispatch;
 #[path = "check_worker/invalidation.rs"]
 mod invalidation;
 #[path = "check_worker/recovery.rs"]

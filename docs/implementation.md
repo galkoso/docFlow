@@ -2917,3 +2917,27 @@ Checkboxes represent verified work only.
   keyboard, visual RTL and 320px acceptance remain unverified. Automatic
   invalidation, stale-operation resolution, native enforcement, final APPROVED/
   merge, real GitHub acceptance and the remaining full specification stay open.
+
+- Automatic check admission from saved review snapshots: migration 033 adds an
+  independent, durable per-event dispatcher with bounded owner/attempt leases,
+  retry deadlines, immutable source associations and exact audit receipts. One
+  dispatcher runs in the API. It verifies the canonical succeeded submission
+  provenance, then rechecks the original publisher's current authority, configured
+  App, private policy evidence, current refs, quotas and active lane. Provider
+  reads hold no database transaction or source-event lock. Source-bound check
+  admission and ENQUEUED acknowledgement commit together; a missing audit rolls
+  both back. PR delivery keeps its independent sent_at marker and either consumer
+  can run first. Invalid sources are quarantined, superseded snapshots skip, and
+  transient failures retain timed retries and shared provider cooldown. Expired
+  attempts can be reclaimed without granting stale owners admission authority;
+  shutdown preserves the lease for recovery. Eleven new PostgreSQL scenarios
+  cover these boundaries, including end-to-end publication through the existing
+  check worker without approving or merging a proposal. All 874 backend tests
+  pass with the same two performance tests ignored; workspace Clippy with
+  warnings denied, formatting, all runtime binary builds and exact OpenAPI
+  export comparison pass. Migration 033 is applied locally, its table/indexes
+  and ledger entry are verified, and migration reruns cleanly. The existing API
+  remains ready; it has not been restarted to load this new dispatcher. Subsequent review,
+  coverage and blocker events, automatic negative invalidation, stale-operation
+  resolution, native enforcement, final APPROVED/merge, real GitHub/OIDC acceptance
+  and the remaining full specification stay open.

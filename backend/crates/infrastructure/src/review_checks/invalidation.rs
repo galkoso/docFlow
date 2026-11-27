@@ -117,11 +117,12 @@ impl PgReviewChecks {
         })).map_err(|_|CheckStoreError::InvalidRecord)?));
         let intent = CheckPublicationIntent::invalidate(source, reason, run, target)
             .map_err(|_| CheckStoreError::InvalidRecord)?;
-        let job_id = reservation::reserve(&mut tx, &intent).await?;
+        let job_id = reservation::reserve(&mut tx, &intent, None).await?;
         tx.commit().await?;
         Ok(CheckReservation {
             job_id,
             replayed: false,
+            source_event: None,
             intent,
         })
     }

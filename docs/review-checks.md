@@ -1,7 +1,7 @@
 # Required review-policy calculation
 
-The domain evaluator in `specspace_domain::review_check` calculates the future
-`specspace/review-policy` required check from current trusted evidence. It does
+The domain evaluator in `specspace_domain::review_check` calculates the
+`specspace/review-policy` check from current trusted evidence. It does
 not publish provider checks, change proposal state or authorize merge.
 
 `Context` deliberately has no deserialization path. The server must obtain the
@@ -269,9 +269,42 @@ keyboard and narrow-screen use. DOM/router tests cover these controls and guards
 physical keyboard, visual RTL and 320px checks remain pending because browser
 selection and discovery found no connected browser.
 
-Automatic event dispatch/invalidation, stale-operation resolution, native rule
-verification and the remaining merge workflow remain open. App configuration and native rule verification
-also remain to be exposed to the authorized administrator. Runtime publishing of
-admitted jobs does not establish native enforcement, proposal approval or merge
-permission. Real GitHub integration acceptance, automatic invalidation and
-serialized merge still require implementation.
+Migration 033 and one `ReviewCheckDispatcher` in the API now deliver saved
+`REVIEW_SNAPSHOT_PUBLISHED` events into check evaluation automatically. The source
+must be backed by the real succeeded submission, job/result, ready snapshot and
+exact publication flags. The existing canonical publication verifier supplies the
+original publishing actor; event-owned IDs and flags grant no authority. Current
+actor access, configured App, metadata, private policy evidence, provider refs,
+admission quotas and the active check lane are rechecked by evaluation.
+
+Check delivery has an independent record and never consumes or resets the PR
+consumer's `outbox.sent_at`. Either consumer can run first, including for events
+already delivered to PR synchronization. A short claim transaction assigns a
+120-second owner/attempt lease. Evaluation has a 90-second deadline; provider
+reads hold no transaction, source-event lock or delivery lock. The final admission
+checks that same live fence and commits its source-bound intent/job/audit/outbox
+with the ENQUEUED delivery receipt/audit in one transaction. The source event UUID
+is the immutable check-operation identity. Manual evaluation retries cannot
+substitute for a dispatched source, and dispatched admission cannot silently
+adopt an unrelated intent.
+
+Delivery independently records WAITING, ENQUEUED, SKIPPED or REJECTED outcomes.
+Superseded backed snapshots skip before provider IO. Invalid envelopes are
+quarantined; missing setup/authority, an occupied lane, quota and provider problems
+retain a timed retry. Retry-After also persists shared connection cooldown for
+the frozen source connection. Claims increment attempts after expiry; old owners
+and old attempts cannot reserve work or rewrite terminal delivery. Shutdown leaves
+the read-only attempt reclaimable after expiry. Missing acknowledgement audit
+rolls back the check reservation. Source envelopes, association fields and terminal
+receipts cannot be rewritten. Logs/audits contain fixed codes and identifiers.
+The new scoped history index supports administrator keyset discovery.
+
+ENQUEUED means delivery to the journal. The existing check worker separately
+journals its single-use provider writes, reconciles uncertainty and rechecks
+current authority/policy before publication. No proposal is approved or merged by
+this dispatcher. Subsequent review/coverage/blocker events, automatic invalidation
+on policy/authority/ref changes, stale-operation resolution, native rule
+verification and the remaining merge workflow remain open. App configuration
+and native rule verification still need an administrator workflow. Real
+GitHub/OIDC integration acceptance and the full specification's other requirements
+remain pending.

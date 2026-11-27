@@ -6,6 +6,7 @@ use specspace_application::review_check_publication::CheckPurpose;
 pub(super) async fn reserve(
     conn: &mut PgConnection,
     intent: &CheckPublicationIntent,
+    delivery: Option<&dispatch::DispatchLease>,
 ) -> Result<Uuid, CheckStoreError> {
     let job = Uuid::new_v4();
     let audit = Uuid::new_v4();
@@ -33,12 +34,12 @@ pub(super) async fn reserve(
         .bind(job).bind(s.organization).bind(s.operation).execute(&mut *conn).await?;
     sqlx::query("INSERT INTO review_check_intents(operation_id,job_id,organization_id,proposal_id,repository_id,actor_id,snapshot_id,
         remote_id,installation_id,app_id,branch,head_sha,target_sha,merge_base_sha,proposal_version,configuration_version,policy_version,
-        fingerprint,evidence_digest,authority_digest,request_hash,purpose,result,report_digest,invalidation_reason,target_run_id,target_operation,audit_id,event_id)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)")
+        fingerprint,evidence_digest,authority_digest,request_hash,purpose,result,report_digest,invalidation_reason,target_run_id,target_operation,audit_id,event_id,source_event,dispatch_worker,dispatch_attempt)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)")
         .bind(s.operation).bind(job).bind(s.organization).bind(s.proposal).bind(s.repository.repository).bind(s.actor).bind(s.snapshot)
         .bind(s.repository.remote_id as i64).bind(s.repository.installation_id as i64).bind(s.app_id as i64).bind(s.branch.as_str()).bind(s.head.as_str()).bind(s.target.as_str()).bind(s.merge_base.as_str())
         .bind(s.proposal_version).bind(s.configuration_version).bind(s.policy_version).bind(&s.fingerprint).bind(&s.evidence_digest).bind(&s.authority_digest).bind(intent.request_hash())
-        .bind(purpose).bind(read::result(intent.result())).bind(report).bind(reason).bind(run).bind(target).bind(audit).bind(event).execute(&mut *conn).await?;
+        .bind(purpose).bind(read::result(intent.result())).bind(report).bind(reason).bind(run).bind(target).bind(audit).bind(event).bind(delivery.map(|v|v.event)).bind(delivery.map(|v|v.worker)).bind(delivery.map(|v|v.attempt)).execute(&mut *conn).await?;
     sqlx::query("INSERT INTO audit_events(id,organization_id,actor_id,action,entity_id,after_ref,operation_id,result) VALUES($1,$2,$3,'REVIEW_CHECK_RESERVED',$4,$5,$6,'QUEUED')")
         .bind(audit).bind(s.organization).bind(s.actor).bind(s.proposal).bind(s.snapshot.to_string()).bind(s.operation).execute(&mut *conn).await?;
     sqlx::query("INSERT INTO outbox(id,organization_id,event_type,entity_id,payload) VALUES($1,$2,'REVIEW_CHECK_QUEUED',$3,$4)")

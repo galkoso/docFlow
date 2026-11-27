@@ -4,6 +4,7 @@ use specspace_application::pr_sync::PrSiteOrigin;
 use specspace_git_adapter::app_auth::GitHubAppKey;
 use specspace_infrastructure::oidc::{Deployment, Oidc};
 use specspace_infrastructure::pr_sync::PrSyncDispatcher;
+use specspace_infrastructure::review_checks::ReviewCheckDispatcher;
 use specspace_infrastructure::secrets;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
@@ -161,6 +162,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     handles.push(tokio::spawn(async move {
         review_worker.run(review_stopped).await
     }));
+    let check_dispatcher = ReviewCheckDispatcher::new(state.review_checks.clone());
+    let dispatch_stopped = stopped.clone();
+    handles.push(tokio::spawn(async move {
+        check_dispatcher.run(dispatch_stopped).await
+    }));
     let check_stopped = stopped.clone();
     handles.push(tokio::spawn(async move {
         check_worker.run(check_stopped).await
@@ -180,7 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         async move { proposal_worker.run(stopped).await },
     ));
     let shutdown_stop = stop.clone();
-    tracing::info!(%address, index_workers = 2, proposal_workers = 1, save_workers=1, comparison_workers=1, review_workers=1, pr_sync_workers=1,review_check_workers=1,pr_dispatchers, "API listening");
+    tracing::info!(%address, index_workers = 2, proposal_workers = 1, save_workers=1, comparison_workers=1, review_workers=1, pr_sync_workers=1,review_check_workers=1,review_check_dispatchers=1,pr_dispatchers, "API listening");
     let result = axum::serve(listener, router(state))
         .with_graceful_shutdown(async move {
             shutdown_signal().await;

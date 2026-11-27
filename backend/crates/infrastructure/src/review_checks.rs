@@ -11,6 +11,8 @@ use specspace_git_adapter::CommitSha;
 use sqlx::{PgConnection, PgPool};
 use std::sync::Arc;
 use uuid::Uuid;
+mod dispatch;
+pub use dispatch::{CheckDispatchWork, ReviewCheckDispatcher};
 mod invalidation;
 mod journal;
 mod read;
@@ -68,6 +70,7 @@ pub struct CheckReservation {
     pub job_id: Uuid,
     pub replayed: bool,
     intent: CheckPublicationIntent,
+    source_event: Option<Uuid>,
 }
 impl CheckReservation {
     pub fn intent(&self) -> &CheckPublicationIntent {
@@ -100,6 +103,17 @@ impl PgReviewChecks {
         snapshot: Uuid,
         operation: Uuid,
     ) -> Result<CheckReservation, CheckStoreError> {
+        self.evaluate_inner(actor, proposal, snapshot, operation, None)
+            .await
+    }
+    async fn evaluate_inner(
+        &self,
+        actor: Uuid,
+        proposal: Uuid,
+        snapshot: Uuid,
+        operation: Uuid,
+        delivery: Option<&dispatch::DispatchLease>,
+    ) -> Result<CheckReservation, CheckStoreError> {
         if [actor, proposal, snapshot, operation]
             .iter()
             .any(Uuid::is_nil)
@@ -116,9 +130,22 @@ impl PgReviewChecks {
             .as_ref()
             .ok_or(CheckStoreError::InvalidRecord)?
             .organization;
+        if delivery.is_some_and(|v| {
+            v.organization != org || v.proposal != proposal || v.event != operation
+        }) {
+            return Err(CheckStoreError::InvalidRecord);
+        }
         let mut conn = self.pool.acquire().await?;
-        if let Some(replay) =
-            read::evaluation(&mut conn, org, actor, proposal, snapshot, operation).await?
+        if let Some(replay) = read::evaluation(
+            &mut conn,
+            org,
+            actor,
+            proposal,
+            snapshot,
+            operation,
+            delivery.map(|v| v.event),
+        )
+        .await?
         {
             return Ok(replay);
         }
@@ -175,8 +202,16 @@ impl PgReviewChecks {
             PgReviewReadiness::capture_in(&mut tx, actor, proposal, snapshot, true, true).await?;
         authorized(&locked)?;
         // A concurrent identical admission wins once; never re-render its proof.
-        if let Some(replay) =
-            read::evaluation(&mut tx, org, actor, proposal, snapshot, operation).await?
+        if let Some(replay) = read::evaluation(
+            &mut tx,
+            org,
+            actor,
+            proposal,
+            snapshot,
+            operation,
+            delivery.map(|v| v.event),
+        )
+        .await?
         {
             tx.commit().await?;
             return Ok(replay);
@@ -187,11 +222,18 @@ impl PgReviewChecks {
         }
         admission_limits(&mut tx, org, actor, proposal, operation).await?;
         journal::connection_cooldown(&mut tx, org, &intent.source().repository).await?;
-        let job_id = reservation::reserve(&mut tx, &intent).await?;
+        if let Some(lease) = delivery {
+            dispatch::fence(&mut tx, lease).await?;
+        }
+        let job_id = reservation::reserve(&mut tx, &intent, delivery).await?;
+        if let Some(lease) = delivery {
+            dispatch::enqueued_in(&mut tx, lease).await?;
+        }
         tx.commit().await?;
         Ok(CheckReservation {
             job_id,
             replayed: false,
+            source_event: delivery.map(|v| v.event),
             intent,
         })
     }

@@ -12,6 +12,7 @@ use sqlx::FromRow;
 #[derive(FromRow)]
 struct Frozen {
     operation_id: Uuid,
+    source_event: Option<Uuid>,
     job_id: Uuid,
     organization_id: Uuid,
     proposal_id: Uuid,
@@ -53,12 +54,14 @@ pub(super) async fn evaluation(
     proposal: Uuid,
     snapshot: Uuid,
     operation: Uuid,
+    source_event: Option<Uuid>,
 ) -> Result<Option<CheckReservation>, CheckStoreError> {
     let Some(receipt) = load(conn, org, operation).await? else {
         return Ok(None);
     };
     let source = receipt.intent.source();
-    if source.actor != actor
+    if receipt.source_event != source_event
+        || source.actor != actor
         || source.proposal != proposal
         || source.snapshot != snapshot
         || !matches!(receipt.intent.purpose(), CheckPurpose::Evaluation { .. })
@@ -148,6 +151,7 @@ pub(super) async fn load(
         .map_err(|_| invalid())?;
     Ok(Some(CheckReservation {
         job_id: row.job_id,
+        source_event: row.source_event,
         replayed: true,
         intent,
     }))

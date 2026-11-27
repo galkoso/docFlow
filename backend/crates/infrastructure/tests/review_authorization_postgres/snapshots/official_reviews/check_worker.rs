@@ -16,6 +16,7 @@ mod invalidation;
 mod recovery;
 
 struct Provider {
+    run_id: u64,
     rows: Mutex<Vec<CheckRun>>,
     creates: AtomicUsize,
     updates: AtomicUsize,
@@ -131,7 +132,7 @@ impl ReviewCheckProvider for Provider {
         );
         let mode = self.mode.load(Ordering::SeqCst);
         let row = CheckRun {
-            id: CheckRunId::new(81).unwrap(),
+            id: CheckRunId::new(self.run_id).unwrap(),
             scope: scope.clone(),
             operation,
             state: CheckState::Pending,
@@ -205,6 +206,7 @@ async fn setup_worker(
         .await
         .unwrap();
     let provider = Arc::new(Provider {
+        run_id: 81,
         rows: Mutex::new(vec![]),
         creates: AtomicUsize::new(0),
         updates: AtomicUsize::new(0),

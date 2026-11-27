@@ -1,4 +1,4 @@
-//! Independent snapshot-publication delivery. Claims/receipts are short DB
+//! Independent review-evidence delivery. Claims/receipts are short DB
 //! transactions; readiness provider reads hold no transaction or delivery lock.
 use super::*;
 use crate::provider_backoff::{self, ConnectionKey};
@@ -117,7 +117,7 @@ async fn claim(
     worker: Uuid,
 ) -> Result<Option<DispatchLease>, CheckStoreError> {
     let mut tx = journal.transaction().await?;
-    let candidate:Option<(Uuid,Uuid,Uuid)>=sqlx::query_as("SELECT e.id,e.organization_id,e.entity_id FROM outbox e LEFT JOIN review_check_dispatch d ON d.event_id=e.id WHERE e.event_type='REVIEW_SNAPSHOT_PUBLISHED' AND (d.event_id IS NULL OR (d.state='WAITING' AND d.next_at<=clock_timestamp()) OR (d.state='RUNNING' AND d.leased_until<=clock_timestamp())) ORDER BY coalesce(d.next_at,d.leased_until,e.created_at),e.created_at,e.id LIMIT 1")
+    let candidate:Option<(Uuid,Uuid,Uuid)>=sqlx::query_as("SELECT e.id,e.organization_id,e.entity_id FROM outbox e LEFT JOIN review_check_dispatch d ON d.event_id=e.id WHERE e.event_type IN ('REVIEW_SNAPSHOT_PUBLISHED','REVIEW_DECISION_RECORDED','REVIEW_UNIT_APPROVED','REVIEW_SOURCE_ACKNOWLEDGED') AND (d.event_id IS NULL OR (d.state='WAITING' AND d.next_at<=clock_timestamp()) OR (d.state='RUNNING' AND d.leased_until<=clock_timestamp())) ORDER BY coalesce(d.next_at,d.leased_until,e.created_at),e.created_at,e.id LIMIT 1")
         .fetch_optional(&mut *tx).await?;
     let Some((event, organization, proposal)) = candidate else {
         tx.commit().await?;
@@ -169,7 +169,7 @@ async fn publication(
     conn: &mut PgConnection,
     lease: &DispatchLease,
 ) -> Result<Option<(Uuid, Uuid)>, CheckStoreError> {
-    let row:Option<(Option<Uuid>,Option<Uuid>)>=sqlx::query_as("SELECT CASE WHEN octet_length(payload::text)<=8192 THEN pr_sync_publication_actor(id) END,CASE WHEN payload->>'snapshot_id'~'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' THEN (payload->>'snapshot_id')::uuid END FROM outbox WHERE id=$1 AND organization_id=$2 AND entity_id=$3 AND event_type='REVIEW_SNAPSHOT_PUBLISHED'")
+    let row:Option<(Option<Uuid>,Option<Uuid>)>=sqlx::query_as("SELECT CASE WHEN octet_length(payload::text)<=8192 THEN review_check_event_actor(id) END,CASE WHEN payload->>'snapshot_id'~'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' THEN (payload->>'snapshot_id')::uuid END FROM outbox WHERE id=$1 AND organization_id=$2 AND entity_id=$3 AND event_type IN ('REVIEW_SNAPSHOT_PUBLISHED','REVIEW_DECISION_RECORDED','REVIEW_UNIT_APPROVED','REVIEW_SOURCE_ACKNOWLEDGED')")
         .bind(lease.event).bind(lease.organization).bind(lease.proposal).fetch_optional(conn).await?;
     Ok(match row {
         Some((Some(actor), Some(snapshot))) => Some((actor, snapshot)),

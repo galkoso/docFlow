@@ -299,10 +299,28 @@ rolls back the check reservation. Source envelopes, association fields and termi
 receipts cannot be rewritten. Logs/audits contain fixed codes and identifiers.
 The new scoped history index supports administrator keyset discovery.
 
+Migration 034 extends the same dispatcher to `REVIEW_DECISION_RECORDED`,
+`REVIEW_SOURCE_ACKNOWLEDGED` and `REVIEW_UNIT_APPROVED`. Each event must match the
+immutable review, visit/delivery/attempt or individual approval record by its
+stored event ID, exact organization/proposal, payload and audit. The original
+reviewer becomes the publication actor and must still have current authority.
+Copying a legitimate payload into another event grants no authority. A live
+delivery lease cannot substitute the proposal owner for the reviewer.
+
+These events trigger a fresh full readiness calculation, including current
+independent votes and section coverage. They do not contribute a trusted result
+from the envelope. Independent votes can advance pending to success; a later
+request for changes produces failure. Visits and individual section approvals
+remain distinct from proposal approval. Every evaluation retains its own source
+event operation ID and provider Check Run; earlier runs never satisfy a later
+operation. Events wait while the proposal's check lane is occupied. Unstarted
+stale work stops without provider writes so a due event can retry; a started
+uncertain operation still requires the existing reconciliation/recovery path.
+
 ENQUEUED means delivery to the journal. The existing check worker separately
 journals its single-use provider writes, reconciles uncertainty and rechecks
 current authority/policy before publication. No proposal is approved or merged by
-this dispatcher. Subsequent review/coverage/blocker events, automatic invalidation
+this dispatcher. Discussion/question blocker events, automatic invalidation
 on policy/authority/ref changes, stale-operation resolution, native rule
 verification and the remaining merge workflow remain open. App configuration
 and native rule verification still need an administrator workflow. Real

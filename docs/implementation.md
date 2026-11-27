@@ -2941,3 +2941,29 @@ Checkboxes represent verified work only.
   coverage and blocker events, automatic negative invalidation, stale-operation
   resolution, native enforcement, final APPROVED/merge, real GitHub/OIDC acceptance
   and the remaining full specification stay open.
+
+- Automatic check refresh after review evidence: migration 034 extends the
+  existing independently leased dispatcher to official decisions, explicit source
+  acknowledgements and individual section approvals. A canonical database
+  verifier resolves the original reviewer only from the exact immutable source
+  record, event ID, payload, organization/proposal and matching audit; copied or
+  forged envelopes grant no authority. Admission and publication retain all
+  current-actor, ref, policy, source, quota and lease checks. Fresh independent
+  votes can advance pending to success and a later request for changes to failure.
+  Each event has its own operation and provider run; discovery includes earlier
+  runs without borrowing their outcome. Visits/section approvals do not approve
+  the proposal. Busy events retain timed retries, and stale unstarted work stops
+  without provider writes so the next due evaluation can enter the lane. Six new
+  PostgreSQL scenarios exercise those transitions, authentic visit/approval
+  delivery, forged source rejection, actor loss/supersession, direct SQL actor
+  substitution under a live lease and retry after lane release. All 880 backend
+  tests pass with the same two performance tests ignored; workspace Clippy with
+  warnings denied, formatting, runtime builds and exact OpenAPI export comparison
+  pass. Migration 034 is applied locally, its ledger entry, verifier and index
+  are verified, and reruns cleanly. The existing API remains ready but has not
+  been restarted to load the updated dispatcher. Browser discovery still returns
+  no connected browser; physical accessibility/RTL/narrow-screen acceptance is
+  unverified. Discussion and
+  product-question events, automatic policy/authority/ref invalidation, started
+  stale-operation resolution, native enforcement, final APPROVED/merge, real
+  GitHub/OIDC acceptance and the remaining full specification stay open.

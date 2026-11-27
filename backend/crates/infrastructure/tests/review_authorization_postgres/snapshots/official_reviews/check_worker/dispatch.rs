@@ -3,6 +3,8 @@ use serde_json::json;
 use specspace_infrastructure::review_checks::{
     CheckDispatchWork as D, CheckStoreError as E, ReviewCheckDispatcher,
 };
+#[path = "dispatch/evidence.rs"]
+mod evidence;
 struct Frame {
     f: Fixture,
     git: Arc<Source>,
@@ -24,6 +26,7 @@ async fn prepared(pool: &PgPool, approved: bool) -> Frame {
 }
 fn provider(pool: &PgPool, f: &Frame) -> Arc<Provider> {
     Arc::new(Provider {
+        run_id: 81,
         rows: Mutex::new(vec![]),
         creates: AtomicUsize::new(0),
         updates: AtomicUsize::new(0),
@@ -57,6 +60,16 @@ async fn saved_snapshot_dispatches_and_publishes_one_pending_or_success_check_wi
             }
             v => panic!("{v:?}"),
         };
+        // The two real approval events also become delivery candidates. While
+        // the snapshot check owns the lane they retain independent timed retries.
+        if approved {
+            for _ in 0..2 {
+                assert!(matches!(
+                    dispatcher.run_once().await.unwrap(),
+                    D::Deferred(_)
+                ));
+            }
+        }
         assert_eq!(dispatcher.run_once().await.unwrap(), D::Idle);
         assert_eq!(
             dispatch_state(&pool, f.event).await,
